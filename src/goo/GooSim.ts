@@ -10,6 +10,8 @@
  * Simulation runs in frame units: velocities are px/frame at 60 Hz, dt = 1.
  */
 
+import { ALPHA_SOLID, type AlphaMask } from './alphaMask';
+
 export const enum PState {
   Free = 0,
   Stuck = 1, // glued to a collider (a victim), slowly dripping down
@@ -46,6 +48,16 @@ export interface Collider {
   vx: number; // px/frame, for friction / stuck-follow
   vy: number;
   sticky: boolean;
+  /**
+   * Sprite silhouette (center-origin) for pixel-accurate stick/drip.
+   * Absent → plain AABB behavior. The owner keeps this pointing at the
+   * *currently displayed* texture, so a reaction-frame swap moves the
+   * silhouette and shakes loose any goo left hanging in mid-air.
+   */
+  mask?: AlphaMask;
+  scaleX?: number;
+  scaleY?: number;
+  flipX?: boolean;
   onHit?: (p: Particle, impactSpeed: number) => void;
 }
 
@@ -66,7 +78,7 @@ export interface GooParams {
 }
 
 export const DEFAULT_PARAMS: GooParams = {
-  h: 26,
+  h: 20,
   gravity: 0.42,
   restDensity: 4.0,
   stiffness: 0.035,
@@ -74,7 +86,7 @@ export const DEFAULT_PARAMS: GooParams = {
   viscSigma: 0.04,
   viscBeta: 0.12,
   airEntrainX: 0.02,
-  maxParticles: 550,
+  maxParticles: 750,
   settleFrames: 110,
   fadeFrames: 45,
   stickSpeed: 2.2,
@@ -94,6 +106,8 @@ export class GooSim {
 
   private grid = new Map<number, number[]>();
   private pool: Particle[] = [];
+  /** aperiodic 0–1 random walk driving shade wander along the emitted stream */
+  private shadeK = Math.random();
 
   constructor(params: Partial<GooParams> = {}) {
     this.params = { ...DEFAULT_PARAMS, ...params };
@@ -109,8 +123,14 @@ export class GooSim {
       p.vy = vy + (Math.random() - 0.5) * 1.2;
       p.px = p.x - p.vx;
       p.py = p.y - p.vy;
-      p.r = 4.5 + Math.random() * 2;
-      p.tint = tint;
+      p.r = 3.0 + Math.random() * 1.6;
+      // low-frequency shade wander + per-drop jitter: darker bands streak
+      // through the flow, so the merged mass reads as marbled guano rather
+      // than uniform cream foam (per-drop noise alone averages away).
+      // Random walk, not a sine — periodic bands read as caterpillar segments.
+      this.shadeK += (Math.random() - 0.5) * 0.14;
+      this.shadeK = this.shadeK < 0 ? -this.shadeK : this.shadeK > 1 ? 2 - this.shadeK : this.shadeK;
+      p.tint = shadeToward(tint, 0x332c22, this.shadeK * 0.5 + Math.random() * 0.15);
       p.state = PState.Free;
       p.age = 0;
       p.settled = 0;
@@ -138,9 +158,25 @@ export class GooSim {
         this.unstick(p);
         continue;
       }
-      p.sy += P.dripSlide;
-      p.x = c.x + p.sx;
-      p.y = c.y + p.sy;
+      // heavier drops slide faster, so a splat streaks apart as it runs down
+      const nsy = p.sy + P.dripSlide * (p.r / 3.5);
+      const nx = c.x + p.sx;
+      const ny = c.y + nsy;
+      if (c.mask && !maskSolid(c, nx, ny)) {
+        // slid past the silhouette's lower edge (chin, hem, fingertip) — or the
+        // reaction frame moved the body out from under it — fall as a drip
+        this.unstick(p);
+        p.x = nx;
+        p.y = ny;
+        p.vx = c.vx;
+        p.vy = Math.max(c.vy, 0) + 0.5;
+        p.px = p.x - p.vx;
+        p.py = p.y - p.vy;
+        continue;
+      }
+      p.sy = nsy;
+      p.x = nx;
+      p.y = ny;
       p.px = p.x - c.vx;
       p.py = p.y - c.vy;
       if (p.sy > c.hh + 2) {
@@ -360,16 +396,30 @@ export class GooSim {
         const dx = p.x - c.x;
         const dy = p.y - c.y;
         if (Math.abs(dx) > c.hw + p.r * 0.5 || Math.abs(dy) > c.hh + p.r * 0.5) continue;
+        // narrowphase: inside the box but off the drawn body (over a shoulder,
+        // between the legs) — fly straight through
+        if (c.mask && !maskSolid(c, p.x, p.y)) continue;
         const vRelX = p.x - p.px - c.vx;
         const vRelY = p.y - p.py - c.vy;
         const impact = Math.hypot(vRelX, vRelY);
         if (c.sticky && impact > P.stickSpeed) {
           p.state = PState.Stuck;
           p.stickId = c.id;
-          p.sx = Phaser_clamp(dx, -c.hw, c.hw);
-          p.sy = Phaser_clamp(dy, -c.hh, c.hh);
+          p.sx = c.mask ? dx : Phaser_clamp(dx, -c.hw, c.hw);
+          p.sy = c.mask ? dy : Phaser_clamp(dy, -c.hh, c.hh);
           p.age = 0;
           c.onHit?.(p, impact);
+        } else if (c.mask) {
+          // slow contact: perch on the silhouette — back out to the first clear
+          // texel above, then damp like a ground landing
+          const vyOld = p.y - p.py;
+          const vxOld = p.x - p.px;
+          let lift = 0;
+          const maxLift = p.r * 2 + 4;
+          while (lift < maxLift && maskSolid(c, p.x, p.y - lift)) lift += 2;
+          p.y -= lift;
+          p.py = p.y + vyOld * 0.15;
+          p.px = p.x - (c.vx + (vxOld - c.vx) * 0.35);
         } else {
           // shallow push-out along the smaller penetration axis
           const penX = c.hw + p.r * 0.5 - Math.abs(dx);
@@ -384,4 +434,23 @@ export class GooSim {
 
 function Phaser_clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** Mix a 0xRRGGBB colour toward a target by factor k. */
+function shadeToward(tint: number, target: number, k: number): number {
+  const r = ((tint >> 16) & 0xff) + (((target >> 16) & 0xff) - ((tint >> 16) & 0xff)) * k;
+  const g = ((tint >> 8) & 0xff) + (((target >> 8) & 0xff) - ((tint >> 8) & 0xff)) * k;
+  const b = (tint & 0xff) + ((target & 0xff) - (tint & 0xff)) * k;
+  return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+}
+
+/** Is the world-space point on an opaque texel of the collider's sprite? */
+function maskSolid(c: Collider, wx: number, wy: number): boolean {
+  const m = c.mask!;
+  let tx = (wx - c.x) / (c.scaleX ?? 1);
+  if (c.flipX) tx = -tx;
+  const px = (tx + m.w / 2) | 0;
+  const py = ((wy - c.y) / (c.scaleY ?? 1) + m.h / 2) | 0;
+  if (px < 0 || py < 0 || px >= m.w || py >= m.h) return false;
+  return m.data[py * m.w + px] >= ALPHA_SOLID;
 }

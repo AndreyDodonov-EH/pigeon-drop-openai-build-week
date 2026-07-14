@@ -16,8 +16,6 @@ export function buildTextures(scene: Phaser.Scene): void {
   buildings(scene, 'bg-near', 0x5c6480, 0x515970, 260, 420, true);
   street(scene);
   shadow(scene);
-  pedestrians(scene);
-  cars(scene);
 }
 
 function sky(scene: Phaser.Scene): void {
@@ -90,58 +88,3 @@ function shadow(scene: Phaser.Scene): void {
   sg.destroy();
 }
 
-const SHIRTS = [0xc75b4a, 0x4a8ac7, 0x5aa964, 0xc7a24a, 0x9a5ac7];
-const SKIN = [0xe8b890, 0xc98d5f, 0x8d5f3f];
-
-function pedestrians(scene: Phaser.Scene): void {
-  for (let v = 0; v < 3; v++) {
-    const g = scene.add.graphics();
-    const shirt = SHIRTS[(Math.random() * SHIRTS.length) | 0];
-    const skin = SKIN[(Math.random() * SKIN.length) | 0];
-    // legs
-    g.fillStyle(0x33384a, 1);
-    g.fillRect(8, 36, 6, 20);
-    g.fillRect(16, 36, 6, 20);
-    // torso
-    g.fillStyle(shirt, 1);
-    g.fillRect(5, 16, 20, 22);
-    // arms
-    g.fillRect(1, 18, 5, 16);
-    g.fillRect(24, 18, 5, 16);
-    // head
-    g.fillStyle(skin, 1);
-    g.fillCircle(15, 8, 8);
-    // hair
-    g.fillStyle(0x2b2420, 1);
-    g.fillRect(8, 0, 14, 4);
-    g.generateTexture(`ped-${v}`, 30, 56);
-    g.destroy();
-  }
-}
-
-const CAR_COLORS = [0xb0473c, 0x3c6cb0, 0xc4b73a];
-
-function cars(scene: Phaser.Scene): void {
-  for (let v = 0; v < 2; v++) {
-    const g = scene.add.graphics();
-    const col = CAR_COLORS[(Math.random() * CAR_COLORS.length) | 0];
-    // body
-    g.fillStyle(col, 1);
-    g.fillRoundedRect(0, 16, 120, 24, 8);
-    // cabin
-    g.fillRoundedRect(24, 2, 62, 22, { tl: 10, tr: 10, bl: 0, br: 0 });
-    // windows
-    g.fillStyle(0xbcd6e4, 1);
-    g.fillRoundedRect(30, 6, 24, 14, 3);
-    g.fillRoundedRect(58, 6, 22, 14, 3);
-    // wheels
-    g.fillStyle(0x22242b, 1);
-    g.fillCircle(26, 42, 9);
-    g.fillCircle(94, 42, 9);
-    g.fillStyle(0x8b8f9a, 1);
-    g.fillCircle(26, 42, 4);
-    g.fillCircle(94, 42, 4);
-    g.generateTexture(`car-${v}`, 120, 52);
-    g.destroy();
-  }
-}
