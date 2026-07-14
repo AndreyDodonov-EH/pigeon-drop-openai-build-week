@@ -1,0 +1,20 @@
+{
+  "name": "shitting-pigeon",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4"
+  }
+}
