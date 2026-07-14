@@ -104,6 +104,14 @@ extending a set — consistency depends on it.
   >
   > After generating, save the PNG to assets/masters/cars-sheet.png in the workspace and reply with the absolute path of the saved file.
 
+## public/assets/portraits/panic.png — 2026-07-14
+
+- **References attached:** `images/normal.png`, `images/damage_taken.png`, `public/assets/portraits/strain.png`
+- **Tool:** `codex exec` built-in image generation; one-shot, no retries; pngquant 256 after accept
+- **Used for:** pre-blowout telegraph + blowout portrait state (meter ≥ 92 / dumping)
+- **Prompt:**
+  > The attached images are portraits of the same cartoon pigeon character (game HUD portraits, circular bust on warm tan circle over black background, thick clean outlines, orange eyes, purple eye patches, black scruffy brows, iridescent green-purple neck feathers). The third image is the 'straining mid-poop' state of this series. Generate a NEW portrait of the SAME character in the SAME style and composition: the 'PANIC — about to involuntarily burst' state. The pigeon has held it in far too long and is a split second from an uncontrollable blowout: beak wide OPEN in alarm, eyes bulging huge (small shrunken orange pupils), cheeks puffed out to bursting, two or three comic sweat drops flying off the head, faint trembling motion lines around the cheeks. Clearly MORE alarmed than the straining reference — this is panic, not effort; comic and absurd, not gross. Keep identical framing: circular warm-tan medallion, black background, head and neck only. Square image, 1024x1024.
+
 ## public/assets/portraits/strain.png — 2026-07-12
 
 - **References attached:** `images/normal.png`, `images/damage_taken.png`

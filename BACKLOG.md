@@ -1,22 +1,18 @@
 # Backlog
 
-## Meter inversion — pressure economy (agreed 2026-07-14, DO NEXT SESSION)
+## Meter inversion — pressure economy (agreed 2026-07-14, CORE SHIPPED 2026-07-14)
 
-Replace the ammo-style meter (drain on poop, passive regen) with digestion pressure;
-no health/HP anywhere. Decisions already made with the user — don't re-litigate:
+Shipped: digestion-pressure economy (passive fill 0.12/frame, poop drains), auto-blowout
+at 100% with telegraph (wobbly flight from meter ≥ 92 + panic portrait; no sound yet),
+scare-poop replacing damage entirely (D key debugs it — wire to real hazards later),
+portrait as a pure prioritized state function with min-hold (battered → panic → strain →
+pleased → normal; flicker fixed), and the gauge reimagined as a ring around the portrait
+(cream → amber ≥ 70% → pulsing red ≥ 88%). New `portrait-panic` art logged in ART_LOG.
 
-- **Fill:** slow passive digestion tick + food pickups for big jumps (bread crusts,
-  fries, kebab; place at varying altitude to lure the player off the safe line).
-- **Full meter = auto-blowout:** at 100% the pigeon involuntarily dumps everything in
-  one huge uncontrolled blast, usually wasted, combo-neutral at best. The approach MUST
-  be clearly telegraphed before it fires: wobbly flight, open-beak pigeon sprite,
-  and sound. (User called the indication "important".)
-- **Hazard hit = scare-poop:** replaces damage/health entirely — involuntary full dump,
-  combo reset, battered portrait. Punishment is wasted pressure, never survival.
-- **Portrait becomes a pure function of state** (fixes flicker: pleasedTimer currently
-  fights pooping frame-by-frame): strict priority battered → panic/blowout → strain
-  (pooping OR meter > ~85%) → pleased (just relieved) → normal, with a minimum hold
-  time per state. Strain-at-high-meter doubles as the urgency warning.
+Still to do from the agreed design:
+- **Food pickups** for big meter jumps (bread crusts, fries, kebab; place at varying
+  altitude to lure the player off the safe line).
+- **Open-beak flight sprite** for the telegraph (portrait + wobble only for now) + sound.
 - Ties into turbo (below): turbo spends meter as rocket fuel — one resource governs
   ammo, boost, and comedy.
 
