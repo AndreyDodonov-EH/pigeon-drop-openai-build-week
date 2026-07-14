@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GooSim, type Collider, type Particle } from '../goo/GooSim';
 import { GooLayer } from '../goo/GooLayer';
+import { getAlphaMask } from '../goo/alphaMask';
 import { buildTextures, W, H, GROUND_Y } from '../world/textures';
 
 const SCROLL = 2.1; // world scroll, px/frame
@@ -10,10 +11,17 @@ interface Victim {
   sprite: Phaser.GameObjects.Sprite;
   collider: Collider;
   kind: 'ped' | 'car';
+  variant: number;
   vx: number; // own velocity, px/frame (screen space handled in update)
   hitCooldown: number;
   bobT: number;
+  reactTimer: number; // frames left showing the reaction texture
 }
+
+// per-variant splat reactions: outraged one-liner + how the sprite acts out
+const PED_LINES = ['MY SUIT!', 'EW EW EW!', 'CONSARN IT!'];
+const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
+const REACT_FRAMES = 90;
 
 export class GameScene extends Phaser.Scene {
   private sim!: GooSim;
@@ -66,6 +74,16 @@ export class GameScene extends Phaser.Scene {
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
+    this.load.image('ped-0', 'assets/sprites/ped-0.png');
+    this.load.image('ped-1', 'assets/sprites/ped-1.png');
+    this.load.image('ped-2', 'assets/sprites/ped-2.png');
+    this.load.image('car-0', 'assets/sprites/car-0.png');
+    this.load.image('car-1', 'assets/sprites/car-1.png');
+    this.load.image('car-2', 'assets/sprites/car-2.png');
+    for (let i = 0; i < 3; i++) {
+      this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
+      this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
+    }
   }
 
   create(): void {
@@ -210,46 +228,61 @@ export class GameScene extends Phaser.Scene {
     const v = (Math.random() * 3) | 0;
     const dir = Math.random() < 0.5 ? -1 : 1;
     const sprite = this.add
-      .sprite(W + 40, GROUND_Y - 28, `ped-${v}`)
+      .sprite(W + 40, 0, `ped-${v}`)
+      .setScale(0.5)
       .setDepth(5)
-      .setFlipX(dir < 0);
+      .setFlipX(dir > 0);
+    sprite.setY(GROUND_Y - sprite.displayHeight / 2);
     this.victims.push({
       sprite,
       kind: 'ped',
+      variant: v,
       vx: dir * (0.3 + Math.random() * 0.5),
       hitCooldown: 0,
       bobT: Math.random() * 10,
+      reactTimer: 0,
       collider: {
         id: this.nextColliderId++,
         x: sprite.x,
         y: sprite.y,
-        hw: 15,
-        hh: 28,
+        // full-sprite broadphase; the alpha mask is the narrow test now
+        hw: sprite.displayWidth / 2,
+        hh: sprite.displayHeight / 2,
         vx: 0,
         vy: 0,
         sticky: true,
+        mask: getAlphaMask(this, `ped-${v}`),
+        scaleX: sprite.scaleX,
+        scaleY: sprite.scaleY,
+        flipX: dir > 0,
       },
     });
   }
 
   private spawnCar(): void {
-    const v = (Math.random() * 2) | 0;
-    const sprite = this.add.sprite(W + 80, GROUND_Y + 6, `car-${v}`).setDepth(5).setFlipX(true);
+    const v = (Math.random() * 3) | 0;
+    const sprite = this.add.sprite(W + 80, 0, `car-${v}`).setScale(0.5).setDepth(5);
+    sprite.setY(GROUND_Y + 32 - sprite.displayHeight / 2);
     this.victims.push({
       sprite,
       kind: 'car',
+      variant: v,
       vx: -(1.6 + Math.random() * 1.2),
       hitCooldown: 0,
       bobT: 0,
+      reactTimer: 0,
       collider: {
         id: this.nextColliderId++,
         x: sprite.x,
         y: sprite.y,
-        hw: 58,
-        hh: 24,
+        hw: sprite.displayWidth / 2,
+        hh: sprite.displayHeight / 2,
         vx: 0,
         vy: 0,
         sticky: true,
+        mask: getAlphaMask(this, `car-${v}`),
+        scaleX: sprite.scaleX,
+        scaleY: sprite.scaleY,
       },
     });
   }
@@ -269,14 +302,23 @@ export class GameScene extends Phaser.Scene {
     for (const v of this.victims) {
       const screenVx = v.vx - SCROLL;
       v.sprite.x += screenVx * f;
+      if (v.reactTimer > 0) {
+        v.reactTimer -= f;
+        if (v.reactTimer <= 0) v.sprite.setTexture(`${v.kind}-${v.variant}`);
+      }
       if (v.kind === 'ped') {
         v.bobT += 0.25 * f;
-        v.sprite.y = GROUND_Y - 28 + Math.abs(Math.sin(v.bobT)) * -3;
+        v.sprite.y = GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * -3;
+      } else {
+        v.sprite.y = GROUND_Y + 32 - v.sprite.displayHeight / 2;
       }
       v.collider.x = v.sprite.x;
       v.collider.y = v.sprite.y;
       v.collider.vx = screenVx * f;
       v.collider.vy = 0;
+      // track the displayed frame: a reaction-frame swap moves the silhouette,
+      // so goo left hanging over a swung arm shakes loose on its own
+      v.collider.mask = getAlphaMask(this, v.sprite.texture.key);
       v.hitCooldown -= f;
       v.collider.onHit = (p: Particle, impact: number) => this.onSplat(v, p, impact);
     }
@@ -304,13 +346,32 @@ export class GameScene extends Phaser.Scene {
     const label = v.kind === 'car' ? 'DING!' : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
     this.popup(v.sprite.x, v.sprite.y - 46, `${label} +${pts}`);
 
+    // outraged reaction frame, reverted by updateVictims after REACT_FRAMES
+    v.sprite.setTexture(`${v.kind}-${v.variant}-r`);
+    v.reactTimer = REACT_FRAMES;
+
     if (v.kind === 'ped') {
-      // indignant hop
-      this.tweens.add({ targets: v.sprite, y: v.sprite.y - 14, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
-      this.popup(v.sprite.x + 18, v.sprite.y - 70, '@#$%!', '#ff8a5c', 15);
+      // jogger shudders, the others shake fist/cane (y is owned by the bob update — don't tween it)
+      const wiggle = v.variant === 1 ? 5 : 9;
+      this.tweens.add({
+        targets: v.sprite,
+        angle: { from: -wiggle, to: wiggle },
+        duration: 80,
+        yoyo: true,
+        repeat: 3,
+        onComplete: () => v.sprite.setAngle(0),
+      });
+      this.popup(v.sprite.x + 18, v.sprite.y - 70, PED_LINES[v.variant], '#ff8a5c', 15);
     } else {
-      this.tweens.add({ targets: v.sprite, scaleY: 0.92, duration: 70, yoyo: true });
-      this.popup(v.sprite.x - 30, v.sprite.y - 40, 'HONK!', '#ffd34e', 15);
+      // suspension dip; the van wobbles twice
+      this.tweens.add({
+        targets: v.sprite,
+        scaleY: v.sprite.scaleY * 0.9,
+        duration: 70,
+        yoyo: true,
+        repeat: v.variant === 2 ? 2 : 0,
+      });
+      this.popup(v.sprite.x - 30, v.sprite.y - 40, CAR_LINES[v.variant], '#ffd34e', 15);
     }
   }
 
@@ -345,7 +406,8 @@ export class GameScene extends Phaser.Scene {
 
     if (pooping) {
       this.meter = Math.max(0, this.meter - 0.45 * f);
-      this.emitCarry += 0.9 * f;
+      // finer drops → higher rate to keep the stream's volume
+      this.emitCarry += 1.6 * f;
       const n = Math.floor(this.emitCarry);
       this.emitCarry -= n;
       if (n > 0) {

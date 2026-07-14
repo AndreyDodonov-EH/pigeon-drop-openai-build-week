@@ -5,7 +5,7 @@ import type { Particle } from './GooSim';
 const STAMP_KEY = 'goo-stamp';
 const STAMP_SIZE = 64;
 /** visual stamp radius vs. physical particle radius — overlap makes blobs merge */
-const STAMP_SCALE = 2.3;
+const STAMP_SCALE = 2.7;
 
 /**
  * Draws the particle field into a RenderTexture each frame and runs the
@@ -37,7 +37,11 @@ export class GooLayer {
     for (const p of particles) {
       const visR = p.r * STAMP_SCALE * p.fade;
       if (visR <= 0.5) continue;
-      this.stamp.setScale((visR * 2) / STAMP_SIZE);
+      const s = (visR * 2) / STAMP_SIZE;
+      // settled drops squash into wide flat ribbons, so street trails merge
+      // into a smooth puddle line instead of a caterpillar of round humps
+      const sq = Math.min(p.settled / 40, 1) * 0.4;
+      this.stamp.setScale(s * (1 + sq * 0.9), s * (1 - sq));
       this.stamp.setTint(p.tint);
       rt.batchDraw(this.stamp, p.x, p.y);
     }

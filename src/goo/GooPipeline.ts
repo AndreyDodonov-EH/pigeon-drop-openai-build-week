@@ -33,7 +33,7 @@ void main() {
 
   // darker, denser-looking rim near the surface
   float interior = smoothstep(EDGE1, EDGE1 + 0.22, a);
-  vec3 col = mix(base * 0.62, base, interior);
+  vec3 col = mix(base * 0.52, base, interior);
 
   // gradient of the field ~ surface normal; light from upper-left
   float aR = texture2D(uMainSampler, outTexCoord + vec2(uTexel.x * 2.0, 0.0)).a;
@@ -42,8 +42,8 @@ void main() {
   float gl = length(grad);
   vec2 n = grad / max(gl, 0.0001);
   float spec = clamp(dot(n, normalize(vec2(-0.55, -0.84))), 0.0, 1.0);
-  spec = pow(spec, 3.0) * smoothstep(0.0, 0.06, gl) * interior;
-  col += spec * 0.38;
+  spec = pow(spec, 4.0) * smoothstep(0.0, 0.06, gl) * interior;
+  col += spec * 0.10;
 
   // premultiplied output
   gl_FragColor = vec4(col * body, body * 0.96);
