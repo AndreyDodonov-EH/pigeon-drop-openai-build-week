@@ -104,6 +104,57 @@ extending a set — consistency depends on it.
   >
   > After generating, save the PNG to assets/masters/cars-sheet.png in the workspace and reply with the absolute path of the saved file.
 
+## assets/masters/hydrant-sheet.png → public/assets/sprites/hydrant-{0,1}.png — 2026-07-15
+
+- **References attached:** `images/normal.png`, `public/assets/portraits/strain.png` (style only — no pigeon in the render)
+- **Tool:** `codex exec` built-in image generation (master 1774×887, two 887×887 panels); one-shot, no retries
+- **Post-processing:** key whole sheet (`-fuzz 12% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`) → crop halves → `-trim +repage` → uniform `-resize 16%` → pad BOTH frames to a common 96×125 canvas with `-background none -gravity south -extent 96x125` (base on the bottom edge, so the in-game texture swap never shifts the sprite; the burst frame's floating cap needs the extra headroom) → pngquant. Neck opening sits ≈46 px above the base at the rendered setScale(0.5) — `GameScene` hardcodes this as the water-jet anchor.
+- **Panel semantics:** hydrant-0 = idle (cap on), hydrant-1 = burst (cap blown off, tumbling above, open neck; NO water — the jet is drawn in code)
+- **Prompt:**
+  > The attached images are HUD portraits from a cartoon game and define its ART STYLE: thick clean dark outlines, painterly cel shading, warm slightly desaturated palette, comic/absurdist tone. Do NOT draw the pigeon — these references are style only.
+  >
+  > Generate a FIRE HYDRANT HAZARD SPRITE SHEET for this game, in that SAME art style (same outline weight, same cel shading). It is a squat, chunky, slightly battered red city fire hydrant with a comic personality — worn paint, a couple of chipped scuffs, brass-yellow side caps and top cap. NOT sleek or realistic.
+  >
+  > Composition: wide landscape image, divided into exactly TWO equal side-by-side panels. Each panel shows the SAME hydrant in flat side/front view, base near (but not touching) the bottom of the panel. The hydrant's body, size, colors and position must be IDENTICAL in both panels — only the top differs:
+  > - Panel 1 (left): intact idle hydrant, top cap firmly on.
+  > - Panel 2 (right): the SAME hydrant the instant its top cap has BLOWN OFF — the little brass top cap tumbling in the air just above it, the open neck exposed, two or three small comic motion lines around the neck. Do NOT draw any water or spray — the game renders the water jet separately.
+  >
+  > Background: the ENTIRE background must be solid flat pure magenta #ff00ff — no gradients, no ground shadows, no panel divider lines, no outlines touching the image edges. Just the two hydrants evenly spaced on flat magenta, never touching the image edges.
+
+## assets/masters/water-tile-sheet.png → public/assets/sprites/water-col.png — 2026-07-15
+
+- **References attached:** `images/normal.png`, `public/assets/portraits/strain.png` (style only — no pigeon in the render)
+- **Tool:** `codex exec` built-in image generation (master 1254×1254, full-bleed tile); one-shot, no retries
+- **Post-processing:** crop a 350×900 portrait region out of the master → `-roll +0+450` to relocate the top/bottom wrap seam to the vertical center → blur a 350×40 band at the new seam (`-region ... -blur 0x6`) so the repeat reads clean when scrolled → non-uniform `-resize 40x108!` down to game size → pngquant. Opaque RGB, no alpha — `GameScene` applies alpha/scale in code.
+- **Used for:** the hydrant water jet's shaft. Rendered as a `TileSprite` (`water-col`) anchored bottom-up at the hydrant's neck, height driven every frame by `jetH`, `tilePositionY` scrolled continuously for flow. Replaces the earlier code-only `fillRect` band loop.
+- **Prompt:**
+  > The attached images are HUD portraits from a cartoon game and define its ART STYLE: thick clean dark outlines, painterly cel shading, warm slightly desaturated palette, comic/absurdist tone. Do NOT draw the pigeon or any character — these references are for STYLE ONLY (line weight, shading technique).
+  >
+  > Generate a SEAMLESSLY TILEABLE water texture tile for a fire-hydrant water-jet effect in this same cartoon art style. Square image, texture fills the ENTIRE frame edge-to-edge (no background, no border, no vignette — the texture must bleed off all four sides since it will be tiled).
+  >
+  > Content: a vertical column of rushing water rendered in cel-shaded cartoon style — pale sky-blue base (#a8dcf2) with brighter near-white highlight streaks (#e6f6fd) running vertically, a few small cartoon bubble/foam ellipses with thick dark outlines, subtle horizontal banding suggesting turbulent flow. Keep the linework graphic/flat (2-3 shading tones per streak), not photoreal or gradient-heavy.
+  >
+  > CRITICAL: the pattern must tile seamlessly when repeated top-to-bottom and left-to-right — whatever appears at the very top edge must continue naturally from the very bottom edge, and the left edge must continue from the right edge, with no visible seam, no vignette darkening at edges, and no single centered focal element.
+  >
+  > Save the PNG to assets/masters/water-tile-sheet.png in the workspace and reply with the absolute path of the saved file.
+
+## assets/masters/water-splash-sheet.png → public/assets/sprites/water-crown.png — 2026-07-15
+
+- **References attached:** `images/normal.png`, `public/assets/portraits/strain.png` (style only — no pigeon in the render)
+- **Tool:** `codex exec` built-in image generation (master 1254×1254); one-shot, no retries (Codex self-corrected an off-key magenta field with an `-fx` recolor pass before handing off)
+- **Post-processing:** key (`-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`) → `-trim +repage` → `-resize 96x96` → pngquant. Verified transparent corners, no magenta fringe.
+- **Used for:** the splash/crown sitting atop the water jet. Rendered as an `Image` (`water-crown`) positioned at the jet's current top, scaled 0.1→0.44 as `jetH` grows so it swells in with the burst and collapses back down with it, with a slight alpha/scale wobble for life.
+- **Prompt:**
+  > The attached images are HUD portraits from a cartoon game and define its ART STYLE: thick clean dark outlines, painterly cel shading, warm slightly desaturated palette, comic/absurdist tone. Do NOT draw the pigeon or any character — these references are for STYLE ONLY.
+  >
+  > Generate a WATER SPLASH/SPRAY CROWN sprite for a fire hydrant's water jet, in that same cartoon style. This is the fan of droplets and foam that bursts out the top of a vertical water column. Square image, the splash/spray shape centered and fully visible, NOT touching the image edges.
+  >
+  > Content: a cartoon burst of pale sky-blue (#a8dcf2) water droplets and a few brighter near-white (#e6f6fd) highlight droplets, radiating outward and slightly upward in an asymmetric spray, thick dark clean outlines around each droplet, 2-3 tone cel shading, comic energy lines optional. No column/stem below it — just the spray burst itself.
+  >
+  > Background: the ENTIRE background must be solid flat pure magenta #ff00ff — no gradients, no shadows, no other elements. Just the splash burst on flat magenta, never touching the image edges.
+  >
+  > Save the PNG to assets/masters/water-splash-sheet.png in the workspace and reply with the absolute path of the saved file.
+
 ## public/assets/portraits/panic.png — 2026-07-14
 
 - **References attached:** `images/normal.png`, `images/damage_taken.png`, `public/assets/portraits/strain.png`
