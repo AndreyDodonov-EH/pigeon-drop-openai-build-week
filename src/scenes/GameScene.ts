@@ -502,7 +502,12 @@ export class GameScene extends Phaser.Scene {
       const capY = GROUND_Y - 46;
 
       h.timer -= f;
-      if (h.state === 'idle' && h.timer <= 0) {
+      // guaranteed threat: instead of a random idle cycle (which let hydrants
+      // drift across without ever erupting), each hydrant bursts exactly once,
+      // triggered when the scroll brings it to a fixed distance ahead of the
+      // pigeon — warn (65f ≈ 137px of travel) + burst (130f ≈ 273px) then span
+      // the pigeon's x, so the column always crosses the flight line at height
+      if (h.state === 'idle' && !h.splashed && h.sprite.x <= this.pigeon.x + 230) {
         h.state = 'warn';
         h.timer = 65;
         h.sprite.setTexture('hydrant-1');
@@ -512,10 +517,9 @@ export class GameScene extends Phaser.Scene {
         // always tall enough to reach the default cruise line (forces a climb
         // to dodge) but never so tall the ceiling clamp can't out-climb it
         h.jetMaxH = 280 + Math.random() * 70;
-        h.splashed = false;
       } else if (h.state === 'burst' && h.timer <= 0) {
         h.state = 'idle';
-        h.timer = 170 + Math.random() * 220;
+        h.splashed = true; // burst spent — never re-arm
         h.sprite.setTexture('hydrant-0');
       }
 

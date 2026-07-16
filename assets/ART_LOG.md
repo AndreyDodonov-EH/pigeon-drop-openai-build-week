@@ -143,6 +143,10 @@ extending a set — consistency depends on it.
 - **References attached:** `images/normal.png`, `public/assets/portraits/strain.png` (style only — no pigeon in the render)
 - **Tool:** `codex exec` built-in image generation (master 1254×1254); one-shot, no retries (Codex self-corrected an off-key magenta field with an `-fx` recolor pass before handing off)
 - **Post-processing:** key (`-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`) → `-trim +repage` → `-resize 96x96` → pngquant. Verified transparent corners, no magenta fringe.
+- **Whitened 2026-07-17:** the crown's blue droplets clashed with the foamy near-white
+  column (`water-col` foamier revision below). Rebuilt the shipping copy from this master
+  with `-modulate 108,55` (brightness up, saturation halved) inserted before the resize —
+  same key/erode/trim recipe otherwise. Master untouched.
 - **Used for:** the splash/crown sitting atop the water jet. Rendered as an `Image` (`water-crown`) positioned at the jet's current top, scaled 0.1→0.44 as `jetH` grows so it swells in with the burst and collapses back down with it, with a slight alpha/scale wobble for life.
 - **Prompt:**
   > The attached images are HUD portraits from a cartoon game and define its ART STYLE: thick clean dark outlines, painterly cel shading, warm slightly desaturated palette, comic/absurdist tone. Do NOT draw the pigeon or any character — these references are for STYLE ONLY.

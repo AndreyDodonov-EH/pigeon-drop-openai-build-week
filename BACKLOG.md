@@ -53,6 +53,17 @@ clamp (y=56) can still out-climb the tallest jet with ~10px to spare — always 
 you react to the warn telegraph. Possible follow-ups: peds reacting to the water, hydrant
 splash puddle, sound, terrified portrait cue during warn.
 
+**Guaranteed threat (2026-07-17):** the random idle→warn→burst cycle let some hydrants
+scroll across without ever erupting (or erupt far from the pigeon). Replaced with a
+position trigger: each hydrant bursts exactly once, warn starting when the scroll brings it
+to pigeon.x + 230, so warn (65f) + burst (130f) always span the pigeon's x — verified the
+jet is at full height precisely as the column crosses the flight line. `splashed` doubles
+as the spent flag after the burst ends.
+
+**Crown color match (2026-07-17):** the splash crown's blue droplets clashed with the
+near-white foamy column; shipping `water-crown.png` rebuilt from the master desaturated
+and brightened (see ART_LOG).
+
 **Water jet visual upgrade (2026-07-15):** replaced the code-only `fillRect` band loop with
 a `water-col` sprite (seamless tileable texture, `assets/ART_LOG.md`) rendered as a
 `TileSprite` — height driven by `jetH` every frame, `tilePositionY` scrolled continuously
