@@ -6,7 +6,32 @@ import { buildTextures, W, H, GROUND_Y } from '../world/textures';
 
 const SCROLL = 2.1; // world scroll, px/frame
 const GUANO_TINT = 0xf2ecd4;
-const RAINBOW_DURATION = 60 * 10;
+
+// ---- UI palette (string form for text, hex for graphics) ----
+const COLOR_CREAM = '#f3ead8';
+const COLOR_INK = '#1d1f2a'; // outlines/strokes
+const COLOR_AMBER = '#ffd34e';
+const COLOR_PALE_GOLD = '#fff7bd';
+const COLOR_ORANGE = '#ff8a5c'; // outrage lines, blowout
+const COLOR_JOY_GREEN = '#7be07b'; // rainbow-delight reaction lines
+const COLOR_WATER = '#a8dcf2';
+/** red→violet spectrum used by the pickup burst (matches the arc sprite bands) */
+const RAINBOW_COLORS = [0xff5b57, 0xff9d3e, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8];
+
+// ---- sprite scales ----
+const PIGEON_SCALE = 0.38;
+const VICTIM_SCALE = 0.58; // pedestrians and cars
+const HYDRANT_SCALE = 0.5;
+const PICKUP_SCALE = 0.42;
+
+// ---- rainbow pickup tuning ----
+const RAINBOW_DURATION = 60 * 10; // frames of rainbow goo per pickup
+const PICKUP_FIRST_MS = 2500; // first spawn after game start
+const PICKUP_MIN_MS = 12000; // respawn window
+const PICKUP_MAX_MS = 20000;
+/** collection hitbox half-extents around the pigeon */
+const PICKUP_GRAB_X = 40;
+const PICKUP_GRAB_Y = 38;
 
 interface Victim {
   sprite: Phaser.GameObjects.Sprite;
@@ -24,6 +49,7 @@ const PED_LINES = ['MY SUIT!', 'EW EW EW!', 'CONSARN IT!'];
 // rainbow goo delights instead of disgusts — same characters, opposite mood
 const PED_LINES_RAINBOW = ['FABULOUS!', 'SO PRETTY!!', 'HOT DIGGITY!'];
 const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
+const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
 const REACT_FRAMES = 90;
 
 /** cruise line the pigeon starts on (also the altitude it holds hands-off) */
@@ -74,7 +100,7 @@ export class GameScene extends Phaser.Scene {
   private pedTimer = 0;
   private carTimer = 0;
   private hydrantTimer = 4000;
-  private pickupTimer = 2500;
+  private pickupTimer = PICKUP_FIRST_MS;
 
   /** digestion pressure, 0–100: fills passively, spent by pooping, 100 = blowout */
   private meter = 40;
@@ -129,6 +155,7 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
       this.load.image(`ped-${i}-rainbow`, `assets/sprites/ped-${i}-rainbow.png`);
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
+      this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
     this.load.image('hydrant-0', 'assets/sprites/hydrant-0.png');
     this.load.image('hydrant-1', 'assets/sprites/hydrant-1.png');
@@ -157,7 +184,7 @@ export class GameScene extends Phaser.Scene {
     this.sim.worldVx = SCROLL;
     this.gooLayer = new GooLayer(this, W, H, 6);
 
-    this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(0.38);
+    this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
     this.pigeon = this.add.container(240, this.pigeonY, [this.pigeonImg]).setDepth(7);
 
     this.createHud();
@@ -194,8 +221,8 @@ export class GameScene extends Phaser.Scene {
       .text(W - 24, 18, '0', {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '34px',
-        color: '#f3ead8',
-        stroke: '#1d1f2a',
+        color: COLOR_CREAM,
+        stroke: COLOR_INK,
         strokeThickness: 6,
       })
       .setOrigin(1, 0)
@@ -204,8 +231,8 @@ export class GameScene extends Phaser.Scene {
       .text(W - 24, 58, '', {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '20px',
-        color: '#ffd34e',
-        stroke: '#1d1f2a',
+        color: COLOR_AMBER,
+        stroke: COLOR_INK,
         strokeThickness: 4,
       })
       .setOrigin(1, 0)
@@ -215,8 +242,8 @@ export class GameScene extends Phaser.Scene {
       .text(W / 2, 20, '', {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '18px',
-        color: '#fff7bd',
-        stroke: '#1d1f2a',
+        color: COLOR_PALE_GOLD,
+        stroke: COLOR_INK,
         strokeThickness: 5,
       })
       .setOrigin(0.5, 0)
@@ -226,7 +253,7 @@ export class GameScene extends Phaser.Scene {
       .text(16, H - 26, 'HOLD ↑ / SPACE / LMB — climb     HOLD ↓ — dive     HOLD S / RMB — let it rip', {
         fontFamily: 'monospace',
         fontSize: '13px',
-        color: '#f3ead8',
+        color: COLOR_CREAM,
       })
       .setDepth(10)
       .setAlpha(0.75);
@@ -313,7 +340,7 @@ export class GameScene extends Phaser.Scene {
       .circle(x, y, 36, 0xffffff, 0.07)
       .setDepth(6.4)
       .setBlendMode(Phaser.BlendModes.ADD);
-    const sprite = this.add.image(x, y, `pickup-${kind}`).setScale(0.42).setDepth(6.5);
+    const sprite = this.add.image(x, y, `pickup-${kind}`).setScale(PICKUP_SCALE).setDepth(6.5);
     this.pickups.push({ kind, sprite, halo, baseY: y, phase: Math.random() * Math.PI * 2 });
   }
 
@@ -321,7 +348,7 @@ export class GameScene extends Phaser.Scene {
     this.pickupTimer -= deltaMs;
     if (this.pickupTimer <= 0) {
       this.spawnPickup('rainbow');
-      this.pickupTimer = 12000 + Math.random() * 8000;
+      this.pickupTimer = PICKUP_MIN_MS + Math.random() * (PICKUP_MAX_MS - PICKUP_MIN_MS);
     }
 
     this.pickups = this.pickups.filter((p) => {
@@ -331,15 +358,15 @@ export class GameScene extends Phaser.Scene {
       // a rainbow arc hangs in the sky — sway gently instead of coin-spinning
       p.sprite.setAngle(Math.sin(p.phase * 0.8) * 7);
       const pulse = 1 + Math.sin(p.phase * 1.7) * 0.05;
-      p.sprite.setScale(0.42 * pulse);
+      p.sprite.setScale(PICKUP_SCALE * pulse);
       p.halo
         .setPosition(p.sprite.x, p.sprite.y)
         .setScale(0.9 + Math.sin(p.phase * 1.7) * 0.12)
         .setAlpha(0.45 + Math.sin(p.phase * 1.7) * 0.25);
 
       const collected =
-        Math.abs(p.sprite.x - this.pigeon.x) < 40 &&
-        Math.abs(p.sprite.y - this.pigeonY) < 38;
+        Math.abs(p.sprite.x - this.pigeon.x) < PICKUP_GRAB_X &&
+        Math.abs(p.sprite.y - this.pigeonY) < PICKUP_GRAB_Y;
       if (collected) {
         this.collectPickup(p.kind, p.sprite.x, p.sprite.y);
         p.sprite.destroy();
@@ -360,17 +387,16 @@ export class GameScene extends Phaser.Scene {
       case 'rainbow':
         this.rainbowTimer = RAINBOW_DURATION;
         this.rainbowHue = 0;
-        this.popup(x, y - 44, 'RAINBOW GOO!  10s', '#fff7bd', 20);
+        this.popup(x, y - 44, 'RAINBOW GOO!  10s', COLOR_PALE_GOLD, 20);
         this.pickupBurst(x, y);
         break;
     }
   }
 
   private pickupBurst(x: number, y: number): void {
-    const colors = [0xff5b57, 0xff9d3e, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8];
     for (let i = 0; i < 12; i++) {
       const angle = (i / 12) * Math.PI * 2;
-      const dot = this.add.circle(x, y, 5, colors[i % colors.length]).setDepth(9);
+      const dot = this.add.circle(x, y, 5, RAINBOW_COLORS[i % RAINBOW_COLORS.length]).setDepth(9);
       this.tweens.add({
         targets: dot,
         x: x + Math.cos(angle) * (45 + (i % 3) * 8),
@@ -389,7 +415,7 @@ export class GameScene extends Phaser.Scene {
     const dir = Math.random() < 0.5 ? -1 : 1;
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
-      .setScale(0.58)
+      .setScale(VICTIM_SCALE)
       .setDepth(5)
       .setFlipX(dir > 0);
     sprite.setY(GROUND_Y - sprite.displayHeight / 2);
@@ -421,7 +447,7 @@ export class GameScene extends Phaser.Scene {
 
   private spawnCar(): void {
     const v = (Math.random() * 3) | 0;
-    const sprite = this.add.sprite(W + 80, 0, `car-${v}`).setScale(0.58).setDepth(5);
+    const sprite = this.add.sprite(W + 80, 0, `car-${v}`).setScale(VICTIM_SCALE).setDepth(5);
     sprite.setY(GROUND_Y + 32 - sprite.displayHeight / 2);
     this.victims.push({
       sprite,
@@ -448,7 +474,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnHydrant(): void {
-    const sprite = this.add.sprite(W + 40, 0, 'hydrant-0').setScale(0.5).setDepth(5);
+    const sprite = this.add.sprite(W + 40, 0, 'hydrant-0').setScale(HYDRANT_SCALE).setDepth(5);
     sprite.setY(GROUND_Y - sprite.displayHeight / 2);
     const jetCol = this.add
       .tileSprite(sprite.x, sprite.y, 14, 0, 'water-col')
@@ -540,7 +566,7 @@ export class GameScene extends Phaser.Scene {
           h.splashed = true;
           this.scarePoop();
           this.pigeonVy = -5.5; // geyser kick
-          this.popup(this.pigeon.x, this.pigeonY - 52, 'SPLOOSH!!', '#a8dcf2', 22);
+          this.popup(this.pigeon.x, this.pigeonY - 52, 'SPLOOSH!!', COLOR_WATER, 22);
         }
       }
 
@@ -661,8 +687,8 @@ export class GameScene extends Phaser.Scene {
     const pts = base * this.combo;
     this.score += pts;
 
-    // rainbow goo flips the mood: peds get a delighted frame + positive line
-    const joyful = p.rainbow && v.kind === 'ped';
+    // rainbow goo flips the mood: victims get a delighted frame + positive line
+    const joyful = p.rainbow;
 
     const label = v.kind === 'car' ? 'DING!' : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
     this.popup(v.sprite.x, v.sprite.y - 46, `${label} +${pts}`);
@@ -683,27 +709,28 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => v.sprite.setAngle(0),
       });
       const line = joyful ? PED_LINES_RAINBOW[v.variant] : PED_LINES[v.variant];
-      this.popup(v.sprite.x + 18, v.sprite.y - 70, line, joyful ? '#7be07b' : '#ff8a5c', 15);
+      this.popup(v.sprite.x + 18, v.sprite.y - 70, line, joyful ? COLOR_JOY_GREEN : COLOR_ORANGE, 15);
     } else {
-      // suspension dip; the van wobbles twice
+      // suspension dip; the van wobbles twice (a happy car bounces once more)
       this.tweens.add({
         targets: v.sprite,
         scaleY: v.sprite.scaleY * 0.9,
         duration: 70,
         yoyo: true,
-        repeat: v.variant === 2 ? 2 : 0,
+        repeat: (v.variant === 2 ? 2 : 0) + (joyful ? 1 : 0),
       });
-      this.popup(v.sprite.x - 30, v.sprite.y - 40, CAR_LINES[v.variant], '#ffd34e', 15);
+      const line = joyful ? CAR_LINES_RAINBOW[v.variant] : CAR_LINES[v.variant];
+      this.popup(v.sprite.x - 30, v.sprite.y - 40, line, joyful ? COLOR_JOY_GREEN : COLOR_AMBER, 15);
     }
   }
 
-  private popup(x: number, y: number, msg: string, color = '#f3ead8', size = 19): void {
+  private popup(x: number, y: number, msg: string, color = COLOR_CREAM, size = 19): void {
     const t = this.add
       .text(x, y, msg, {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: `${size}px`,
         color,
-        stroke: '#1d1f2a',
+        stroke: COLOR_INK,
         strokeThickness: 5,
       })
       .setOrigin(0.5)
@@ -729,7 +756,7 @@ export class GameScene extends Phaser.Scene {
     // full = involuntary blowout: one huge uncontrolled blast until empty
     if (this.meter >= 100 && this.dumpKind === 'none') {
       this.dumpKind = 'blowout';
-      this.popup(this.pigeon.x, this.pigeonY - 52, 'BLOWOUT!!', '#ff8a5c', 22);
+      this.popup(this.pigeon.x, this.pigeonY - 52, 'BLOWOUT!!', COLOR_ORANGE, 22);
       this.cameras.main.shake(160, 0.003);
     }
 

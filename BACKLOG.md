@@ -33,8 +33,10 @@ this slot in alongside the normal flight frames.
   victims, or hold a persistent goo coat).
 - Higher-value fast targets: quick rollerblader/skater — harder lead, bigger reward.
 - Higher-altitude targets: rooftop party.
-- Fix combo + funny names for combo tiers (like DMC's style ranks, but our shitting ones:
-  e.g. Splat! → Dirty! → Craptacular! → SHITSTORM).
+- Combo ranks instead of the x8 cap (too boring): let the combo climb and show DMC-style
+  rank names as it grows — our shitting ones, e.g. Splat! → Dirty! → Craptacular! →
+  SHITSTORM. Ranks are the reward/spectacle; multiplier can keep scaling or plateau
+  behind the scenes.
 - Chain reactions to create chaos? (one splat triggers the next — startled ped stumbles
   into a car, honk scares more peds…)
 

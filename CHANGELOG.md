@@ -76,11 +76,12 @@ debug/screenshot override, alongside deterministic pickup spawn/timer hooks.
 gently instead of coin-spinning. See `assets/ART_LOG.md` for geometry and the agy-MCP
 inspiration provenance.
 
-**Happy victims (2026-07-17):** rainbow goo flips the pedestrian reaction — each particle
+**Happy victims (2026-07-17):** rainbow goo flips the victim reaction — each particle
 carries a `rainbow` flag (kept pure-hue in the sim, skipping the brown marbling), and a
-rainbow-flagged splat on a ped shows the `ped-N-rainbow` delight frame plus a positive
-line (FABULOUS! / SO PRETTY!! / HOT DIGGITY!) in green instead of the outrage frame.
-Cars still honk either way. The delight sprites (`ped-{0,1,2}-rainbow.png`) were provided
+rainbow-flagged splat shows the `-rainbow` delight frame plus a positive line in green
+instead of the outrage frame. Peds: FABULOUS! / SO PRETTY!! / HOT DIGGITY!; cars (added
+same day): FREE PAINT JOB! / BEEP BEEP JOY! / LOVELY!!, with one extra suspension bounce.
+The delight sprites (`ped-{0,1,2}-rainbow.png`, `car-{0,1,2}-rainbow.png`) were provided
 externally — not logged in ART_LOG.
 
 **Sprite proportions (2026-07-17):** pigeon scale 0.42 → 0.38, pedestrians/cars 0.5 → 0.58;
