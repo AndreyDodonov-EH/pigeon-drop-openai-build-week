@@ -466,9 +466,18 @@ export class GameScene extends Phaser.Scene {
     }
 
     // scrolling flow: the tile's texture slides upward through a box that
-    // grows/shrinks with jetH, so height changes never distort the water
-    h.jetCol.tilePositionY -= 1.4 * f;
-    h.jetCol.setPosition(x, capY).setSize(14 * (1 + Math.sin(t * 2.4) * 0.06), h.jetH).setVisible(true);
+    // grows/shrinks with jetH, so height changes never distort the water.
+    // WebGL pads TileSprite textures to power-of-two dimensions. Scale by
+    // that padded width, not the source PNG width, or the render box clips
+    // the right side of the water texture before it reaches the crown.
+    const jetW = 14 * (1 + Math.sin(t * 2.4) * 0.06);
+    const jetScale = jetW / h.jetCol.potWidth;
+    h.jetCol.tilePositionY -= (1.4 / jetScale) * f;
+    h.jetCol
+      .setPosition(x, capY)
+      .setSize(jetW, h.jetH)
+      .setTileScale(jetScale)
+      .setVisible(true);
 
     // crown rides the jet top, swelling in as the burst reaches full height
     // and collapsing back down with it

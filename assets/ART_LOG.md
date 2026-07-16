@@ -169,3 +169,14 @@ extending a set — consistency depends on it.
 - **Tool:** `codex exec` built-in image generation
 - **Prompt:**
   > The two attached images are portraits of the same cartoon pigeon character (game HUD portraits, circular bust on warm tan circle over black background, thick clean outlines, orange eyes, purple eye patches, black scruffy brows, iridescent green-purple neck feathers). Generate a NEW portrait of the SAME character in the SAME style and composition: the 'straining mid-poop' state — eyes crossed or squeezed, cheeks puffed, gritted beak, veins/effort lines on forehead, comically intense effort. Keep identical framing: circular tan medallion, black background, head and neck only. Square image, 1024x1024.
+
+## water-col.png — foamier revision (2026-07-15)
+
+- **Asset:** `public/assets/sprites/water-col.png` (64×128) — fire-hydrant jet, vertically-scrolling tile
+- **Reason:** previous column read too much like a smooth waterfall sheet; made it foamy/aerated white whitewater.
+- **Master:** `assets/water-col-master.png` (240×648, magenta bg). Old sprite kept at `assets/water-col.prev-waterfall.png`.
+- **Post:** crop central foam core (170px band, `+35+0`), chroma-key `#ff00ff` (fuzz 12%) + 1px erode, alpha `Close Disk:2` to seal pinholes, `-level 0,55%` to firm up the body, `-modulate 108,70` (brighter/whiter). Then made **vertically seamless** for the scrolling `tileSprite`: take the top half and append its vertical flip so the top row == bottom row (no repeat seam / "cut in half" break). Resized to the WebGL-native power-of-two 64×128 canvas so Phaser renders the full tile instead of clipping its NPOT padding, then pngquant. Verified live in-game via Playwright + the `window.SP` debug hook (forced hydrant burst).
+- **References attached:** `public/assets/sprites/water-col.png` (prior version)
+- **Tool:** `codex exec` built-in image generation
+- **Prompt:**
+  > tall vertical column of water blasting straight upward under high pressure out of a fire hydrant … FOAMY and AERATED: churning frothy whitewater packed with bubbles, air pockets and spray … dominantly WHITE / near-white foam, only thin light-blue (#a8dcf2) tint in recessed shadow gaps … cartoon, clean thin dark outlines, painterly cel shading … vertically-scrolling TILING texture, foam tiles seamlessly top→bottom, no cap/base … solid #ff00ff magenta background, ~240×648.
