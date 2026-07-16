@@ -23,6 +23,22 @@ const PED_LINES = ['MY SUIT!', 'EW EW EW!', 'CONSARN IT!'];
 const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const REACT_FRAMES = 90;
 
+/** cruise line the pigeon starts on (also the altitude it holds hands-off) */
+const START_Y = 150;
+
+interface Hydrant {
+  sprite: Phaser.GameObjects.Sprite;
+  collider: Collider;
+  jetCol: Phaser.GameObjects.TileSprite; // scrolling water-column sprite, grows from the cap
+  crown: Phaser.GameObjects.Image; // splash burst sitting atop the column
+  warnFx: Phaser.GameObjects.Graphics; // sputter drops during the warn telegraph
+  state: 'idle' | 'warn' | 'burst';
+  timer: number; // frames until the next state change
+  jetH: number; // current jet height, px above the cap
+  jetMaxH: number; // this burst's full height
+  splashed: boolean; // pigeon already caught by this burst
+}
+
 export class GameScene extends Phaser.Scene {
   private sim!: GooSim;
   private gooLayer!: GooLayer;
@@ -30,7 +46,7 @@ export class GameScene extends Phaser.Scene {
   private pigeon!: Phaser.GameObjects.Container;
   private pigeonImg!: Phaser.GameObjects.Image;
   private pigeonShadow!: Phaser.GameObjects.Image;
-  private pigeonY = 200;
+  private pigeonY = START_Y;
   private pigeonVy = 0;
   private flapPhase = 0;
 
@@ -39,9 +55,11 @@ export class GameScene extends Phaser.Scene {
   private streetTs!: Phaser.GameObjects.TileSprite;
 
   private victims: Victim[] = [];
+  private hydrants: Hydrant[] = [];
   private nextColliderId = 1;
   private pedTimer = 0;
   private carTimer = 0;
+  private hydrantTimer = 4000;
 
   /** digestion pressure, 0–100: fills passively, spent by pooping, 100 = blowout */
   private meter = 40;
@@ -63,7 +81,7 @@ export class GameScene extends Phaser.Scene {
   private emptyLock = false;
   private wobbleT = 0;
 
-  private keys!: Record<'up' | 'up2' | 'poop' | 'poop2' | 'rainbow' | 'damage', Phaser.Input.Keyboard.Key>;
+  private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'rainbow' | 'damage', Phaser.Input.Keyboard.Key>;
   private pointerFly = false;
   private pointerPoop = false;
   private rainbow = false;
@@ -93,6 +111,10 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
     }
+    this.load.image('hydrant-0', 'assets/sprites/hydrant-0.png');
+    this.load.image('hydrant-1', 'assets/sprites/hydrant-1.png');
+    this.load.image('water-col', 'assets/sprites/water-col.png');
+    this.load.image('water-crown', 'assets/sprites/water-crown.png');
   }
 
   create(): void {
@@ -128,6 +150,8 @@ export class GameScene extends Phaser.Scene {
       setPoop: (v: boolean) => (this.pointerPoop = v),
       setRainbow: (v: boolean) => (this.rainbow = v),
       particleCount: () => this.sim.particles.length,
+      spawnHydrant: () => this.spawnHydrant(),
+      pigeonY: () => this.pigeonY,
     };
   }
 
@@ -166,7 +190,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
 
     this.add
-      .text(16, H - 26, 'HOLD SPACE / LMB — fly     HOLD S / RMB — let it rip     R — rainbow mode', {
+      .text(16, H - 26, 'HOLD ↑ / SPACE / LMB — climb     HOLD ↓ — dive     HOLD S / RMB — let it rip     R — rainbow mode', {
         fontFamily: 'monospace',
         fontSize: '13px',
         color: '#f3ead8',
@@ -180,8 +204,8 @@ export class GameScene extends Phaser.Scene {
     this.keys = {
       up: kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       up2: kb.addKey(Phaser.Input.Keyboard.KeyCodes.UP),
+      down: kb.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
       poop: kb.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      poop2: kb.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
       rainbow: kb.addKey(Phaser.Input.Keyboard.KeyCodes.R),
       damage: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
@@ -203,6 +227,7 @@ export class GameScene extends Phaser.Scene {
     this.scrollWorld(f);
     this.updatePigeon(f);
     this.updateVictims(f, deltaMs);
+    this.updateHydrants(f, deltaMs);
     this.updateGuano(f);
     this.updateHud(f);
   }
@@ -214,15 +239,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updatePigeon(f: number): void {
-    const flying =
-      this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly;
-    this.pigeonVy += (flying ? -0.55 : 0.38) * f;
-    this.pigeonVy = Phaser.Math.Clamp(this.pigeonVy, -6.5, 7);
+    const up = this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly;
+    const down = this.keys.down.isDown;
+    // it's a bird, not a brick: velocity trims toward an input-chosen target,
+    // so releasing everything levels off and holds the current altitude
+    const targetVy = up ? -3.6 : down ? 4.2 : 0;
+    this.pigeonVy += (targetVy - this.pigeonVy) * 0.09 * f;
     this.pigeonY = Phaser.Math.Clamp(this.pigeonY + this.pigeonVy * f, 56, GROUND_Y - 90);
     if (this.pigeonY <= 56 || this.pigeonY >= GROUND_Y - 90) this.pigeonVy = 0;
 
-    // wing flap: fast while thrusting, lazy glide otherwise
-    this.flapPhase += (flying ? 0.22 : 0.07) * f;
+    // wing flap: fast while climbing, steady hover beat, lazy dive glide
+    this.flapPhase += (up ? 0.22 : down ? 0.05 : 0.11) * f;
     const flapSeq = [0, 1, 2, 1];
     this.pigeonImg.setTexture(`pigeon-f${flapSeq[Math.floor(this.flapPhase) % 4]}`);
 
@@ -232,8 +259,10 @@ export class GameScene extends Phaser.Scene {
     this.wobbleT += 0.5 * f;
     const wobbleY = Math.sin(this.wobbleT * 2.1) * 5 * wobbleAmp;
     const wobbleRot = Math.sin(this.wobbleT * 3.3) * 0.16 * wobbleAmp;
+    // gentle hover bob (visual only) so holding a line doesn't look frozen
+    const hoverBob = !up && !down ? Math.sin(this.wobbleT * 0.8) * 2.5 : 0;
 
-    this.pigeon.setY(this.pigeonY + wobbleY);
+    this.pigeon.setY(this.pigeonY + wobbleY + hoverBob);
     this.pigeon.setRotation(
       Phaser.Math.Clamp(this.pigeonVy * 0.06, -0.3, 0.35) + wobbleRot,
     );
@@ -303,6 +332,161 @@ export class GameScene extends Phaser.Scene {
         scaleY: sprite.scaleY,
       },
     });
+  }
+
+  private spawnHydrant(): void {
+    const sprite = this.add.sprite(W + 40, 0, 'hydrant-0').setScale(0.5).setDepth(5);
+    sprite.setY(GROUND_Y - sprite.displayHeight / 2);
+    const jetCol = this.add
+      .tileSprite(sprite.x, sprite.y, 14, 0, 'water-col')
+      .setOrigin(0.5, 1)
+      .setDepth(5)
+      .setAlpha(0.88)
+      .setVisible(false);
+    const crown = this.add
+      .image(sprite.x, sprite.y, 'water-crown')
+      .setOrigin(0.5, 0.72)
+      .setDepth(5)
+      .setScale(0.4)
+      .setVisible(false);
+    this.hydrants.push({
+      sprite,
+      jetCol,
+      crown,
+      warnFx: this.add.graphics().setDepth(5),
+      state: 'idle',
+      timer: 90 + Math.random() * 140,
+      jetH: 0,
+      jetMaxH: 0,
+      splashed: false,
+      collider: {
+        id: this.nextColliderId++,
+        x: sprite.x,
+        y: sprite.y,
+        hw: sprite.displayWidth / 2,
+        hh: sprite.displayHeight / 2,
+        vx: 0,
+        vy: 0,
+        sticky: true,
+        mask: getAlphaMask(this, 'hydrant-0'),
+        scaleX: sprite.scaleX,
+        scaleY: sprite.scaleY,
+      },
+    });
+  }
+
+  private updateHydrants(f: number, deltaMs: number): void {
+    this.hydrantTimer -= deltaMs;
+    if (this.hydrantTimer <= 0) {
+      this.spawnHydrant();
+      this.hydrantTimer = 9000 + Math.random() * 8000;
+    }
+
+    for (const h of this.hydrants) {
+      h.sprite.x -= SCROLL * f;
+      // hydrants sit on the ground; the open neck is a fixed height above it
+      // (both textures share one padded canvas, so a swap never shifts the base)
+      const capY = GROUND_Y - 46;
+
+      h.timer -= f;
+      if (h.state === 'idle' && h.timer <= 0) {
+        h.state = 'warn';
+        h.timer = 65;
+        h.sprite.setTexture('hydrant-1');
+      } else if (h.state === 'warn' && h.timer <= 0) {
+        h.state = 'burst';
+        h.timer = 130;
+        // always tall enough to reach the default cruise line (forces a climb
+        // to dodge) but never so tall the ceiling clamp can't out-climb it
+        h.jetMaxH = 280 + Math.random() * 70;
+        h.splashed = false;
+      } else if (h.state === 'burst' && h.timer <= 0) {
+        h.state = 'idle';
+        h.timer = 170 + Math.random() * 220;
+        h.sprite.setTexture('hydrant-0');
+      }
+
+      // jet grows fast on burst, collapses when the cap reseats
+      const targetH = h.state === 'burst' ? h.jetMaxH : 0;
+      h.jetH += (targetH - h.jetH) * 0.16 * f;
+
+      // warn telegraph: the cap rattles
+      h.sprite.setAngle(h.state === 'warn' ? Math.sin(h.timer * 1.7) * 4 : 0);
+
+      this.updateJetVisual(h, capY, f);
+
+      // the jet is the hazard: fly into the column and get blasted
+      if (h.state === 'burst' && !h.splashed && h.jetH > 30) {
+        const inX = Math.abs(this.pigeon.x - h.sprite.x) < 30;
+        const inY = this.pigeonY + 22 > capY - h.jetH;
+        if (inX && inY) {
+          h.splashed = true;
+          this.scarePoop();
+          this.pigeonVy = -5.5; // geyser kick
+          this.popup(this.pigeon.x, this.pigeonY - 52, 'SPLOOSH!!', '#a8dcf2', 22);
+        }
+      }
+
+      h.collider.x = h.sprite.x;
+      h.collider.y = h.sprite.y;
+      h.collider.vx = -SCROLL * f;
+      h.collider.mask = getAlphaMask(this, h.sprite.texture.key);
+    }
+
+    this.hydrants = this.hydrants.filter((h) => {
+      if (h.sprite.x < -160) {
+        h.sprite.destroy();
+        h.jetCol.destroy();
+        h.crown.destroy();
+        h.warnFx.destroy();
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /** Water column: scrolling sprite tile stretched to jetH, capped by a splash-crown sprite; sputter drops while warning. */
+  private updateJetVisual(h: Hydrant, capY: number, f: number): void {
+    const x = h.sprite.x;
+    const t = this.time.now * 0.02;
+
+    h.warnFx.clear();
+    if (h.state === 'warn') {
+      h.warnFx.fillStyle(0xa8dcf2, 0.9);
+      for (let i = 0; i < 3; i++) {
+        const ph = t * 1.3 + i * 2.1;
+        h.warnFx.fillCircle(x + Math.sin(ph) * 8, capY - 6 - (ph % 1.7) * 14, 2.5);
+      }
+    }
+
+    if (h.jetH < 6) {
+      h.jetCol.setVisible(false);
+      h.crown.setVisible(false);
+      return;
+    }
+
+    // scrolling flow: the tile's texture slides upward through a box that
+    // grows/shrinks with jetH, so height changes never distort the water.
+    // WebGL pads TileSprite textures to power-of-two dimensions. Scale by
+    // that padded width, not the source PNG width, or the render box clips
+    // the right side of the water texture before it reaches the crown.
+    const jetW = 14 * (1 + Math.sin(t * 2.4) * 0.06);
+    const jetScale = jetW / h.jetCol.potWidth;
+    h.jetCol.tilePositionY -= (1.4 / jetScale) * f;
+    h.jetCol
+      .setPosition(x, capY)
+      .setSize(jetW, h.jetH)
+      .setTileScale(jetScale)
+      .setVisible(true);
+
+    // crown rides the jet top, swelling in as the burst reaches full height
+    // and collapsing back down with it
+    const growth = Phaser.Math.Clamp(h.jetH / 40, 0, 1);
+    h.crown
+      .setPosition(x, capY - h.jetH)
+      .setScale(0.34 * growth + 0.1, (0.34 * growth + 0.1) * (1 + Math.sin(t * 3) * 0.05))
+      .setAlpha(0.85 + Math.sin(t * 2.6) * 0.1)
+      .setVisible(true);
   }
 
   private updateVictims(f: number, deltaMs: number): void {
@@ -432,7 +616,7 @@ export class GameScene extends Phaser.Scene {
     this.pooping =
       this.dumpKind === 'none' &&
       !this.emptyLock &&
-      (this.keys.poop.isDown || this.keys.poop2.isDown || this.pointerPoop) &&
+      (this.keys.poop.isDown || this.pointerPoop) &&
       this.meter > 0;
     if (wasPooping && !this.pooping) this.relievedTimer = 60;
 
@@ -453,7 +637,10 @@ export class GameScene extends Phaser.Scene {
       if (this.meter <= 0) this.emptyLock = true;
     }
 
-    this.sim.step(this.victims.map((v) => v.collider));
+    this.sim.step([
+      ...this.victims.map((v) => v.collider),
+      ...this.hydrants.map((h) => h.collider),
+    ]);
     this.gooLayer.render(this.sim.particles);
   }
 
