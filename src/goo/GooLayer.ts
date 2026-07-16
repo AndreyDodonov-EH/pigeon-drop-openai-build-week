@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GooPipeline } from './GooPipeline';
-import type { Particle } from './GooSim';
+import { PState, type Particle } from './GooSim';
 
 const STAMP_KEY = 'goo-stamp';
 const STAMP_SIZE = 64;
@@ -41,7 +41,25 @@ export class GooLayer {
       // settled drops squash into wide flat ribbons, so street trails merge
       // into a smooth puddle line instead of a caterpillar of round humps
       const sq = Math.min(p.settled / 40, 1) * 0.4;
-      this.stamp.setScale(s * (1 + sq * 0.9), s * (1 - sq));
+      let scaleX = s * (1 + sq * 0.9);
+      let scaleY = s * (1 - sq);
+      let rotation = 0;
+      if (p.state === PState.Stuck) {
+        // a contact patch briefly spreads across the victim before gravity
+        // pulls it into a rounded drip
+        const fresh = Phaser.Math.Clamp(1 - p.age / Math.max(p.stickHold, 1), 0, 1);
+        scaleX *= 1 + fresh * 0.42;
+        scaleY *= 1 - fresh * 0.22;
+      } else if (p.settled === 0) {
+        // velocity stretch makes separated drops read as falling liquid while
+        // preserving the same metaball mass when they merge into the stream
+        const speed = Math.hypot(p.vx, p.vy);
+        const stretch = Phaser.Math.Clamp((speed - 4) * 0.035, 0, 0.42);
+        scaleX *= 1 - stretch * 0.28;
+        scaleY *= 1 + stretch;
+        rotation = Math.atan2(p.vy, p.vx) - Math.PI / 2;
+      }
+      this.stamp.setScale(scaleX, scaleY).setRotation(rotation);
       this.stamp.setTint(p.tint);
       rt.batchDraw(this.stamp, p.x, p.y);
     }

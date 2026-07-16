@@ -38,6 +38,10 @@ export interface Particle {
   stickId: number;
   sx: number;
   sy: number;
+  /** frames of impact adhesion before gravity starts pulling the splat down */
+  stickHold: number;
+  /** short-lived sideways smear from the impact, in collider-local px/frame */
+  surfaceVx: number;
   dead: boolean;
 }
 
@@ -76,7 +80,9 @@ export interface GooParams {
   settleFrames: number; // rest duration before a puddle starts absorbing
   fadeFrames: number; // shrink duration once absorbing
   stickSpeed: number; // min impact speed to glue onto a sticky collider
+  stickHoldFrames: number; // base pause before a fresh splat begins to drip
   dripSlide: number; // px/frame a stuck particle slides down its victim
+  surfaceSeek: number; // sideways search distance for following sloped silhouettes
 }
 
 export const DEFAULT_PARAMS: GooParams = {
@@ -92,7 +98,9 @@ export const DEFAULT_PARAMS: GooParams = {
   settleFrames: 110,
   fadeFrames: 45,
   stickSpeed: 2.2,
-  dripSlide: 0.35,
+  stickHoldFrames: 14,
+  dripSlide: 0.28,
+  surfaceSeek: 8,
 };
 
 const CELL_SHIFT = 5; // 32px cells (~h)
@@ -142,6 +150,8 @@ export class GooSim {
       p.stickId = -1;
       p.sx = 0;
       p.sy = 0;
+      p.stickHold = 0;
+      p.surfaceVx = 0;
       p.dead = false;
       this.particles.push(p);
     }
@@ -162,22 +172,33 @@ export class GooSim {
         this.unstick(p);
         continue;
       }
-      // heavier drops slide faster, so a splat streaks apart as it runs down
-      const nsy = p.sy + P.dripSlide * (p.r / 3.5);
-      const nx = c.x + p.sx;
-      const ny = c.y + nsy;
-      if (c.mask && !maskSolid(c, nx, ny)) {
-        // slid past the silhouette's lower edge (chin, hem, fingertip) — or the
-        // reaction frame moved the body out from under it — fall as a drip
-        this.unstick(p);
-        p.x = nx;
-        p.y = ny;
-        p.vx = c.vx;
-        p.vy = Math.max(c.vy, 0) + 0.5;
-        p.px = p.x - p.vx;
-        p.py = p.y - p.vy;
-        continue;
+      // A fresh impact clings for a beat and smears sideways. After that,
+      // heavier drops slide faster, so a splat streaks apart as it runs down.
+      // Searching a few pixels sideways at the next y lets the goo follow a
+      // shoulder, bonnet or windscreen instead of dropping off every slope.
+      const held = p.age < p.stickHold;
+      const nsy = p.sy + (held ? 0 : P.dripSlide * (p.r / 3.5));
+      const smear = p.surfaceVx * Math.max(0, 1 - p.age / Math.max(p.stickHold, 1));
+      let nsx = p.sx + smear;
+      if (c.mask) {
+        const supportX = seekMaskSupport(c, nsx, nsy, P.surfaceSeek, p.surfaceVx);
+        if (supportX === undefined) {
+          const nx = c.x + nsx;
+          const ny = c.y + nsy;
+          this.unstick(p);
+          p.x = nx;
+          p.y = ny;
+          p.vx = c.vx + p.surfaceVx * 0.35;
+          p.vy = Math.max(c.vy, 0) + 0.7;
+          p.px = p.x - p.vx;
+          p.py = p.y - p.vy;
+          continue;
+        }
+        nsx = supportX;
       }
+      const nx = c.x + nsx;
+      const ny = c.y + nsy;
+      p.sx = nsx;
       p.sy = nsy;
       p.x = nx;
       p.y = ny;
@@ -186,8 +207,8 @@ export class GooSim {
       if (p.sy > c.hh + 2) {
         // dripped off the bottom edge — become a falling droplet again
         this.unstick(p);
-        p.vx = c.vx;
-        p.vy = Math.max(c.vy, 0) + 0.5;
+        p.vx = c.vx + p.surfaceVx * 0.35;
+        p.vy = Math.max(c.vy, 0) + 0.7;
       }
       p.age++;
       if (p.age > 60 * 6) p.fade -= 1 / P.fadeFrames;
@@ -247,6 +268,7 @@ export class GooSim {
     p.state = PState.Free;
     p.stickId = -1;
     p.settled = 0;
+    p.stickHold = 0;
   }
 
   private reapOldest(): void {
@@ -384,7 +406,58 @@ export class GooSim {
     for (const p of this.particles) {
       if (p.state !== PState.Free) continue;
 
-      // ground
+      // victims
+      for (const c of colliders) {
+        // Work in the collider's moving frame and sweep from the previous
+        // particle position to the current one. Endpoint-only collision lets
+        // a fast drop tunnel through thin heads, arms and car roofs.
+        const hit = sweepCollider(c, p);
+        if (!hit) continue;
+        const dx = hit.x;
+        const dy = hit.y;
+        const vRelX = p.x - p.px - c.vx;
+        const vRelY = p.y - p.py - c.vy;
+        // Translate the contact to the collider's current position. The goo
+        // is now attached to where the moving victim ended this frame.
+        p.x = c.x + dx;
+        p.y = c.y + dy;
+        const impact = Math.hypot(vRelX, vRelY);
+        if (c.sticky && impact > P.stickSpeed) {
+          p.state = PState.Stuck;
+          p.stickId = c.id;
+          p.sx = c.mask ? dx : Phaser_clamp(dx, -c.hw, c.hw);
+          p.sy = c.mask ? dy : Phaser_clamp(dy, -c.hh, c.hh);
+          p.stickHold = P.stickHoldFrames * (0.65 + Math.random() * 0.7);
+          p.surfaceVx = Phaser_clamp(vRelX * 0.18 + (Math.random() - 0.5) * 0.8, -1.4, 1.4);
+          p.age = 0;
+          c.onHit?.(p, impact);
+          break;
+        } else if (c.mask) {
+          // slow contact: perch on the silhouette — back out to the first clear
+          // texel above, then damp like a ground landing
+          const vyOld = vRelY + c.vy;
+          const vxOld = vRelX + c.vx;
+          let lift = 0;
+          const maxLift = p.r * 2 + 4;
+          while (lift < maxLift && maskSolidLocal(c, dx, dy - lift)) lift += 2;
+          p.y -= lift;
+          p.py = p.y + vyOld * 0.15;
+          p.px = p.x - (c.vx + (vxOld - c.vx) * 0.35);
+          break;
+        } else {
+          // shallow push-out along the smaller penetration axis
+          const penX = c.hw + p.r * 0.5 - Math.abs(dx);
+          const penY = c.hh + p.r * 0.5 - Math.abs(dy);
+          if (penX < penY) p.x += penX * Math.sign(dx || 1);
+          else p.y += penY * Math.sign(dy || 1);
+          break;
+        }
+      }
+
+      // Resolve the street after foreground objects so a fast drop cannot be
+      // snapped to the ground before its swept path checks a car or person's
+      // silhouette.
+      if (p.state !== PState.Free) continue;
       const floor = this.groundY - p.r * 0.5;
       if (p.y > floor) {
         p.y = floor;
@@ -393,44 +466,6 @@ export class GooSim {
         p.px = p.x - (groundVx + (p.x - p.px - groundVx) * 0.35);
         // kill most of the bounce, keep a hint of splash
         p.py = p.y + (p.y - p.py) * 0.15;
-      }
-
-      // victims
-      for (const c of colliders) {
-        const dx = p.x - c.x;
-        const dy = p.y - c.y;
-        if (Math.abs(dx) > c.hw + p.r * 0.5 || Math.abs(dy) > c.hh + p.r * 0.5) continue;
-        // narrowphase: inside the box but off the drawn body (over a shoulder,
-        // between the legs) — fly straight through
-        if (c.mask && !maskSolid(c, p.x, p.y)) continue;
-        const vRelX = p.x - p.px - c.vx;
-        const vRelY = p.y - p.py - c.vy;
-        const impact = Math.hypot(vRelX, vRelY);
-        if (c.sticky && impact > P.stickSpeed) {
-          p.state = PState.Stuck;
-          p.stickId = c.id;
-          p.sx = c.mask ? dx : Phaser_clamp(dx, -c.hw, c.hw);
-          p.sy = c.mask ? dy : Phaser_clamp(dy, -c.hh, c.hh);
-          p.age = 0;
-          c.onHit?.(p, impact);
-        } else if (c.mask) {
-          // slow contact: perch on the silhouette — back out to the first clear
-          // texel above, then damp like a ground landing
-          const vyOld = p.y - p.py;
-          const vxOld = p.x - p.px;
-          let lift = 0;
-          const maxLift = p.r * 2 + 4;
-          while (lift < maxLift && maskSolid(c, p.x, p.y - lift)) lift += 2;
-          p.y -= lift;
-          p.py = p.y + vyOld * 0.15;
-          p.px = p.x - (c.vx + (vxOld - c.vx) * 0.35);
-        } else {
-          // shallow push-out along the smaller penetration axis
-          const penX = c.hw + p.r * 0.5 - Math.abs(dx);
-          const penY = c.hh + p.r * 0.5 - Math.abs(dy);
-          if (penX < penY) p.x += penX * Math.sign(dx || 1);
-          else p.y += penY * Math.sign(dy || 1);
-        }
       }
     }
   }
@@ -448,13 +483,67 @@ function shadeToward(tint: number, target: number, k: number): number {
   return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
 }
 
-/** Is the world-space point on an opaque texel of the collider's sprite? */
-function maskSolid(c: Collider, wx: number, wy: number): boolean {
+/**
+ * First contact along this frame's particle path, measured in the collider's
+ * current local coordinates. Both objects may move during the frame.
+ */
+function sweepCollider(c: Collider, p: Particle): { x: number; y: number } | undefined {
+  const fromX = p.px - (c.x - c.vx);
+  const fromY = p.py - (c.y - c.vy);
+  const toX = p.x - c.x;
+  const toY = p.y - c.y;
+  const pad = p.r * 0.5;
+
+  // Cheap swept broadphase before sampling an alpha silhouette.
+  if (
+    Math.max(fromX, toX) < -c.hw - pad ||
+    Math.min(fromX, toX) > c.hw + pad ||
+    Math.max(fromY, toY) < -c.hh - pad ||
+    Math.min(fromY, toY) > c.hh + pad
+  ) {
+    return undefined;
+  }
+
+  const travel = Math.hypot(toX - fromX, toY - fromY);
+  // At most ~2 px between mask probes: narrower than the smallest emitted
+  // drop, but bounded so an extreme debug velocity cannot explode frame cost.
+  const steps = Math.min(32, Math.max(1, Math.ceil(travel / Math.max(1.5, p.r * 0.45))));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = fromX + (toX - fromX) * t;
+    const y = fromY + (toY - fromY) * t;
+    if (Math.abs(x) > c.hw + pad || Math.abs(y) > c.hh + pad) continue;
+    if (!c.mask || maskSolidLocal(c, x, y)) return { x, y };
+  }
+  return undefined;
+}
+
+/** Find nearby opaque sprite at the requested y so a drip can follow a slope. */
+function seekMaskSupport(
+  c: Collider,
+  localX: number,
+  localY: number,
+  maxSeek: number,
+  bias: number,
+): number | undefined {
+  if (maskSolidLocal(c, localX, localY)) return localX;
+  const firstDir = bias < 0 ? -1 : 1;
+  for (let d = 1; d <= maxSeek; d++) {
+    const first = localX + d * firstDir;
+    if (maskSolidLocal(c, first, localY)) return first;
+    const second = localX - d * firstDir;
+    if (maskSolidLocal(c, second, localY)) return second;
+  }
+  return undefined;
+}
+
+/** Is a collider-local point on an opaque texel of its sprite? */
+function maskSolidLocal(c: Collider, localX: number, localY: number): boolean {
   const m = c.mask!;
-  let tx = (wx - c.x) / (c.scaleX ?? 1);
+  let tx = localX / (c.scaleX ?? 1);
   if (c.flipX) tx = -tx;
   const px = (tx + m.w / 2) | 0;
-  const py = ((wy - c.y) / (c.scaleY ?? 1) + m.h / 2) | 0;
+  const py = (localY / (c.scaleY ?? 1) + m.h / 2) | 0;
   if (px < 0 || py < 0 || px >= m.w || py >= m.h) return false;
   return m.data[py * m.w + px] >= ALPHA_SOLID;
 }

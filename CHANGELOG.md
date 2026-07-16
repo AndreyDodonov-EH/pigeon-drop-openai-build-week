@@ -87,3 +87,15 @@ externally — not logged in ART_LOG.
 **Sprite proportions (2026-07-17):** pigeon scale 0.42 → 0.38, pedestrians/cars 0.5 → 0.58;
 colliders and goo masks follow display size automatically. Pickup shrunk (scale 0.62 →
 0.42) with a matching tighter collection hitbox.
+
+## Goo impact and contour pass (shipped 2026-07-17)
+
+Fast drops now sweep their full frame path in each moving collider's local space, so they
+cannot tunnel through thin heads, arms, car roofs or windscreens between alpha-mask
+checks. Victims resolve before the street, preventing the ground clamp from erasing a
+drop's path through a low target. Fresh hits briefly cling and smear sideways, then seek
+nearby opaque pixels as gravity pulls them down; goo follows shoulders and sloped bodywork
+before detaching instead of immediately falling from the first transparent texel. Falling
+drops stretch along their velocity and new contact patches squash across the surface.
+`scripts/goo-hit.mjs` regression-checks single-frame high-speed impacts against both a
+pedestrian and a car.
