@@ -60,11 +60,30 @@ for flow, so the shaft actually reads as moving water instead of static ribbed r
 Topped with a `water-crown` splash sprite that scales in/out with the burst. Warn-state
 sputter drops stayed as cheap procedural graphics circles.
 
+## Rainbow pickup (SHIPPED 2026-07-17)
+
+First pickup and the base pattern for future behavior-changing collectibles. A floating,
+spinning rainbow token spawns at varied altitudes and scrolls with the world; collecting it
+activates ten seconds of rainbow-tinted goo, with a collection burst and HUD countdown. The
+old R-key rainbow toggle is gone from player controls; `window.SP.setRainbow()` remains as a
+debug/screenshot override, alongside deterministic pickup spawn/timer hooks.
+
+**v2 art (2026-07-17):** token medallion replaced with a literal quarter-circle rainbow arc
+(no dark outlines — it lives in the sky, deliberately softer than the ground props), swaying
+gently instead of coin-spinning. See `assets/ART_LOG.md` for geometry and the agy-MCP
+inspiration provenance.
+
+**Happy victims (2026-07-17):** rainbow goo flips the pedestrian reaction — each particle
+carries a `rainbow` flag (kept pure-hue in the sim, skipping the brown marbling), and a
+rainbow-flagged splat on a ped shows the `ped-N-rainbow` delight frame plus a positive
+line (FABULOUS! / SO PRETTY!! / HOT DIGGITY!) in green instead of the outrage frame.
+Cars still honk either way. The delight sprites (`ped-{0,1,2}-rainbow.png`) were provided
+externally — not logged in ART_LOG.
+
 ## Other candidates
 - Absurd hazards: e.g. kid throws a car at the pigeon → triggers scare-poop (see meter
   inversion above; no health).
-- Pickups: rainbow-boost (already supported by the sim via per-particle tint) — food
-  pickups themselves are part of meter inversion above.
+- Food pickups are part of the meter inversion above.
 - Pigeon skins (portrait + flight set per skin).
 - Terrified portrait state for incoming hazards.
 - Audio: coo, splat, honk.

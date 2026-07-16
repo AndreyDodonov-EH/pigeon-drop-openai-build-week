@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "agy": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["scripts/agy-mcp.mjs"],
+      "env": {}
+    }
+  }
+}

@@ -180,3 +180,43 @@ extending a set — consistency depends on it.
 - **Tool:** `codex exec` built-in image generation
 - **Prompt:**
   > tall vertical column of water blasting straight upward under high pressure out of a fire hydrant … FOAMY and AERATED: churning frothy whitewater packed with bubbles, air pockets and spray … dominantly WHITE / near-white foam, only thin light-blue (#a8dcf2) tint in recessed shadow gaps … cartoon, clean thin dark outlines, painterly cel shading … vertically-scrolling TILING texture, foam tiles seamlessly top→bottom, no cap/base … solid #ff00ff magenta background, ~240×648.
+
+## assets/masters/rainbow-pickup.png → public/assets/sprites/pickup-rainbow.png — 2026-07-17
+
+- **References inspected:** `assets/masters/hydrant-sheet.png`, `public/assets/sprites/hydrant-0.png`, `public/assets/sprites/water-crown.png` (style only — no reference subjects appear in the render)
+- **Tool:** hand-authored SVG vector artwork rendered with ImageMagick 6; no generative model used
+- **Master:** 1024×1024 PNG on solid `#ff00ff`; centered 652 px circular token with generous edge clearance
+- **Shipping asset:** 96×96 RGBA PNG
+- **Post-processing:** ImageMagick SVG render → `-fuzz 5% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel -trim +repage -resize 96x96` → pngquant 256. Verified transparent corner pixel and inspected both master and shipping render.
+- **Used for:** the floating rainbow pickup. The scene supplies bob, spin, pulse, collection burst, and timed status feedback in code.
+- **Art specification:**
+  > Create one centered, circular rainbow collectible token for the game. Match the established cartoon prop style: thick clean dark outlines, flat painterly cel-shaded color blocks, warm slightly desaturated gold rim, chunky readable silhouette, playful absurdist tone. Inside the rim, show a six-band rainbow rising from two cream cloud puffs against a dark slate-blue enamel face, plus two bright comic sparkles. Keep the icon symmetrical enough to read while spinning, high-contrast at 48–64 px, with no pigeon, hydrant, character, text, ground shadow, or content touching the frame edge. Use a solid pure `#ff00ff` background for chroma keying. Master size 1024×1024; ship at 96×96 with transparency.
+- **SUPERSEDED 2026-07-17** by the quarter-arc revision below (user direction: a literal
+  quarter-circle rainbow in the sky, not a medallion token). Master kept for history.
+
+## assets/masters/rainbow-arc.png → public/assets/sprites/pickup-rainbow.png — 2026-07-17 (v2, quarter arc)
+
+- **Direction:** user asked for a literal one-quarter-circle rainbow — the pickup floats in
+  the air, so it deliberately breaks the thick-dark-outline prop style (no outlines at all,
+  soft airy rendering). Inspiration image generated first via the agy MCP server
+  (`mcp__agy__generate_image`, gemini-3.1-flash-image →
+  `images/inspiration/quarter-rainbow-pickup-idea-2026-07-16-22-46-41.jpg`, reference only,
+  not shipped).
+- **Tool:** hand-authored SVG rendered with ImageMagick 6; no generative model in the
+  shipping asset.
+- **Geometry:** six concentric 90° arcs around a common center at SVG (262,802), red outer
+  (r=524) → violet inner (r=294), each sweeping exactly from its 12 o'clock point to its
+  3 o'clock point (horizontal tangent at top, vertical at right). Band ends are hidden
+  under two outline-free cloud puffs; a short white sheen arc rides the red band.
+- **Master:** `assets/masters/rainbow-arc.png` 1024×1024 RGBA (SVG renders directly to
+  alpha — no magenta keying needed for this vector workflow).
+- **Post-processing:** `-trim +repage -resize 144x144` → pngquant 256 →
+  `public/assets/sprites/pickup-rainbow.png` (144×127). Verified transparent corners and
+  inspected composited over dark slate (#3a405a) for halo/pinhole issues.
+- **Mirrored 2026-07-17** (user request): master and sprite flipped horizontally with
+  `convert -flop` — arc now rises left-to-right (vertical tangent at left, horizontal at
+  top-right), matching the rightward flight direction. Master updated in place; SVG source
+  in scratchpad reflects the pre-flip orientation.
+- **Scene changes:** pickup no longer coin-spins (a rainbow shouldn't); it sways ±7° with a
+  gentle pulse, and the halo is a soft additive white glow (alpha 0.07 fill) instead of the
+  gold ring.

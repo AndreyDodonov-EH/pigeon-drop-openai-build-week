@@ -26,6 +26,8 @@ export interface Particle {
   vy: number;
   r: number;
   tint: number;
+  /** emitted while rainbow mode was active — victims react with joy, not outrage */
+  rainbow: boolean;
   state: PState;
   /** frames since spawn */
   age: number;
@@ -113,7 +115,7 @@ export class GooSim {
     this.params = { ...DEFAULT_PARAMS, ...params };
   }
 
-  emit(x: number, y: number, vx: number, vy: number, tint: number, count = 1): void {
+  emit(x: number, y: number, vx: number, vy: number, tint: number, count = 1, rainbow = false): void {
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= this.params.maxParticles) this.reapOldest();
       const p = this.pool.pop() ?? ({} as Particle);
@@ -130,7 +132,9 @@ export class GooSim {
       // Random walk, not a sine — periodic bands read as caterpillar segments.
       this.shadeK += (Math.random() - 0.5) * 0.14;
       this.shadeK = this.shadeK < 0 ? -this.shadeK : this.shadeK > 1 ? 2 - this.shadeK : this.shadeK;
-      p.tint = shadeToward(tint, 0x332c22, this.shadeK * 0.5 + Math.random() * 0.15);
+      // rainbow drops keep their pure hue — marbling toward brown would muddy the spectrum
+      p.tint = rainbow ? tint : shadeToward(tint, 0x332c22, this.shadeK * 0.5 + Math.random() * 0.15);
+      p.rainbow = rainbow;
       p.state = PState.Free;
       p.age = 0;
       p.settled = 0;
