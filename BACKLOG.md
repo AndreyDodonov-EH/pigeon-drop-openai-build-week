@@ -55,8 +55,6 @@ this slot in alongside the normal flight frames.
 **Visuals**
 - Slightly decrease model size? (another pass — sprites were rebalanced 2026-07-17,
   see CHANGELOG).
-- Procedural color variation for the same sprites (tint shifts to fake variety from the
-  existing ped/car sets).
 
 ## Other candidates
 
