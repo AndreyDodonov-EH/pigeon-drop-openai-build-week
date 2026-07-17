@@ -55,7 +55,6 @@ this slot in alongside the normal flight frames.
 **Visuals**
 - Slightly decrease model size? (another pass — sprites were rebalanced 2026-07-17,
   see CHANGELOG).
-- Extend the pedestrian palette shader to cars if the clothing variation reads well in play.
 
 ## Other candidates
 

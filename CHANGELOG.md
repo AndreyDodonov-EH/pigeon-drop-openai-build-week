@@ -100,10 +100,17 @@ drops stretch along their velocity and new contact patches squash across the sur
 `scripts/goo-hit.mjs` regression-checks single-frame high-speed impacts against both a
 pedestrian and a car.
 
-## Procedural pedestrian colors (shipped 2026-07-17)
+## Procedural victim colors (shipped 2026-07-17)
 
 Pedestrian clothing now picks from eight colors at spawn through a custom Phaser WebGL
 sprite pipeline. The shader recognizes each character's existing garment palette and
 replaces it while preserving pixel luminance, so ink, skin, hair, props, highlights and
 fold shading remain intact. The same palette follows normal, outraged and rainbow-delight
 texture swaps without adding any sprite files or reaction-frame combinations.
+
+**Car paint follow-up (2026-07-17):** generalized the pedestrian pipeline into one shared
+victim-palette shader and packed the victim kind into the previously unused tint control
+byte. Cars now choose from the same eight hues at spawn. Per-vehicle source palettes
+select only the sedan, taxi, or van paint while retaining the sedan's mismatched door,
+taxi checker/sign, van side panel, glass, chrome, wheels, lights, drivers, rust, and
+shading. The tint also persists across angry and rainbow reaction textures.
