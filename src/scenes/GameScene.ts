@@ -2,6 +2,10 @@ import Phaser from 'phaser';
 import { GooSim, type Collider, type Particle } from '../goo/GooSim';
 import { GooLayer } from '../goo/GooLayer';
 import { getAlphaMask } from '../goo/alphaMask';
+import {
+  ensurePedestrianPipeline,
+  PEDESTRIAN_PIPELINE,
+} from '../pedestrians/PedestrianPipeline';
 import { buildTextures, W, H, GROUND_Y } from '../world/textures';
 
 const SCROLL = 2.1; // world scroll, px/frame
@@ -23,6 +27,11 @@ const PIGEON_SCALE = 0.38;
 const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.42;
+
+// Curated garment hues: blue, burgundy, green, violet, orange, teal, ochre, plum.
+// The shader receives hue + source-character id through the sprite tint vertex data.
+const PED_CLOTHING_HUES = [0.6, 0.97, 0.28, 0.75, 0.07, 0.5, 0.13, 0.88];
+const PED_VARIANT_CONTROLS = [0, 128, 255];
 
 // ---- rainbow pickup tuning ----
 const RAINBOW_DURATION = 60 * 10; // frames of rainbow goo per pickup
@@ -166,6 +175,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     buildTextures(this);
+    ensurePedestrianPipeline(this);
 
     this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(W, H).setDepth(0);
     this.bgFar = this.add.tileSprite(0, 0, W, H, 'bg-far').setOrigin(0, 0).setDepth(1);
@@ -413,11 +423,15 @@ export class GameScene extends Phaser.Scene {
   private spawnPed(): void {
     const v = (Math.random() * 3) | 0;
     const dir = Math.random() < 0.5 ? -1 : 1;
+    const hue = PED_CLOTHING_HUES[(Math.random() * PED_CLOTHING_HUES.length) | 0];
+    const paletteControl = (Math.round(hue * 255) << 16) | (PED_VARIANT_CONTROLS[v] << 8);
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
       .setDepth(5)
-      .setFlipX(dir > 0);
+      .setFlipX(dir > 0)
+      .setTint(paletteControl)
+      .setPipeline(PEDESTRIAN_PIPELINE);
     sprite.setY(GROUND_Y - sprite.displayHeight / 2);
     this.victims.push({
       sprite,

@@ -99,3 +99,11 @@ before detaching instead of immediately falling from the first transparent texel
 drops stretch along their velocity and new contact patches squash across the surface.
 `scripts/goo-hit.mjs` regression-checks single-frame high-speed impacts against both a
 pedestrian and a car.
+
+## Procedural pedestrian colors (shipped 2026-07-17)
+
+Pedestrian clothing now picks from eight colors at spawn through a custom Phaser WebGL
+sprite pipeline. The shader recognizes each character's existing garment palette and
+replaces it while preserving pixel luminance, so ink, skin, hair, props, highlights and
+fold shading remain intact. The same palette follows normal, outraged and rainbow-delight
+texture swaps without adding any sprite files or reaction-frame combinations.
