@@ -104,6 +104,27 @@ extending a set — consistency depends on it.
   >
   > After generating, save the PNG to assets/masters/cars-sheet.png in the workspace and reply with the absolute path of the saved file.
 
+## Car windshield magenta cleanup — 2026-07-17
+
+- **Shipped paths:** `public/assets/sprites/car-{0,1,2}.png`,
+  `public/assets/sprites/car-{0,1,2}-r.png`, and
+  `public/assets/sprites/car-{0,1,2}-rainbow.png`
+- **References inspected:** all nine shipped car states plus the original
+  `assets/masters/cars-sheet.png` / `assets/masters/cars-react-sheet.png` provenance
+  entries above. The reusable masters were not modified.
+- **Tool:** deterministic local RGBA post-processing with Node.js + `pngjs`, followed by
+  a lossless indexed-PNG repack with Pillow; no image generation or repainting.
+- **Repair:** reapplied the logged magenta-alpha threshold, then isolated the sloped front
+  windshield band for each vehicle/state and cleared the lower-saturation purple glass
+  contamination that survived the original key. Finally set RGB to black wherever alpha
+  is zero, preventing hidden magenta from bleeding back through WebGL texture filtering.
+  Repacked each result to an indexed PNG only when its exact RGBA palette fit within 256
+  entries, with a byte-for-byte decoded RGBA round-trip check.
+- **Invariants:** source dimensions, visible non-windshield pixels, sprite framing, ground
+  line, and texture-swap anchors remain unchanged. Normal, outraged, and rainbow-delight
+  states retain their existing panel/vehicle identity.
+- **Prompt:** none (deterministic corrective post-processing only).
+
 ## assets/masters/hydrant-sheet.png → public/assets/sprites/hydrant-{0,1}.png — 2026-07-15
 
 - **References attached:** `images/normal.png`, `public/assets/portraits/strain.png` (style only — no pigeon in the render)
