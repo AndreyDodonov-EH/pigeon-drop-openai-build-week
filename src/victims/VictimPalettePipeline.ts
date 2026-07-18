@@ -3,7 +3,8 @@ import Phaser from 'phaser';
 export const VICTIM_PALETTE_PIPELINE = 'VictimPalette';
 
 const SOURCE_CONTROLS = [0, 128, 255];
-const CAR_CONTROL = 255;
+const KIND_CAR_BIT = 128;
+const ACCENT_HUE_MAX = 127;
 
 const FRAG = `
 #define SHADER_NAME VICTIM_PALETTE_FS
@@ -38,29 +39,54 @@ void main() {
 
   // Phaser supplies the sprite tint as an interpolated vertex attribute, which
   // lets every victim remain in one draw batch. R stores the target hue, G the
-  // source variant (0, 0.5, 1), and B selects clothing or car paint.
+  // source variant (0, 0.5, 1). B packs two controls: bit 7 selects clothing
+  // or car paint, bits 0-6 carry the accent hue (tie, hair) in 128 steps.
   vec3 control = outTint.bgr;
+  float kindByte = floor(control.b * 255.0 + 0.5);
+  float isCar = step(128.0, kindByte);
+  float accentHue = (kindByte - isCar * 128.0) / 127.0;
   vec3 sourceColor;
   float maxLuminance;
   float matchStart;
   float matchEnd;
   float targetSaturation;
   float targetValue;
+  // Second recolorable material per pedestrian: the businessman's tie and the
+  // runner's hair (with eyebrows). The old man has no chromatically separable
+  // accent — his cap, coat, and trousers are all neighboring browns.
+  vec3 accentSource = vec3(1.0);
+  float accentMaxLuminance = 0.0;
+  float accentMatchStart = 0.0;
+  float accentMatchEnd = 0.01;
+  float accentStrength = 0.0;
 
-  if (control.b < 0.5) {
+  if (isCar < 0.5) {
     if (control.g < 0.25) {
       sourceColor = vec3(0.314, 0.318, 0.310);
       maxLuminance = 0.50;
+      accentSource = vec3(0.549, 0.157, 0.118);
+      accentMatchStart = 0.10;
+      accentMatchEnd = 0.22;
+      accentMaxLuminance = 0.60;
+      accentStrength = 1.0;
     } else if (control.g < 0.75) {
       sourceColor = vec3(0.149, 0.455, 0.404);
       maxLuminance = 0.54;
+      // Hair brown sits near skin in chroma; the luminance ceiling does the
+      // separating (hair tops out near 0.40, lit skin starts near 0.55).
+      accentSource = vec3(0.424, 0.294, 0.169);
+      accentMatchStart = 0.08;
+      accentMatchEnd = 0.16;
+      accentMaxLuminance = 0.47;
+      accentStrength = 1.0;
     } else {
       sourceColor = vec3(0.435, 0.282, 0.122);
       maxLuminance = 0.38;
     }
     matchStart = 0.08;
     matchEnd = 0.18;
-    targetSaturation = 0.66;
+    // Keep variants lively without looking like a full neon recolor.
+    targetSaturation = 0.56;
     targetValue = 0.74;
   } else {
     // Faded-red sedan, yellow taxi, and pale-blue van body palettes. Neutral
@@ -75,7 +101,8 @@ void main() {
     maxLuminance = 1.0;
     matchStart = 0.10;
     matchEnd = 0.28;
-    targetSaturation = 0.72;
+    // Paint variants should feel like sun-faded city cars, not glossy neon.
+    targetSaturation = 0.58;
     targetValue = 0.78;
   }
 
@@ -92,10 +119,45 @@ void main() {
   float belowHighlight = 1.0 - smoothstep(maxLuminance - 0.05, maxLuminance + 0.05, luminance);
   float material = paletteMask * visibleTone * belowHighlight * texture.a;
 
+  float accentDistance = length(chroma(texture.rgb) - chroma(accentSource));
+  float accentMask = 1.0 - smoothstep(accentMatchStart, accentMatchEnd, accentDistance);
+  float accentBelow = 1.0 - smoothstep(accentMaxLuminance - 0.05, accentMaxLuminance + 0.05, luminance);
+  float accentMaterial = accentMask * visibleTone * accentBelow * texture.a * accentStrength;
+  // The accent owns any pixel both masks claim.
+  material *= 1.0 - accentMaterial;
+
+  // Runner hue bands are deliberately reserved for natural-looking hair.
+  // His source hair is dark, so retaining its luminance below still gives
+  // blonde hair a shaded gold rather than a flat bright-yellow fill.
+  float accentSaturation = 0.55;
+  float accentValue = 0.62;
+  float blondeLift = 0.0;
+  if (isCar < 0.5 && control.g >= 0.25 && control.g < 0.75) {
+    if (accentHue < 0.055) {
+      accentSaturation = 0.68; // red
+      accentValue = 0.70;
+    } else if (accentHue < 0.105) {
+      accentSaturation = 0.54; // brown
+      accentValue = 0.50;
+    } else {
+      accentSaturation = 0.48; // blonde
+      accentValue = 0.92;
+      blondeLift = 0.42;
+    }
+  }
+  vec3 accentTarget = hsvToRgb(vec3(accentHue, accentSaturation, accentValue));
+
   // Keep the source luminance so highlights, folds, rust, and dents survive.
   float targetLuminance = max(dot(targetColor, LUMA), 0.025);
   vec3 recolored = clamp(targetColor * (luminance / targetLuminance), 0.0, 1.0);
-  vec3 color = mix(texture.rgb, recolored, material * 0.92);
+  // Preserve more of the original palette so pedestrian variants stay subtle.
+  vec3 color = mix(texture.rgb, recolored, material * (isCar < 0.5 ? 0.82 : 0.80));
+  float accentTargetLuminance = max(dot(accentTarget, LUMA), 0.025);
+  vec3 accentRecolored = clamp(accentTarget * (luminance / accentTargetLuminance), 0.0, 1.0);
+  // The original runner hair has no light blonde pixels to preserve. Give the
+  // blonde band a small lift while retaining its source-derived shading.
+  accentRecolored = mix(accentRecolored, accentTarget, blondeLift);
+  color = mix(color, accentRecolored, accentMaterial * 0.82);
 
   // Phaser's sprite renderer uses premultiplied alpha.
   gl_FragColor = vec4(color * outTint.a, texture.a * outTint.a);
@@ -103,7 +165,8 @@ void main() {
 `;
 
 /**
- * Selectively recolors pedestrian clothing and car paint without extra art.
+ * Selectively recolors pedestrian clothing, per-pedestrian accents (tie,
+ * hair), and car paint without extra art.
  *
  * Palette controls travel in Phaser's existing per-vertex tint attribute, so
  * differently colored victims share one shader, the existing textures, and a
@@ -115,10 +178,16 @@ export class VictimPalettePipeline extends Phaser.Renderer.WebGL.Pipelines.Multi
   }
 }
 
-export function victimPaletteTint(hue: number, variant: number, kind: 'ped' | 'car'): number {
+export function victimPaletteTint(
+  hue: number,
+  variant: number,
+  kind: 'ped' | 'car',
+  accentHue = 0,
+): number {
   const hueControl = Phaser.Math.Clamp(Math.round(hue * 255), 0, 255);
   const sourceControl = SOURCE_CONTROLS[variant] ?? SOURCE_CONTROLS[0];
-  const kindControl = kind === 'car' ? CAR_CONTROL : 0;
+  const accentControl = Phaser.Math.Clamp(Math.round(accentHue * ACCENT_HUE_MAX), 0, ACCENT_HUE_MAX);
+  const kindControl = (kind === 'car' ? KIND_CAR_BIT : 0) | accentControl;
   return (hueControl << 16) | (sourceControl << 8) | kindControl;
 }
 

@@ -29,10 +29,12 @@ const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.42;
 
-// Curated clothing/paint hues: blue, burgundy, green, violet, orange, teal,
-// ochre, and plum. The shared shader receives hue, source variant, and victim
-// kind through the sprite tint vertex data.
+// Curated clothing/paint/tie hues: blue, burgundy, green, violet, orange,
+// teal, ochre, and plum. The shared shader receives hue, accent hue, source
+// variant, and victim kind through the sprite tint vertex data.
 const VICTIM_PALETTE_HUES = [0.6, 0.97, 0.28, 0.75, 0.07, 0.5, 0.13, 0.88];
+// The runner's hair stays plausible while still adding visible variety.
+const RUNNER_HAIR_HUES = [0.03, 0.08, 0.13]; // red, brown, blonde
 
 // ---- rainbow pickup tuning ----
 const RAINBOW_DURATION = 60 * 10; // frames of rainbow goo per pickup
@@ -424,13 +426,23 @@ export class GameScene extends Phaser.Scene {
   private spawnPed(): void {
     const v = (Math.random() * 3) | 0;
     const dir = Math.random() < 0.5 ? -1 : 1;
-    const hue = VICTIM_PALETTE_HUES[(Math.random() * VICTIM_PALETTE_HUES.length) | 0];
+    const hueIndex = (Math.random() * VICTIM_PALETTE_HUES.length) | 0;
+    const hue = VICTIM_PALETTE_HUES[hueIndex];
+    // The businessman gets a contrasting tie; the runner instead picks a
+    // natural hair shade (red, brown, or blonde).
+    const accentHue =
+      v === 1
+        ? RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0]
+        : VICTIM_PALETTE_HUES[
+            (hueIndex + 1 + ((Math.random() * (VICTIM_PALETTE_HUES.length - 1)) | 0)) %
+              VICTIM_PALETTE_HUES.length
+          ];
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
       .setDepth(5)
       .setFlipX(dir > 0)
-      .setTint(victimPaletteTint(hue, v, 'ped'))
+      .setTint(victimPaletteTint(hue, v, 'ped', accentHue))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
     sprite.setY(GROUND_Y - sprite.displayHeight / 2);
     this.victims.push({
