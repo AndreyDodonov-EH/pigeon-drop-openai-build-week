@@ -1,23 +1,19 @@
 import Phaser from 'phaser';
 
 /**
- * World background: a mix of procedural canvas textures (sky, far skyline,
- * street) and generated sprite art (near building facades composed into a
- * tile at runtime, clouds, street furniture). Palette matched to the portrait
- * references — slate blue bird, purple accents, warm tan backdrop.
+ * World background: procedural canvas textures (sky, far skyline, street).
+ * The near building layer lives in NearBuildings.ts; clouds and street
+ * furniture are generated sprites driven by GameScene. Palette matched to the
+ * portrait references — slate blue bird, purple accents, warm tan backdrop.
  */
 
 export const W = 960;
 export const H = 540;
 export const GROUND_Y = 484;
 
-/** generated facade sprites composed into the near parallax tile */
-export const BUILDING_COUNT = 5;
-
 export function buildTextures(scene: Phaser.Scene): void {
   sky(scene);
   farSkyline(scene);
-  nearBuildings(scene);
   street(scene);
   shadow(scene);
 }
@@ -156,108 +152,6 @@ function shade(hex: string, amt: number): string {
   const g = ch((n >> 8) & 0xff);
   const b = ch(n & 0xff);
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
-
-// ------------------------------------------------------- near buildings
-
-/**
- * Compose the near parallax tile out of the generated facade sprites: random
- * order, flips and slight scale jitter, standing on the sidewalk line. The
- * tile width is trimmed to exactly the composed row so the wrap never slices
- * a building. Falls back to flat procedural blocks if the art is missing.
- */
-function nearBuildings(scene: Phaser.Scene): void {
-  const sources: { img: HTMLImageElement; flippable: boolean }[] = [];
-  for (let i = 0; i < BUILDING_COUNT; i++) {
-    const key = `bg-building-${i}`;
-    if (scene.textures.exists(key)) {
-      sources.push({
-        img: scene.textures.get(key).getSourceImage() as HTMLImageElement,
-        flippable: i !== 2, // the café is drawn in 3/4 view; mirroring reads wrong
-      });
-    }
-  }
-  if (sources.length === 0) {
-    proceduralNearFallback(scene);
-    return;
-  }
-
-  interface Placement {
-    img: HTMLImageElement;
-    scale: number;
-    flip: boolean;
-    w: number;
-  }
-  const placements: Placement[] = [];
-  let total = 0;
-  // shuffled decks: every facade appears once per cycle, so a distinctive
-  // building (the café) can't show up twice on one screen; keep dealing
-  // decks until the tile is wider than the screen
-  let prev: (typeof sources)[number] | undefined;
-  while (total < W * 1.2) {
-    const deck = [...sources];
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    if (deck[0] === prev && deck.length > 1) [deck[0], deck[1]] = [deck[1], deck[0]];
-    for (const { img, flippable } of deck) {
-      const scale = 0.86 + Math.random() * 0.14;
-      const w = Math.round(img.width * scale - 6); // slight overlap, no sky gaps
-      placements.push({ img, scale, flip: flippable && Math.random() < 0.5, w });
-      total += w;
-    }
-    prev = deck[deck.length - 1];
-  }
-
-  const c = scene.textures.createCanvas('bg-near', total, H)!;
-  const ctx = c.getContext();
-  const baseline = GROUND_Y + 6; // feet tucked behind the street strip
-
-  let x = 0;
-  for (const p of placements) {
-    const dw = p.img.width * p.scale;
-    const dh = p.img.height * p.scale;
-    ctx.save();
-    if (p.flip) {
-      ctx.translate(x + dw, baseline - dh);
-      ctx.scale(-1, 1);
-      ctx.drawImage(p.img, 0, 0, dw, dh);
-    } else {
-      ctx.drawImage(p.img, x, baseline - dh, dw, dh);
-    }
-    ctx.restore();
-    x += p.w;
-  }
-
-  // faint unifying haze so the row sits behind the action, not on top of it
-  ctx.fillStyle = 'rgba(226, 205, 166, 0.10)';
-  ctx.fillRect(0, 0, total, H);
-
-  c.refresh();
-}
-
-function proceduralNearFallback(scene: Phaser.Scene): void {
-  const g = scene.add.graphics();
-  let x = 0;
-  let flip = false;
-  while (x < W) {
-    const bw = 60 + Math.random() * 100;
-    const bh = 260 + Math.random() * 160;
-    const clipped = Math.min(bw, W - x);
-    g.fillStyle(flip ? 0x5c6480 : 0x515970, 1);
-    g.fillRect(x, H - bh, clipped, bh);
-    g.fillStyle(0x3a405a, 0.7);
-    for (let wy = H - bh + 18; wy < H - 40; wy += 34) {
-      for (let wx = x + 10; wx < x + clipped - 14; wx += 26) {
-        if (Math.random() < 0.75) g.fillRect(wx, wy, 12, 16);
-      }
-    }
-    x += bw;
-    flip = !flip;
-  }
-  g.generateTexture('bg-near', W, H);
-  g.destroy();
 }
 
 // -------------------------------------------------------------- street

@@ -9,7 +9,13 @@ import {
   victimPaletteTint,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
-import { buildTextures, W, H, GROUND_Y, BUILDING_COUNT } from '../world/textures';
+import { buildTextures, W, H, GROUND_Y } from '../world/textures';
+import {
+  NearBuildingsLayer,
+  BUILDING_SPRITES,
+  CONNECTOR_SPRITES,
+} from '../world/NearBuildings';
+import { ensureBuildingPalettePipeline } from '../world/BuildingPalettePipeline';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 
@@ -177,7 +183,7 @@ export class GameScene extends Phaser.Scene {
   private flapPhase = 0;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
-  private bgNear!: Phaser.GameObjects.TileSprite;
+  private bgNear!: NearBuildingsLayer;
   private streetTs!: Phaser.GameObjects.TileSprite;
   private clouds: Phaser.GameObjects.Image[] = [];
   /** decorative sidewalk furniture (lamps/trees/mailboxes), ground-scrolled */
@@ -278,8 +284,8 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
-    for (let i = 0; i < BUILDING_COUNT; i++) {
-      this.load.image(`bg-building-${i}`, `assets/sprites/bg-building-${i}.png`);
+    for (const key of [...BUILDING_SPRITES, ...CONNECTOR_SPRITES]) {
+      this.load.image(key, `assets/sprites/${key}.png`);
     }
     for (let i = 0; i < 3; i++) {
       this.load.image(`bg-cloud-${i}`, `assets/sprites/bg-cloud-${i}.png`);
@@ -305,6 +311,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     buildTextures(this);
     ensureVictimPalettePipeline(this);
+    ensureBuildingPalettePipeline(this);
 
     this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(W, H).setDepth(0);
     // clouds live between the sky and the far skyline, each with its own drift
@@ -318,7 +325,7 @@ export class GameScene extends Phaser.Scene {
       this.clouds.push(cloud);
     }
     this.bgFar = this.add.tileSprite(0, 0, W, H, 'bg-far').setOrigin(0, 0).setDepth(1);
-    this.bgNear = this.add.tileSprite(0, 0, W, H, 'bg-near').setOrigin(0, 0).setDepth(2);
+    this.bgNear = new NearBuildingsLayer(this, 2);
     this.streetTs = this.add
       .tileSprite(0, GROUND_Y - 20, W, H - GROUND_Y + 30, 'street')
       .setOrigin(0, 0)
@@ -550,7 +557,7 @@ export class GameScene extends Phaser.Scene {
 
   private scrollWorld(f: number): void {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
-    this.bgNear.tilePositionX += SCROLL * 0.55 * f;
+    this.bgNear.update(SCROLL * 0.55 * f);
     this.streetTs.tilePositionX += SCROLL * f;
     for (const cloud of this.clouds) {
       cloud.x -= (SCROLL * 0.06 + cloud.getData('drift')) * f;
