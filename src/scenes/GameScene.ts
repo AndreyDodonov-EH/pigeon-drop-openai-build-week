@@ -263,6 +263,7 @@ export class GameScene extends Phaser.Scene {
 
     this.createHud();
     this.createInput();
+    this.createDebugMenu();
 
     // expose hooks for headless screenshot driving
     (window as unknown as Record<string, unknown>).SP = {
@@ -349,6 +350,61 @@ export class GameScene extends Phaser.Scene {
       if (!p.rightButtonDown()) this.pointerFly = false;
       this.pointerPoop = false;
     });
+  }
+
+  /** Compact always-on development palette for testing scene objects on demand. */
+  private createDebugMenu(): void {
+    const x = W - 174;
+    const y = 106;
+    const buttonW = 48;
+    const buttonH = 22;
+    const gap = 4;
+
+    this.add
+      .text(x, y - 19, 'DEBUG SPAWN', {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: COLOR_CREAM,
+        stroke: COLOR_INK,
+        strokeThickness: 3,
+      })
+      .setDepth(20);
+
+    const addButton = (label: string, col: number, row: number, action: () => void): void => {
+      const bx = x + col * (buttonW + gap);
+      const by = y + row * (buttonH + gap);
+      const bg = this.add
+        .rectangle(bx, by, buttonW, buttonH, 0x1d1f2a, 0.9)
+        .setOrigin(0)
+        .setStrokeStyle(1, 0xf3ead8, 0.65)
+        .setDepth(20)
+        .setInteractive({ useHandCursor: true });
+      this.add
+        .text(bx + buttonW / 2, by + buttonH / 2, label, {
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: COLOR_CREAM,
+        })
+        .setOrigin(0.5)
+        .setDepth(21);
+      bg.on('pointerdown', () => action());
+      bg.on('pointerover', () => bg.setFillStyle(0x394257, 1));
+      bg.on('pointerout', () => bg.setFillStyle(0x1d1f2a, 0.9));
+    };
+
+    const spawnHere = (kind: PickupKind): void =>
+      this.spawnPickup(kind, this.pigeon.x + PICKUP_GRAB_X - 2, this.pigeonY);
+    addButton('PED', 0, 0, () => this.spawnPed());
+    addButton('CAR', 1, 0, () => this.spawnCar());
+    addButton('HYDRA', 2, 0, () => this.spawnHydrant());
+    addButton('RAIN', 0, 1, () => spawnHere('rainbow'));
+    addButton('BREAD', 1, 1, () => spawnHere('bread'));
+    addButton('FRIES', 2, 1, () => spawnHere('fries'));
+    addButton('KEBAB', 0, 2, () => spawnHere('kebab'));
+    addButton('CHILI', 1, 2, () => spawnHere('chilli'));
+    addButton('COFF', 2, 2, () => spawnHere('coffee'));
+    addButton('POD', 0, 3, () => spawnHere('pea'));
+    addButton('GAS', 1, 3, () => this.activateGas());
   }
 
   update(_time: number, deltaMs: number): void {
