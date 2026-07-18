@@ -110,6 +110,27 @@ natural length and `ship` trims silence + normalizes peak to −1 dB.
 - **Shipped:** 3.00 s raw to preserve the loop point. Plays alone while the water column
   is active, after the separate lid-clank telegraph.
 
+## public/assets/audio/splash-hydrant.{ogg,mp3} — 2026-07-19
+
+- **Master:** `assets/audio-masters/splash-hydrant-v1.mp3` (v0 rejected: 28 s of ~15
+  separate splash events instead of one hit)
+- **Prompt:** `cartoon videogame impact sound: a bird crashing into a vertical fire
+  hydrant water jet, one big juicy comedic sploosh with a watery kick, short and snappy,
+  one splash only, no repeats, no long tail, no silence`
+- **Shipped:** 2.00 s after standard trim, mono fold-down, and peak normalization.
+  Plays once when the pigeon flies into the hydrant water column, paired with
+  `koo-irritated` 220 ms later.
+
+## public/assets/audio/koo-irritated.{ogg,mp3} — 2026-07-19
+
+- **Master:** `assets/audio-masters/koo-irritated-v0.mp3` (v1 rejected: three separate
+  coo phrases over 3 s, multi-event)
+- **Prompt:** `cartoon videogame character voice: one short irritated pigeon coo, a
+  grumpy annoyed "koo!" squawk-coo from a cartoon pigeon, indignant and comedic, short
+  and snappy, one coo only, no repeats, no long tail, no silence`
+- **Shipped:** 1.00 s after standard trim, mono fold-down, and peak normalization.
+  Delayed 220 ms after the hydrant-jet splash so it reads as the pigeon's reaction.
+
 ## public/assets/audio/pickup-pea.{ogg,mp3} — 2026-07-18
 
 - **Master:** `assets/audio-masters/pickup-pea-v1.mp3` (v0 rejected: ~1 s dead air between pop and munch)

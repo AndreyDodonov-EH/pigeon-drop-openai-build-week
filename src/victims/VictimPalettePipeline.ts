@@ -86,8 +86,11 @@ void main() {
       maxLuminance = 0.38;
     } else if (control.g < 0.70) {
       // Influencer's pink velour tracksuit (the matching phone may follow it).
+      // The ceiling sits above the velour's specular sheen so the sheen
+      // follows the recolor instead of staying pink; her skin is redder in
+      // chroma than the suit, so the palette mask still excludes it.
       sourceColor = vec3(0.922, 0.274, 0.473);
-      maxLuminance = 0.76;
+      maxLuminance = 0.86;
     } else if (control.g < 0.90) {
       // Tourist's blue vacation shirt; pale palm motifs remain as highlights.
       sourceColor = vec3(0.149, 0.418, 0.589);
@@ -100,8 +103,8 @@ void main() {
     matchStart = 0.08;
     matchEnd = control.g < 0.50 ? 0.18 : 0.22;
     // Keep variants lively without looking like a full neon recolor.
-    targetSaturation = 0.56;
-    targetValue = 0.74;
+    targetSaturation = 0.50;
+    targetValue = 0.72;
   } else {
     // Faded-red sedan, yellow taxi, and pale-blue van body palettes. Neutral
     // doors/panels, glass, chrome, tires, lights, and drivers do not match.
@@ -163,11 +166,19 @@ void main() {
 
   // Keep the source luminance so highlights, folds, rust, and dents survive.
   float targetLuminance = max(dot(targetColor, LUMA), 0.025);
-  vec3 recolored = clamp(targetColor * (luminance / targetLuminance), 0.0, 1.0);
+  // The painted art is not a flat colorize of sourceColor: shadows drift
+  // cool, highlights warm, sheen picks up its own tint. Re-adding each
+  // pixel's deviation from a flat colorize keeps that hand-painted variation
+  // on the new hue instead of collapsing the material to one chroma.
+  float sourceLuminance = max(dot(sourceColor, LUMA), 0.025);
+  vec3 paintDetail = texture.rgb - sourceColor * (luminance / sourceLuminance);
+  vec3 recolored = clamp(targetColor * (luminance / targetLuminance) + paintDetail * 0.65, 0.0, 1.0);
   // Preserve more of the original palette so pedestrian variants stay subtle.
   vec3 color = mix(texture.rgb, recolored, material * (isCar < 0.5 ? 0.82 : 0.80));
   float accentTargetLuminance = max(dot(accentTarget, LUMA), 0.025);
-  vec3 accentRecolored = clamp(accentTarget * (luminance / accentTargetLuminance), 0.0, 1.0);
+  float accentSourceLuminance = max(dot(accentSource, LUMA), 0.025);
+  vec3 accentDetail = texture.rgb - accentSource * (luminance / accentSourceLuminance);
+  vec3 accentRecolored = clamp(accentTarget * (luminance / accentTargetLuminance) + accentDetail * 0.5, 0.0, 1.0);
   // The original runner hair has no light blonde pixels to preserve. Give the
   // blonde band a small lift while retaining its source-derived shading.
   accentRecolored = mix(accentRecolored, accentTarget, blondeLift);

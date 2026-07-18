@@ -9,7 +9,13 @@ import {
   victimPaletteTint,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
-import { buildTextures, W, H, GROUND_Y } from '../world/textures';
+import { buildTextures, W, H, GROUND_Y, SIDEWALK_H } from '../world/textures';
+import {
+  NearBuildingsLayer,
+  BUILDING_SPRITES,
+  CONNECTOR_SPRITES,
+} from '../world/NearBuildings';
+import { ensureBuildingPalettePipeline } from '../world/BuildingPalettePipeline';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 
@@ -32,6 +38,14 @@ const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.34;
 const PED_VARIANT_COUNT = 6;
+const PEDESTRIAN_DEPTH = 5;
+// street furniture (lamps/trees/mailboxes/hydrants) stands at the curb edge,
+// closer to camera than the pedestrians walking against the buildings
+const STREET_PROP_DEPTH = 5.05;
+const CAR_DEPTH = 5.1; // the road lane is closer to camera than the pavement
+// Pedestrians walk on the sidewalk band against the buildings, not on the
+// curb: their ground line sits above GROUND_Y (the curb/road line).
+const PED_GROUND_Y = GROUND_Y - 9;
 
 // Curated clothing/paint/tie hues: blue, burgundy, green, violet, orange,
 // teal, ochre, and plum. The shared shader receives hue, accent hue, source
@@ -53,6 +67,9 @@ const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
+const CHILLI_DURATION = 60 * 8;
+/** extra downward speed while the chilli fire jet is active — reads as thrust, not drip */
+const CHILLI_JET_BOOST = 2.6;
 const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
 // A continuous goo stream lands as one shifting puddle, not a machine-gun row
 // of discrete drops. Keep street impacts far enough apart that the short sample
@@ -172,8 +189,13 @@ export class GameScene extends Phaser.Scene {
   private flapPhase = 0;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
-  private bgNear!: Phaser.GameObjects.TileSprite;
+  private bgNear!: NearBuildingsLayer;
+  private sidewalkTs!: Phaser.GameObjects.TileSprite;
   private streetTs!: Phaser.GameObjects.TileSprite;
+  private clouds: Phaser.GameObjects.Image[] = [];
+  /** decorative sidewalk furniture (lamps/trees/mailboxes), ground-scrolled */
+  private props: Phaser.GameObjects.Image[] = [];
+  private propTimer = 1200;
 
   private victims: Victim[] = [];
   private hydrants: Hydrant[] = [];
@@ -200,6 +222,9 @@ export class GameScene extends Phaser.Scene {
   private batteredTimer = 0;
   private relievedTimer = 0;
   private coffeeTimer = 0;
+  private chilliTimer = 0;
+  private fireEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private sparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private gasTimer = 0;
   private gasEmitCarry = 0;
   private gasHeave?: AdjustableSound;
@@ -246,6 +271,14 @@ export class GameScene extends Phaser.Scene {
       'assets/audio/hydrant-jet-loop.ogg',
       'assets/audio/hydrant-jet-loop.mp3',
     ]);
+    this.load.audio('sfx-splash-hydrant', [
+      'assets/audio/splash-hydrant.ogg',
+      'assets/audio/splash-hydrant.mp3',
+    ]);
+    this.load.audio('sfx-koo-irritated', [
+      'assets/audio/koo-irritated.ogg',
+      'assets/audio/koo-irritated.mp3',
+    ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
@@ -266,6 +299,15 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
+    for (const key of [...BUILDING_SPRITES, ...CONNECTOR_SPRITES]) {
+      this.load.image(key, `assets/sprites/${key}.png`);
+    }
+    for (let i = 0; i < 3; i++) {
+      this.load.image(`bg-cloud-${i}`, `assets/sprites/bg-cloud-${i}.png`);
+    }
+    this.load.image('bg-lamp', 'assets/sprites/bg-lamp.png');
+    this.load.image('bg-tree', 'assets/sprites/bg-tree.png');
+    this.load.image('bg-mailbox', 'assets/sprites/bg-mailbox.png');
     this.load.image('hydrant-0', 'assets/sprites/hydrant-0.png');
     this.load.image('hydrant-1', 'assets/sprites/hydrant-1.png');
     this.load.image('water-col', 'assets/sprites/water-col.png');
@@ -284,18 +326,34 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     buildTextures(this);
     ensureVictimPalettePipeline(this);
+    ensureBuildingPalettePipeline(this);
 
     this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(W, H).setDepth(0);
+    // clouds live between the sky and the far skyline, each with its own drift
+    for (let i = 0; i < 5; i++) {
+      const cloud = this.add
+        .image(Math.random() * W, 36 + Math.random() * 150, `bg-cloud-${i % 3}`)
+        .setDepth(0.5)
+        .setAlpha(0.7 + Math.random() * 0.2)
+        .setScale(0.45 + Math.random() * 0.6);
+      cloud.setData('drift', 0.1 + Math.random() * 0.12);
+      this.clouds.push(cloud);
+    }
     this.bgFar = this.add.tileSprite(0, 0, W, H, 'bg-far').setOrigin(0, 0).setDepth(1);
-    this.bgNear = this.add.tileSprite(0, 0, W, H, 'bg-near').setOrigin(0, 0).setDepth(2);
+    // pavement behind the facades, scrolling with them so stoops stay planted
+    this.sidewalkTs = this.add
+      .tileSprite(0, GROUND_Y - 6 - SIDEWALK_H, W, SIDEWALK_H, 'sidewalk')
+      .setOrigin(0, 0)
+      .setDepth(1.5);
+    this.bgNear = new NearBuildingsLayer(this, 2);
     this.streetTs = this.add
-      .tileSprite(0, GROUND_Y - 20, W, H - GROUND_Y + 30, 'street')
+      .tileSprite(0, GROUND_Y - 6, W, H - GROUND_Y + 6, 'street')
       .setOrigin(0, 0)
       .setDepth(3);
 
     this.pigeonShadow = this.add.image(240, GROUND_Y - 6, 'shadow').setDepth(4);
 
-    // victims live at depth 5, goo at 6, pigeon 7, HUD 10+
+    // pedestrians/road traffic live at depth 5/5.1, goo at 6, pigeon 7, HUD 10+
     this.sim = new GooSim();
     this.sim.groundY = GROUND_Y;
     this.sim.boundsW = W;
@@ -306,6 +364,45 @@ export class GameScene extends Phaser.Scene {
     this.gasSim.boundsW = W;
     this.gasSim.worldVx = SCROLL;
     this.gasLayer = new GasLayer(this, W, H, 6.6);
+
+    // soft radial dot for the chilli flames — concentric fills fake the falloff
+    const flameG = this.make.graphics({ x: 0, y: 0 }, false);
+    for (let r = 8; r > 0; r--) flameG.fillStyle(0xffffff, 0.14).fillCircle(8, 8, r);
+    flameG.generateTexture('flame-dot', 16, 16);
+    flameG.destroy();
+    // flames lick upward off fire goo: fast, additive, dying to nothing
+    this.fireEmitter = this.add
+      .particles(0, 0, 'flame-dot', {
+        speedX: { min: -20, max: 20 },
+        speedY: { min: -110, max: -30 },
+        scale: { start: 1.8, end: 0.2 },
+        alpha: { start: 0.95, end: 0 },
+        lifespan: { min: 250, max: 600 },
+        // born white-hot, cooling through orange to ember red as they rise
+        color: [0xfff7cf, 0xffce42, 0xff7a24, 0xb91f24],
+        colorEase: 'quad.out',
+        quantity: 0,
+        emitting: false,
+        maxAliveParticles: 300,
+        blendMode: Phaser.BlendModes.ADD,
+      })
+      .setDepth(6.5);
+    // hot sparks thrown clear of the jet, falling under gravity as they die
+    this.sparkEmitter = this.add
+      .particles(0, 0, 'flame-dot', {
+        speedX: { min: -70, max: 70 },
+        speedY: { min: -140, max: 10 },
+        gravityY: 280,
+        scale: { start: 0.4, end: 0 },
+        alpha: { start: 1, end: 0.2 },
+        lifespan: { min: 300, max: 750 },
+        tint: [0xfff2b0, 0xffce42, 0xff7a24],
+        quantity: 0,
+        emitting: false,
+        maxAliveParticles: 140,
+        blendMode: Phaser.BlendModes.ADD,
+      })
+      .setDepth(6.5);
 
     this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
     this.pigeon = this.add.container(240, this.pigeonY, [this.pigeonImg]).setDepth(7);
@@ -333,6 +430,7 @@ export class GameScene extends Phaser.Scene {
       ) => this.spawnPickup(kind, x, y),
       rainbowRemaining: () => this.rainbowTimer,
       coffeeRemaining: () => this.coffeeTimer,
+      chilliRemaining: () => this.chilliTimer,
       gasRemaining: () => this.gasTimer,
       pigeonY: () => this.pigeonY,
       setCombo: (v: number) => {
@@ -468,6 +566,7 @@ export class GameScene extends Phaser.Scene {
     const f = Math.min(deltaMs / (1000 / 60), 2);
 
     this.scrollWorld(f);
+    this.updateProps(f, deltaMs);
     this.updatePigeon(f);
     this.updatePickups(f, deltaMs);
     this.updateVictims(f, deltaMs);
@@ -478,8 +577,42 @@ export class GameScene extends Phaser.Scene {
 
   private scrollWorld(f: number): void {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
-    this.bgNear.tilePositionX += SCROLL * 0.55 * f;
+    this.bgNear.update(SCROLL * 0.55 * f);
+    this.sidewalkTs.tilePositionX += SCROLL * 0.55 * f;
     this.streetTs.tilePositionX += SCROLL * f;
+    for (const cloud of this.clouds) {
+      cloud.x -= (SCROLL * 0.06 + cloud.getData('drift')) * f;
+      if (cloud.x < -170) {
+        cloud.x = W + 170;
+        cloud.y = 36 + Math.random() * 150;
+        cloud.setScale(0.45 + Math.random() * 0.6);
+      }
+    }
+  }
+
+  /** sidewalk furniture scrolls with the ground, in front of the pedestrians */
+  private updateProps(f: number, deltaMs: number): void {
+    this.propTimer -= deltaMs;
+    if (this.propTimer <= 0) {
+      const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
+      const key = kinds[(Math.random() * kinds.length) | 0];
+      const prop = this.add
+        .image(W + 90, 0, key)
+        .setDepth(STREET_PROP_DEPTH)
+        .setScale(0.21 + Math.random() * 0.03);
+      if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
+      prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
+      this.props.push(prop);
+      this.propTimer = 2400 + Math.random() * 3600;
+    }
+    this.props = this.props.filter((p) => {
+      p.x -= SCROLL * f;
+      if (p.x < -140) {
+        p.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   private updatePigeon(f: number): void {
@@ -592,6 +725,10 @@ export class GameScene extends Phaser.Scene {
       this.meter = Math.min(100, this.meter + effect.pressureGain);
     }
     if (kind === 'coffee') this.coffeeTimer = COFFEE_DURATION;
+    if (kind === 'chilli') {
+      this.chilliTimer = CHILLI_DURATION;
+      this.popup(x, y - 30, 'FIRE JET!!', COLOR_ORANGE, 20);
+    }
     if (kind === 'pea') this.activateGas();
     this.pickupBurst(x, y, effect.burstColors);
   }
@@ -639,11 +776,11 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
-      .setDepth(5)
+      .setDepth(PEDESTRIAN_DEPTH)
       .setFlipX(dir > 0)
       .setTint(victimPaletteTint(hue, v, 'ped', accentHue))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
-    sprite.setY(GROUND_Y - sprite.displayHeight / 2);
+    sprite.setY(PED_GROUND_Y - sprite.displayHeight / 2);
     this.victims.push({
       sprite,
       kind: 'ped',
@@ -676,7 +813,7 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.add
       .sprite(W + 80, 0, `car-${v}`)
       .setScale(VICTIM_SCALE)
-      .setDepth(5)
+      .setDepth(CAR_DEPTH)
       .setTint(victimPaletteTint(hue, v, 'car'))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
     sprite.setY(GROUND_Y + 32 - sprite.displayHeight / 2);
@@ -705,25 +842,28 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnHydrant(): void {
-    const sprite = this.add.sprite(W + 40, 0, 'hydrant-0').setScale(HYDRANT_SCALE).setDepth(5);
+    const sprite = this.add
+      .sprite(W + 40, 0, 'hydrant-0')
+      .setScale(HYDRANT_SCALE)
+      .setDepth(STREET_PROP_DEPTH);
     sprite.setY(GROUND_Y - sprite.displayHeight / 2);
     const jetCol = this.add
       .tileSprite(sprite.x, sprite.y, 14, 0, 'water-col')
       .setOrigin(0.5, 1)
-      .setDepth(5)
+      .setDepth(STREET_PROP_DEPTH)
       .setAlpha(0.88)
       .setVisible(false);
     const crown = this.add
       .image(sprite.x, sprite.y, 'water-crown')
       .setOrigin(0.5, 0.72)
-      .setDepth(5)
+      .setDepth(STREET_PROP_DEPTH)
       .setScale(0.4)
       .setVisible(false);
     this.hydrants.push({
       sprite,
       jetCol,
       crown,
-      warnFx: this.add.graphics().setDepth(5),
+      warnFx: this.add.graphics().setDepth(STREET_PROP_DEPTH),
       state: 'idle',
       timer: 90 + Math.random() * 140,
       jetH: 0,
@@ -804,6 +944,17 @@ export class GameScene extends Phaser.Scene {
           this.scarePoop();
           this.pigeonVy = -5.5; // geyser kick
           this.popup(this.pigeon.x, this.pigeonY - 52, 'SPLOOSH!!', COLOR_WATER, 22);
+          this.sound.play('sfx-splash-hydrant', {
+            volume: 0.5 * SFX_VOLUME,
+            rate: Phaser.Math.FloatBetween(0.96, 1.04),
+          });
+          // the indignant coo lands as a reaction, just after the water hits
+          this.time.delayedCall(220, () => {
+            this.sound.play('sfx-koo-irritated', {
+              volume: 0.55 * SFX_VOLUME,
+              rate: Phaser.Math.FloatBetween(0.97, 1.05),
+            });
+          });
         }
       }
 
@@ -924,7 +1075,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (v.kind === 'ped') {
         v.bobT += 0.25 * f;
-        v.sprite.y = GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * -3;
+        v.sprite.y = PED_GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * -3;
       } else {
         v.sprite.y = GROUND_Y + 32 - v.sprite.displayHeight / 2;
       }
@@ -1048,6 +1199,7 @@ export class GameScene extends Phaser.Scene {
   private updateGuano(f: number): void {
     this.rainbowTimer = Math.max(0, this.rainbowTimer - f);
     this.coffeeTimer = Math.max(0, this.coffeeTimer - f);
+    this.chilliTimer = Math.max(0, this.chilliTimer - f);
     this.gasTimer = Math.max(0, this.gasTimer - f);
     if (this.gasTimer <= 0) this.stopGasStream();
     if (Phaser.Input.Keyboard.JustDown(this.keys.damage)) this.scarePoop();
@@ -1095,6 +1247,7 @@ export class GameScene extends Phaser.Scene {
       ...this.hydrants.map((h) => h.collider),
     ]);
     this.gooLayer.render(this.sim.particles);
+    this.updateFireFx();
     this.gasSim.step(
       f,
       this.victims.map((v) => ({
@@ -1129,16 +1282,51 @@ export class GameScene extends Phaser.Scene {
       if (gasCount > 0) this.gasSim.emit(tailX, tailY, wild, gasCount);
       return;
     }
+    const fire = !rainbow && this.chilliTimer > 0;
+    if (fire) {
+      // spawn above the emit point: big rising flames should lick up past the
+      // tail, never hang below the pigeon
+      this.fireEmitter.emitParticleAt(tailX, tailY - 16, 3);
+      this.sparkEmitter.emitParticleAt(tailX, tailY - 10, 1);
+    }
     for (let i = 0; i < n; i++) {
       let tint = GUANO_TINT;
       if (rainbow) {
         // advance per drop, not per frame, so even a short burst spans the spectrum
         this.rainbowHue = (this.rainbowHue + 0.035) % 1;
         tint = Phaser.Display.Color.HSVToRGB(this.rainbowHue, 0.75, 1).color;
+      } else if (fire) {
+        // narrow red→yellow band; per-drop jitter is the flame's flicker,
+        // with the odd washed-out drop reading as molten white-hot
+        const whiteHot = Math.random() < 0.25;
+        tint = Phaser.Display.Color.HSVToRGB(
+          0.01 + Math.random() * 0.11,
+          whiteHot ? 0.35 : 0.92,
+          1,
+        ).color;
       }
       const vx = wild ? -0.4 + (Math.random() - 0.5) * 4.5 : -0.4;
-      const vy = wild ? 2.5 + Math.random() * 3.5 : this.pigeonVy * 0.35 + 4.2;
-      this.sim.emit(tailX, tailY, vx, vy, tint, 1, rainbow);
+      let vy = wild ? 2.5 + Math.random() * 3.5 : this.pigeonVy * 0.35 + 4.2;
+      if (fire) vy += CHILLI_JET_BOOST;
+      this.sim.emit(tailX, tailY, vx, vy, tint, 1, rainbow, rainbow || fire, fire);
+    }
+  }
+
+  /**
+   * Dress live fire goo with flames so the jet and its puddles read as burning.
+   * Random draws, not a scan: emission stays bounded and unbiased however many
+   * fire drops are in flight.
+   */
+  private updateFireFx(): void {
+    const ps = this.sim.particles;
+    if (ps.length === 0) return;
+    for (let i = 0; i < 24; i++) {
+      const p = ps[(Math.random() * ps.length) | 0];
+      if (!p.fire || p.dead) continue;
+      if (Math.random() < 0.7) {
+        this.fireEmitter.emitParticleAt(p.x + (Math.random() - 0.5) * 6, p.y - 3);
+      }
+      if (Math.random() < 0.12) this.sparkEmitter.emitParticleAt(p.x, p.y - 2);
     }
   }
 
