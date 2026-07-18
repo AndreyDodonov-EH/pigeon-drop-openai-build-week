@@ -5,6 +5,7 @@ import { MUSIC_VOLUME } from './mix';
 // t=0 in lockstep and never stop; combo tier only moves their volumes, so the
 // sneaky→klezmer handoff lands on the shared beat grid instead of restarting.
 const FADE_MS = 900;
+const KLEZMER_FADE_OUT_MS = 2400;
 const KLEZMER_AT_COMBO = 4;
 // relative balance within the music bus — klezmer is mixed denser/louder at
 // the source, so it gets less headroom
@@ -71,7 +72,7 @@ export class MusicManager {
     this.scene.tweens.add({
       targets: fadeOut,
       volume: 0,
-      duration: FADE_MS,
+      duration: frantic ? FADE_MS : KLEZMER_FADE_OUT_MS,
       ease: 'Sine.easeInOut',
     });
   }

@@ -31,6 +31,7 @@ const PIGEON_SCALE = 0.38;
 const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.34;
+const PED_VARIANT_COUNT = 6;
 
 // Curated clothing/paint/tie hues: blue, burgundy, green, violet, orange,
 // teal, ochre, and plum. The shared shader receives hue, accent hue, source
@@ -106,9 +107,23 @@ interface Victim {
 }
 
 // per-variant splat reactions: outraged one-liner + how the sprite acts out
-const PED_LINES = ['MY SUIT!', 'EW EW EW!', 'CONSARN IT!'];
+const PED_LINES = [
+  'MY SUIT!',
+  'EW EW EW!',
+  'CONSARN IT!',
+  'NOT THE BAG!',
+  'MY MAP!',
+  'BRO! SERIOUSLY?!',
+];
 // rainbow goo delights instead of disgusts — same characters, opposite mood
-const PED_LINES_RAINBOW = ['FABULOUS!', 'SO PRETTY!!', 'HOT DIGGITY!'];
+const PED_LINES_RAINBOW = [
+  'FABULOUS!',
+  'SO PRETTY!!',
+  'HOT DIGGITY!',
+  'CONTENT GOLD!',
+  'BEST TRIP EVER!',
+  'SICK COLORS!',
+];
 const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
 const REACT_FRAMES = 90;
@@ -127,6 +142,7 @@ interface Hydrant {
   jetH: number; // current jet height, px above the cap
   jetMaxH: number; // this burst's full height
   splashed: boolean; // pigeon already caught by this burst
+  jetSound?: AdjustableSound;
 }
 
 interface Pickup {
@@ -136,6 +152,9 @@ interface Pickup {
   phase: number;
   animT: number;
 }
+
+/** Phaser's manager returns a WebAudio/HTML5 sound with mutable volume at runtime. */
+type AdjustableSound = Phaser.Sound.BaseSound & { volume: number; rate: number };
 
 type PortraitKey = 'ready' | 'pleased' | 'strain' | 'panic' | 'damage';
 
@@ -183,6 +202,9 @@ export class GameScene extends Phaser.Scene {
   private coffeeTimer = 0;
   private gasTimer = 0;
   private gasEmitCarry = 0;
+  private gasHeave?: AdjustableSound;
+  private gasHeavePlayedThisPress = false;
+  private gasLoop?: AdjustableSound;
   private pooping = false;
   /** involuntary dump in progress (runs until the meter empties) */
   private dumpKind: 'none' | 'blowout' | 'scare' = 'none';
@@ -214,6 +236,16 @@ export class GameScene extends Phaser.Scene {
       'assets/audio/splat-asphalt.ogg',
       'assets/audio/splat-asphalt.mp3',
     ]);
+    this.load.audio('sfx-gas-whoosh', ['assets/audio/gas-whoosh.ogg', 'assets/audio/gas-whoosh.mp3']);
+    this.load.audio('sfx-gas-loop', ['assets/audio/gas-loop.ogg', 'assets/audio/gas-loop.mp3']);
+    this.load.audio('sfx-hydrant-clank', [
+      'assets/audio/hydrant-clank.ogg',
+      'assets/audio/hydrant-clank.mp3',
+    ]);
+    this.load.audio('sfx-hydrant-jet-loop', [
+      'assets/audio/hydrant-jet-loop.ogg',
+      'assets/audio/hydrant-jet-loop.mp3',
+    ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
@@ -222,15 +254,15 @@ export class GameScene extends Phaser.Scene {
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
-    this.load.image('ped-0', 'assets/sprites/ped-0.png');
-    this.load.image('ped-1', 'assets/sprites/ped-1.png');
-    this.load.image('ped-2', 'assets/sprites/ped-2.png');
     this.load.image('car-0', 'assets/sprites/car-0.png');
     this.load.image('car-1', 'assets/sprites/car-1.png');
     this.load.image('car-2', 'assets/sprites/car-2.png');
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < PED_VARIANT_COUNT; i++) {
+      this.load.image(`ped-${i}`, `assets/sprites/ped-${i}.png`);
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
       this.load.image(`ped-${i}-rainbow`, `assets/sprites/ped-${i}-rainbow.png`);
+    }
+    for (let i = 0; i < 3; i++) {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
@@ -566,6 +598,8 @@ export class GameScene extends Phaser.Scene {
 
   private activateGas(): void {
     this.gasTimer = GAS_DURATION;
+    // A fresh pod re-arms the opening heave even mid-hold.
+    this.gasHeavePlayedThisPress = false;
   }
 
   private pickupBurst(x: number, y: number, colors: number[]): void {
@@ -586,19 +620,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnPed(): void {
-    const v = (Math.random() * 3) | 0;
+    const v = (Math.random() * PED_VARIANT_COUNT) | 0;
     const dir = Math.random() < 0.5 ? -1 : 1;
     const hueIndex = (Math.random() * VICTIM_PALETTE_HUES.length) | 0;
     const hue = VICTIM_PALETTE_HUES[hueIndex];
-    // The businessman gets a contrasting tie; the runner instead picks a
-    // natural hair shade (red, brown, or blonde).
-    const accentHue =
-      v === 1
-        ? RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0]
-        : VICTIM_PALETTE_HUES[
+    // Only the first two pedestrians use the shader's secondary material:
+    // a contrasting businessman tie and a natural runner hair shade.
+    let accentHue = 0;
+    if (v === 0) {
+      accentHue =
+        VICTIM_PALETTE_HUES[
             (hueIndex + 1 + ((Math.random() * (VICTIM_PALETTE_HUES.length - 1)) | 0)) %
               VICTIM_PALETTE_HUES.length
           ];
+    } else if (v === 1) {
+      accentHue = RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0];
+    }
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
@@ -731,9 +768,14 @@ export class GameScene extends Phaser.Scene {
         h.state = 'warn';
         h.timer = 65;
         h.sprite.setTexture('hydrant-1');
+        this.sound.play('sfx-hydrant-clank', {
+          volume: 0.34 * SFX_VOLUME,
+          rate: Phaser.Math.FloatBetween(0.98, 1.02),
+        });
       } else if (h.state === 'warn' && h.timer <= 0) {
         h.state = 'burst';
         h.timer = 130;
+        this.startHydrantJet(h);
         // always tall enough to reach the default cruise line (forces a climb
         // to dodge) but never so tall the ceiling clamp can't out-climb it
         h.jetMaxH = 280 + Math.random() * 70;
@@ -741,6 +783,7 @@ export class GameScene extends Phaser.Scene {
         h.state = 'idle';
         h.splashed = true; // burst spent — never re-arm
         h.sprite.setTexture('hydrant-0');
+        this.stopHydrantJet(h);
       }
 
       // jet grows fast on burst, collapses when the cap reseats
@@ -772,6 +815,7 @@ export class GameScene extends Phaser.Scene {
 
     this.hydrants = this.hydrants.filter((h) => {
       if (h.sprite.x < -160) {
+        this.stopHydrantJet(h, false);
         h.sprite.destroy();
         h.jetCol.destroy();
         h.crown.destroy();
@@ -779,6 +823,39 @@ export class GameScene extends Phaser.Scene {
         return false;
       }
       return true;
+    });
+  }
+
+  private startHydrantJet(h: Hydrant): void {
+    this.stopHydrantJet(h, false);
+    const sound = this.sound.add('sfx-hydrant-jet-loop', {
+      loop: true,
+      volume: 0.18 * SFX_VOLUME,
+    }) as AdjustableSound;
+    sound.play();
+    // BaseSound resets its config when play begins; set the live gain after it starts.
+    sound.volume = 0.18 * SFX_VOLUME;
+    h.jetSound = sound;
+  }
+
+  private stopHydrantJet(h: Hydrant, fade = true): void {
+    const sound = h.jetSound;
+    if (!sound) return;
+    h.jetSound = undefined;
+    if (!fade || !sound.isPlaying) {
+      sound.stop();
+      sound.destroy();
+      return;
+    }
+    this.tweens.add({
+      targets: sound,
+      volume: 0,
+      duration: 120,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        sound.stop();
+        sound.destroy();
+      },
     });
   }
 
@@ -911,8 +988,9 @@ export class GameScene extends Phaser.Scene {
     v.reactTimer = REACT_FRAMES;
 
     if (v.kind === 'ped') {
-      // jogger shudders, the others shake fist/cane (y is owned by the bob update — don't tween it)
-      const wiggle = v.variant === 1 ? 5 : 9;
+      // The jogger and map-covered tourist shudder; broader poses shake harder.
+      // y is owned by the bob update, so do not tween it here.
+      const wiggle = v.variant === 1 || v.variant === 4 ? 5 : 9;
       this.tweens.add({
         targets: v.sprite,
         angle: { from: -wiggle, to: wiggle },
@@ -971,6 +1049,7 @@ export class GameScene extends Phaser.Scene {
     this.rainbowTimer = Math.max(0, this.rainbowTimer - f);
     this.coffeeTimer = Math.max(0, this.coffeeTimer - f);
     this.gasTimer = Math.max(0, this.gasTimer - f);
+    if (this.gasTimer <= 0) this.stopGasStream();
     if (Phaser.Input.Keyboard.JustDown(this.keys.damage)) this.scarePoop();
 
     const digestionRate =
@@ -992,6 +1071,7 @@ export class GameScene extends Phaser.Scene {
       (this.keys.poop.isDown || this.pointerPoop) &&
       this.meter > 0;
     if (wasPooping && !this.pooping) this.relievedTimer = 60;
+    if (!this.pooping && this.dumpKind === 'none') this.stopGasStream();
 
     if (this.dumpKind !== 'none') {
       this.meter = Math.max(0, this.meter - 2.4 * f);
@@ -1042,6 +1122,7 @@ export class GameScene extends Phaser.Scene {
     if (this.gasTimer > 0) {
       // Gas replaces liquid output rather than decorating it. Fewer expanding
       // parcels produce a coherent cloud at a fraction of the goo particle count.
+      this.startGasStream();
       this.gasEmitCarry += n * 0.32;
       const gasCount = Math.floor(this.gasEmitCarry);
       this.gasEmitCarry -= gasCount;
@@ -1059,6 +1140,52 @@ export class GameScene extends Phaser.Scene {
       const vy = wild ? 2.5 + Math.random() * 3.5 : this.pigeonVy * 0.35 + 4.2;
       this.sim.emit(tailX, tailY, vx, vy, tint, 1, rainbow);
     }
+  }
+
+  /** Idempotent per frame: opens with one heave, then sustains the sputter bed. */
+  private startGasStream(): void {
+    if (!this.gasLoop) {
+      const loop = this.sound.add('sfx-gas-loop', { loop: true, volume: 0 }) as AdjustableSound;
+      loop.play();
+      this.gasLoop = loop;
+      this.tweens.add({
+        targets: loop,
+        volume: 0.22 * SFX_VOLUME,
+        duration: 130,
+        ease: 'Quad.easeIn',
+      });
+    }
+    if (!this.gasHeavePlayedThisPress) {
+      // One heave per press; a re-press while the last one still rings joins the
+      // loop bed silently instead of stacking another retch on top.
+      if (!this.gasHeave?.isPlaying) {
+        this.gasHeave?.destroy();
+        const volume = 0.38 * SFX_VOLUME;
+        this.gasHeave = this.sound.add('sfx-gas-whoosh') as AdjustableSound;
+        this.gasHeave.play({ volume, rate: Phaser.Math.FloatBetween(0.94, 1.05) });
+        // BaseSound resets its config when play begins; set the live gain after it starts.
+        this.gasHeave.volume = volume;
+      }
+      this.gasHeavePlayedThisPress = true;
+    }
+  }
+
+  private stopGasStream(): void {
+    this.gasHeavePlayedThisPress = false;
+    const loop = this.gasLoop;
+    if (!loop) return;
+    this.gasLoop = undefined;
+    this.tweens.killTweensOf(loop);
+    this.tweens.add({
+      targets: loop,
+      volume: 0,
+      duration: 200,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        loop.stop();
+        loop.destroy();
+      },
+    });
   }
 
   /**

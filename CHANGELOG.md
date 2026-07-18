@@ -177,3 +177,26 @@ the set to three distinct impacts. Pedestrians retain the short wet v3 cut; cars
 reports each particle's first street contact, and the scene applies an impact threshold plus
 a 420 ms global cooldown so a fluid blob sounds cohesive instead of triggering an aggressive
 row of samples. Pedestrian/car routing continues to share the existing per-victim cooldown.
+
+**Gas and hydrant cues (2026-07-18):** gas-mode emission opens each stream with one comical
+wet-heave/whoosh at natural rate (small random detune) and sustains a new seamless bubbly
+sputter loop underneath for as long as the stream runs — however long the press — with a
+130 ms fade-in and a 200 ms fade-out on release or gas expiry. The heave fires once per
+press and rings out naturally; a quick re-press while it still sounds rejoins the loop bed
+without stacking another retch. (This replaces the earlier rate-0.3 slowdown of the single
+one-shot, which pitched the heave into a groan and fell silent after ~3.4 s.) A fire
+hydrant now gives three gentle lid clinks as it enters `warn`, then starts the softer v0
+high-pressure water bed on `burst` for the full visible column and fades it out as the jet
+ends. The earlier harsh burst cue is no longer loaded. Both effects use the shared SFX bus.
+
+**Klezmer transition (2026-07-18):** leaving the frantic combo tier now fades the klezmer
+layer over 2.4 seconds while the sneaky layer returns on the original 0.9-second crossfade,
+giving the energetic track a smoother tail without delaying the base music.
+
+**Second pedestrian cast (2026-07-18):** added three new street victims: a tasteless
+fake-luxury influencer, a hopelessly lost tourist dad, and a skipped-leg-day gym bro. Each
+ships with walk, outraged splat, and delighted rainbow-reaction art plus character-specific
+reaction lines. Pedestrian spawning now samples all six characters. The shared victim
+palette control expanded from three to six source IDs, with isolated primary-garment masks
+for the influencer's velour tracksuit, tourist's vacation shirt, and gym bro's tank/shorts;
+existing pedestrians and the three car paint mappings remain in the same batched shader.

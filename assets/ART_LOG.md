@@ -428,3 +428,92 @@ extending a set — consistency depends on it.
   > Output intent:
   > - One reusable high-resolution master sheet for assets/masters/pea-pod-pickup-sheet.png.
   > - It will be chroma-keyed, split, normalized, and replace the earlier round-pea shipping sprites as public/assets/sprites/pickup-pea-0.png and pickup-pea-1.png on identical transparent 144×144 canvases.
+
+## assets/masters/portrait-pleased-relaxed.png → public/assets/portraits/pleased.png — 2026-07-18
+
+- **References inspected:** `images/pleased.png` (edited state), `images/normal.png`, and `public/assets/portraits/strain.png`; the user-supplied serene-relief meme informed the emotion only. No hands, humans, or meme pose appear in the asset.
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); one-shot, no retries.
+- **Master:** 1254×1254 RGB PNG at `assets/masters/portrait-pleased-relaxed.png`; original generated source is retained in Codex's generated-image store.
+- **Shipping asset:** 1024×1024 indexed PNG at `public/assets/portraits/pleased.png`.
+- **Post-processing:** separate runtime copy resized to 1024×1024, then `pngquant 256`; master untouched. Inspected the shipped PNG full-size and will validate it at the actual 88px circular HUD presentation.
+- **Frame semantics:** replaces the post-dump `pleased` portrait: a quiet, deeply contented release rather than a smug grin.
+- **Prompt:**
+  > Edit the first attached portrait only. Keep this same cartoon pigeon and its square HUD composition: head and neck centered in a circular warm-tan medallion with a dark rim and black outside. It is post-dump and truly relaxed/content, evoking serene release without hands, humans, touching, or copying the reference meme pose. Both eyelids are gently lowered in calm, the brows are softened, cheeks are loose, and the closed beak has a tiny soft smile; the head tips very slightly upward after a long exhale. No strain lines, teeth, panic, wink, smugness, evil grin, or exaggerated expression. Preserve the slate-blue pigeon, orange eyes, purple eye patches, scruffy black brows, iridescent green-to-purple neck feathers, thick clean near-black outlines, painterly cel shading, and absurdist game tone. Output one 1024×1024 PNG.
+
+## assets/masters/pedestrians-sheet-2.png → public/assets/sprites/ped-{3,4,5}.png — 2026-07-18
+
+- **References inspected:** `assets/masters/pedestrians-sheet.png` (sprite-family style, scale, geometry, and layout) and `images/normal.png` (rendering style only; no pigeon rendered).
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); one-shot, no retries.
+- **Master:** untouched 1774×887 RGB PNG.
+- **Post-processing:** whole-sheet `-fuzz 12% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`; content-safe x splits at 578 and 1127 (the generated subjects did not follow nominal thirds exactly); trim; uniform `-resize 15.5%`; `pngquant 256`. Final indexed RGBA sprites are 62×110, 74×105, and 78×107.
+- **Panel semantics:** ped-3 = tasteless influencer with fake luxury bag; ped-4 = lost tourist dad; ped-5 = top-heavy gym bro. All face left and share the existing pedestrian ground-line convention.
+- **Prompt:**
+  > Inspect the first reference as the exact pedestrian sprite-family style, body scale, ground line, side-view geometry, and three-panel layout. Inspect the second reference for the game's rendering style only. The pigeon is the protagonist and MUST NOT appear in this render.
+  >
+  > Generate a SECOND PEDESTRIAN WALK CHARACTER SHEET for the same game: cartoon city pedestrians, thick clean near-black outlines, painterly cel shading, warm slightly desaturated palette, chunky roughly 3.5-head-tall comic caricatures, mildly oblivious, tacky, or self-important.
+  >
+  > Composition: one wide landscape image divided conceptually into exactly THREE equal side-by-side panels, with no visible dividers. Each panel contains ONE different full-body human pedestrian in strict side view, FACING LEFT, mid-walk stride. All three use the SAME apparent scale and SAME shared foot/ground line as the first reference. Keep generous clear space around each figure; nothing may touch any image edge or cross into another panel.
+  >
+  > Panel 1, left — RICH BUT TASTELESS INFLUENCER LADY: an ostentatious nouveau-riche adult woman with an exaggerated hourglass caricature, orange spray tan, overfilled lips, huge black gradient sunglasses, towering blonde blowout, gold hoop earrings, and impractical wedge heels. She wears a loud SOLID BUBBLEGUM-PINK velour tracksuit, jacket and trousers clearly the same pink material, intended as the large primary recolorable garment. She holds a smartphone upright on a tiny handheld selfie gimbal. On her other forearm hangs a tan bootleg luxury handbag covered in an obviously fake invented 'LV-ish' monogram pattern, with one crooked emblem and cheap gold hardware; it must read as tasteless counterfeit fashion rather than a real exact branded product. Smug duck-face expression.
+  >
+  > Panel 2, middle — TOURIST DAD: a stocky middle-aged man, pink sunburned face and nose, floppy white sun hat, camera on neck strap, bulging fanny pack, white calf socks and brown sandals. He wears a roomy SOLID CORNFLOWER-BLUE short-sleeve vacation shirt, intended as the large primary recolorable garment, with only a few sparse tiny pale palm-leaf motifs so most of the shirt remains clean blue material. Khaki cargo shorts. He walks while squinting down at an enormous badly folded city map held in both hands, cheerfully lost.
+  >
+  > Panel 3, right — GYM BRO: a comically top-heavy muscular adult man with absurd shoulders and arms, tiny skipped-leg-day calves, close-cropped dark hair, square jaw, fake tan, and a self-satisfied grimace. He wears a SOLID DEEP COBALT-BLUE stringer tank top and matching short gym shorts, both clearly the same large primary recolorable fabric. White crew socks, chunky trainers, wrist wraps. He carries a translucent shaker bottle in one hand while curling the other arm as he walks. No weights or gym equipment.
+  >
+  > Palette/shader requirements: preserve broad, contiguous regions of exactly one dominant base color in each character's named primary garment. Use folds and cel-shaded lighter/darker versions of that hue, not multicolored patterns. Keep skin, hair, props, handbag, map, camera, socks, shoes, outlines, and metal chromatically distinct from each primary garment so a hue-distance shader can recolor the garment without recoloring skin or props.
+  >
+  > Background/cutout: the ENTIRE background must be perfectly uniform flat pure magenta #ff00ff, with no gradient, texture, shadow, glow, floor, panel divider, text label, or scenery. All outlines must stay well clear of the outer edges. Do not draw droppings, pigeons, logos copied exactly from a real brand, or any fourth character.
+  >
+  > Output intent: preserve the untouched high-resolution image as assets/masters/pedestrians-sheet-2.png, then chroma-key and split it into public/assets/sprites/ped-3.png, ped-4.png, and ped-5.png at the same runtime scale and foot alignment as the existing ped-0..2 sprites.
+
+## assets/masters/pedestrians-react-sheet-2.png → public/assets/sprites/ped-{3,4,5}-r.png — 2026-07-18
+
+- **References inspected:** `assets/masters/pedestrians-sheet-2.png` (immutable identity) and `assets/masters/pedestrians-react-sheet.png` (reaction energy, layout, scale, and ground line only).
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); one-shot, no retries.
+- **Master:** untouched 1774×887 RGB PNG.
+- **Post-processing:** same 12% key and one-pixel alpha erosion; content-safe x splits at 591 and 1143; trim; uniform `-resize 15.5%`; `pngquant 256`. Final sprites are 78×117, 74×110, and 82×110.
+- **Frame semantics:** post-splat outrage with no painted goo: handbag shield / map umbrella / double-biceps roar.
+- **Prompt:**
+  > Inspect the first reference as the immutable identity sheet for three new pedestrians. Inspect the second reference only for the existing game's post-splat reaction-sheet pose energy, rendering style, three-panel layout, scale, and ground-line convention. Do not copy or include any of the second reference's three people.
+  >
+  > Generate a POST-SPLAT OUTRAGE REACTION SHEET of the SAME THREE people from the first reference, in the SAME order, with identical faces, hair, body shapes, clothing, props, colors, thick clean near-black outlines, and painterly cel shading. The incident is pigeon droppings hitting from above, but DO NOT paint any droppings, goo, stains, splashes, pigeons, text, effects, or reaction lines; the game renders those separately. Only their poses and expressions change.
+  >
+  > Composition: wide landscape image divided conceptually into exactly THREE equal side-by-side panels, no visible dividers. One full-body character per panel, still oriented generally FACING LEFT. Keep the same apparent body scale as the identity sheet and the same shared foot/ground line. Dynamic limbs and props must remain entirely inside their own panel and clear of all image edges. Keep each named primary garment's broad source colors intact for shader recoloring: influencer bubblegum-pink velour, tourist cornflower-blue shirt, gym bro cobalt-blue tank and shorts.
+  >
+  > Panel 1, left — SAME influencer lady: she recoils in offended horror with her mouth open and sunglasses slipping crookedly. She desperately raises the fake tan monogram handbag over her head as a shield while her smartphone and tiny gimbal fly loose beside her, still safely inside the panel. One wedge heel stamps down; the bubblegum-pink tracksuit remains clearly visible and unchanged. Expression says 'not the outfit!'.
+  >
+  > Panel 2, middle — SAME tourist dad: startled and outraged, hunched under his huge unfolded map held above his hat like a useless emergency umbrella. Camera swings outward on its strap, knees buckle, and he peers out with an angry sunburned face. Keep his blue palm shirt, khaki shorts, fanny pack, socks, sandals, hat, camera, and map identical.
+  >
+  > Panel 3, right — SAME gym bro: furious and insulted, planting both feet and throwing an absurd aggressive double-biceps pose while roaring upward. His shaker bottle has popped open and tumbles beside him, entirely within the panel. Keep the same huge upper body, tiny calves, cobalt stringer and shorts, wrist wraps, socks, trainers, hair, and face.
+  >
+  > Identity invariants: these must unmistakably be the exact first-reference characters, not redesigns. Do not change wardrobe construction, pattern, color, handbag, camera, map, muscle geometry, proportions, or skin/hair tones. Match each character's height and body scale to their own walk frame so swapping textures in-game does not cause a size jump.
+  >
+  > Background: perfectly uniform flat pure magenta #ff00ff over the entire image, with no gradient, texture, shadow, glow, floor, panel divider, label, or scenery. Nothing touches an image edge.
+  >
+  > Output intent: preserve the untouched source as assets/masters/pedestrians-react-sheet-2.png, then chroma-key, split, normalize by the walk-sheet scale and foot anchor, and ship public/assets/sprites/ped-3-r.png, ped-4-r.png, and ped-5-r.png.
+
+## assets/masters/pedestrians-rainbow-sheet-2.png → public/assets/sprites/ped-{3,4,5}-rainbow.png — 2026-07-18
+
+- **References inspected:** `assets/masters/pedestrians-sheet-2.png` (immutable identity) and a temporary contact sheet of `ped-{0,1,2}-rainbow.png` (delighted tone and body language only).
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); one-shot, no retries.
+- **Master:** untouched 1774×887 RGB PNG.
+- **Post-processing:** same 12% key and one-pixel alpha erosion; content-safe x splits at 619 and 1131; trim; uniform `-resize 15.5%`; `pngquant 256`. Final sprites are 72×124, 72×122, and 75×130.
+- **Frame semantics:** delighted rainbow-hit reactions with no painted goo/effects: triumphant selfie / tourist photo hop / shaker-trophy pose.
+- **Prompt:**
+  > Inspect the first reference as the immutable identity sheet for three new pedestrians. Inspect the second reference only for the existing game's delighted rainbow-hit reaction tone and energetic body language. Do not copy or include any people from the second reference.
+  >
+  > Generate a JOYFUL RAINBOW-HIT REACTION SHEET of the SAME THREE people from the first reference, in the SAME order, with identical faces, hair, body shapes, wardrobe, props, colors, thick clean near-black outlines, and painterly cel shading. The game has hit them with magical rainbow-colored pigeon goo, but DO NOT paint any goo, stains, rainbow, sparkles, hearts, pigeons, text, effects, or reaction lines; the game renders those separately. Show delight only through their poses and expressions.
+  >
+  > Composition: wide landscape image divided conceptually into exactly THREE equal side-by-side panels, with no visible dividers. One full-body character per panel, generally oriented FACING LEFT. Keep the same apparent body scale as the identity sheet and the same shared foot/ground line. Dynamic limbs and props must remain entirely inside their own panel and clear of all image edges. Preserve the named primary shader garment colors: influencer bubblegum-pink velour, tourist cornflower-blue shirt, gym bro cobalt-blue tank and shorts.
+  >
+  > Panel 1, left — SAME influencer lady: utterly thrilled because the magical color makes perfect content. She beams in an extravagant open-mouth smile, sunglasses tipped down, holding the smartphone and gimbal high for a triumphant selfie while presenting the fake monogram handbag proudly with the other arm. One knee lifts in a celebratory fashion pose; hair, hoops, handbag, wedge heels, and pink tracksuit remain identical.
+  >
+  > Panel 2, middle — SAME tourist dad: delighted as though he discovered the trip's best attraction. He throws one hand happily upward and raises the camera in the other to take a picture, with the folded map tucked messily under one arm. Huge cheerful grin, one sandal lifted in a jaunty hop. Hat, blue shirt, khaki shorts, fanny pack, socks, sandals, camera, and map remain identical.
+  >
+  > Panel 3, right — SAME gym bro: euphoric and vain, striking a victorious bodybuilder side-chest pose with an enormous grin, one foot lifted in a celebratory bounce. He raises the closed shaker bottle like a trophy in one hand while flexing the other arm. Keep the same huge upper body, tiny calves, cobalt stringer and shorts, wrist wraps, socks, trainers, hair, face, and shaker.
+  >
+  > Identity and runtime invariants: these are exact reaction poses of the first-reference characters, not redesigns. Do not change garment construction, patterns, source colors, props, muscle geometry, proportions, skin/hair tones, or character heights. Match each character's body scale to their walk frame so texture swaps do not jump. Keep all loose props attached or held; do not add extra objects.
+  >
+  > Background: perfectly uniform flat pure magenta #ff00ff over the entire image, with no gradient, texture, shadow, glow, floor, panel divider, label, or scenery. Nothing touches any image edge.
+  >
+  > Output intent: preserve the untouched source as assets/masters/pedestrians-rainbow-sheet-2.png, then chroma-key, split, normalize by walk-sheet scale and foot anchor, and ship public/assets/sprites/ped-3-rainbow.png, ped-4-rainbow.png, and ped-5-rainbow.png.

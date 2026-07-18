@@ -53,6 +53,63 @@ natural length and `ship` trims silence + normalizes peak to −1 dB.
   normalization, mono fold-down, and dual-format encode.
 - **Shipped:** 0.22 s
 
+## public/assets/audio/gas-whoosh.{ogg,mp3} — 2026-07-18
+
+- **Master:** `assets/audio-masters/gas-whoosh-v1.mp3` (v0 rejected: two seconds of
+  diffuse air noise was too long for a recurring stream cue)
+- **Prompt:** `cartoon videogame gas-mode sound: one short comical wet puke-heave that
+  blossoms into a soft farting whoosh of toxic green gas, silly rather than gross, short
+  and snappy, one burst only, no repeats, no long silence`
+- **Shipped:** 1.00 s after standard trim, mono fold-down, and peak normalization.
+  Runtime plays it once per press at natural rate (±5% random detune) as the opening
+  heave, with the `gas-loop` bed sustaining underneath; it never restarts mid-hold, and
+  a re-press while the last heave still rings joins the bed without stacking another.
+  (Earlier rate-0.3 slowdown hack retired: it pitched the heave down ~1.7 octaves and
+  still went silent after ~3.4 s of an 8 s gas window.)
+
+## public/assets/audio/gas-loop.{ogg,mp3} — 2026-07-18
+
+- **Master:** `assets/audio-masters/gas-loop-v1.mp3` (v0 rejected: plain broadband air
+  hiss, indistinguishable from the hydrant water bed; v1 carries tonal bubbly banding)
+- **Prompt:** `cartoon videogame ambience loop: continuous comical stream of toxic green
+  gas sputtering and hissing from a bird's rear, soft bubbly farting undertone with a
+  steady airy hiss, silly rather than gross, even texture, no distinct events, no rhythm,
+  seamless loop` (`--dur 3 --loop`)
+- **Shipped:** 3.00 s raw to preserve the loop point. Loops under the whole gas stream
+  after the gas-whoosh heave opener: 130 ms fade-in on stream start, 200 ms fade-out on
+  release, meter empty, or gas-timer expiry.
+
+## public/assets/audio/hydrant-burst.{ogg,mp3} — 2026-07-18
+
+- **Master:** `assets/audio-masters/hydrant-burst-v0.mp3` (v1 rejected: contained several
+  separated bursts rather than one cap-pop event)
+- **Prompt:** `cartoon videogame hazard sound: one fire hydrant cap popping open followed
+  by a powerful upward water whoosh and brief spray, comedic, short and snappy, one burst
+  only, no repeats, no long silence`
+- **Shipped:** 1.00 s after standard trim, mono fold-down, and peak normalization.
+  Retained for audition/provenance but superseded in runtime by the gentler clank + jet bed.
+
+## public/assets/audio/hydrant-clank.{ogg,mp3} — 2026-07-18
+
+- **Master:** `assets/audio-masters/hydrant-clank-v0.mp3` (v1 rejected: fourteen seconds
+  of repeated weak rattling rather than a compact telegraph)
+- **Prompt:** `cartoon videogame warning sound: a loose metal fire hydrant lid gently
+  rattles with two or three soft muted clinks, light restrained cap wobble, subtle and
+  anticipatory, no harsh clang, no explosion, no water, short and snappy`
+- **Shipped:** 0.30 s after standard trim, mono fold-down, and peak normalization. Plays
+  once when the hydrant enters its warning state.
+
+## public/assets/audio/hydrant-jet-loop.{ogg,mp3} — 2026-07-18
+
+- **Master:** `assets/audio-masters/hydrant-jet-loop-v0.mp3` (user preferred its fuller,
+  steadier water bed over v1; runtime gain reduced from 0.28 to 0.18)
+- **Prompt:** `cartoon videogame ambience loop: continuous high-pressure water jet
+  erupting from an open fire hydrant, lush rushing water spray, steady watery hiss with
+  slight natural turbulence, no cap pop, no impacts, no rhythm, seamless loop`
+  (`--dur 3 --loop`)
+- **Shipped:** 3.00 s raw to preserve the loop point. Plays alone while the water column
+  is active, after the separate lid-clank telegraph.
+
 ## public/assets/audio/pickup-pea.{ogg,mp3} — 2026-07-18
 
 - **Master:** `assets/audio-masters/pickup-pea-v1.mp3` (v0 rejected: ~1 s dead air between pop and munch)
