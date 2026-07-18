@@ -10,7 +10,7 @@ Shipped: digestion-pressure economy (passive fill 0.12/frame, poop drains), auto
 at 100% with telegraph (wobbly flight from meter ≥ 92 + panic portrait; no sound yet),
 scare-poop replacing damage entirely (D key debugs it — wire to real hazards later),
 portrait as a pure prioritized state function with min-hold (battered → panic → strain →
-pleased → normal; flicker fixed), and the gauge reimagined as a ring around the portrait
+pleased → ready; flicker fixed), and the gauge reimagined as a ring around the portrait
 (cream → amber ≥ 70% → pulsing red ≥ 88%). New `portrait-panic` art logged in ART_LOG.
 
 ## Goo conforming to sprites — alpha-mask dripping (shipped 2026-07-14)
@@ -123,11 +123,32 @@ a faster 5–9 s item timer, with a first item after 4.2 s. All pickups use the 
 altitude range, scroll/bob/sway behavior and collection hitbox. The old additive white halo
 was removed entirely; the silhouettes now float cleanly against the sky.
 
-Bread/fries/kebab immediately add +15/+25/+40 digestion pressure and can push the player
-into a blowout. Chilli, coffee and pea already spawn, collect, and produce item-colored
-feedback bursts, but their fire-poo, accelerated-meter and gas-mode behaviors remain
-deliberately deferred. The frightened pod swaps `pickup-pea-0`/`pickup-pea-1` every 18
-normalized frames so only its pupils dart left/right. `window.SP.spawnItemPickup(kind,x,y)`
-provides deterministic scene testing. Verified in live Phaser with every pickup visible,
-opposite pea frames forced side-by-side, automatic frame alternation observed, bread's
-pressure delta checked, and chilli collection checked.
+Bread/fries/kebab immediately add +5/+8/+20 digestion pressure; kebab is the meaningful
+jump while the two snacks are small top-ups. Coffee now activates an eight-second rush
+that triples passive digestion. Chilli and pea already spawn, collect, and produce
+item-colored feedback bursts, but their fire-poo and gas-mode behaviors remain deliberately
+deferred. The frightened pod swaps `pickup-pea-0`/`pickup-pea-1` every 18 normalized frames
+so only its pupils dart left/right. `window.SP.spawnItemPickup(kind,x,y)` provides
+deterministic scene testing.
+
+**Engagement tuning (2026-07-18):** passive digestion slowed from 0.12 to 0.035 meter per
+normalized frame (7.2 → 2.1 per second; empty-to-full now ≈48 s). Coffee raises that to
+0.105/frame (6.3/s) for eight seconds. Pickup scale dropped 0.42 → 0.34 and the collection
+half-extents followed from 40×38 → 33×30. Removed all pickup-name collection popups,
+including rainbow; collection is communicated through the colored burst. Timed-mode text
+was subsequently removed too: active rainbow and coffee durations now appear as compact,
+text-free draining bars directly under the portrait (six-color rainbow strip, brown-to-gold
+coffee strip), packed upward and hidden at zero. Verified in live Phaser: exact one-second
+meter deltas 2.1/6.3, exact food gains 5/8/20, no pickup/effect text objects, readable pickup
+silhouettes at the new scale, both timer bars visible together, and an empty meter graphic
+after both effects expire.
+
+## Ready portrait semantics (shipped 2026-07-18)
+
+The old runtime `public/assets/portraits/normal.png` was semantically misleading: its
+focused expression reads as “ready to poop,” not an idle neutral face. Renamed the unchanged
+asset and texture key to `ready.png` / `portrait-ready`. After the pigeon runs dry,
+`portrait-pleased` now persists for the entire `emptyLock` recovery window even after the
+short relief timer expires. Crossing the existing meter-8 firing threshold clears the lock
+and returns the portrait to `ready` after the normal anti-flicker hold. Historical
+`images/normal.png` generation references remain named as originally recorded.

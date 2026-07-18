@@ -64,8 +64,8 @@ this slot in alongside the normal flight frames.
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =
-  rapid-fire/accelerated meter, chilli = explosive burning/fire poo, frightened pea pod =
-  gas mode. Rainbow behavior is already shipped.
+  accelerated meter is shipped; chilli = explosive burning/fire poo and frightened pea
+  pod = gas mode remain. Rainbow behavior is already shipped.
 
 **World & level design**
 - Higher platforms / screen layers — e.g. flying at balcony level, vertical screen
