@@ -245,3 +245,63 @@ extending a set — consistency depends on it.
 - **Scene changes:** pickup no longer coin-spins (a rainbow shouldn't); it sways ±7° with a
   gentle pulse, and the halo is a soft additive white glow (alpha 0.07 fill) instead of the
   gold ring.
+
+## assets/masters/food-pickups-sheet.png → public/assets/sprites/pickup-{bread,fries,kebab}.png — 2026-07-18
+
+- **References inspected:** `assets/masters/hydrant-sheet.png` (attached as a style-only
+  reference; no hydrant or reference subject appears) and
+  `public/assets/sprites/pickup-rainbow.png` (runtime footprint comparison only).
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); 1774×887 RGB master;
+  one-shot, no retries.
+- **Panel semantics:** left = torn rustic bread heel/crust (+15 pressure design intent),
+  center = fries in an unbranded red carton (+25), right = loaded Berlin-style döner in
+  pita (+40). The silhouettes become slightly fuller with value while sharing the same
+  center anchor.
+- **Post-processing:** keyed the whole master before splitting with ImageMagick 6
+  (`-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`). The
+  generated magenta field was visually uniform but its sampled corner RGB values were not
+  exact `#ff00ff`; the 10% fuzz cleared it without eating the food palette. Cropped the
+  three connected silhouettes at `424x387+76+292`, `466x606+577+127`, and
+  `598x560+1105+163`; resized them within 116×116, 124×124, and 130×130 respectively;
+  centered each on a common transparent 144×144 canvas; then ran pngquant 256 on the
+  shipping copies. The reusable master was not modified.
+- **Acceptance:** confirmed 144×144 sRGBA outputs and four fully transparent corner
+  pixels per sprite; inspected the cutouts over dark slate at both native and 42% scale;
+  then dynamically loaded all three into the live Phaser scene at `PICKUP_SCALE = 0.42`
+  beside `pickup-rainbow`. All silhouettes remained readable against the real skyline,
+  with no visible magenta fringe or anchor mismatch. No runtime code was changed.
+- **Prompt:**
+  > Use case: stylized-concept
+  >
+  > Asset type: three-panel pickup-item sprite sheet for a cartoon side-scrolling game
+  >
+  > References and role:
+  > - Image 1 is a STYLE-ONLY reference for the established prop rendering: thick clean near-black outlines, painterly cel shading with 2–3 value groups, warm slightly desaturated colors, tiny worn texture accents, chunky comic proportions.
+  > - Do NOT draw a fire hydrant, brass cap, water, pigeon, character, or any other subject from the reference.
+  >
+  > Primary request:
+  > Create one coherent FOOD PICKUP SPRITE SHEET with exactly THREE equal side-by-side panels. One complete isolated food item per panel, in this fixed order:
+  > 1. LEFT — BREAD: a small irregular torn heel/crust of rustic bread, golden-brown outer crust and clearly visible warm cream porous crumb on the torn face. One compact connected silhouette, appetizing but scrappy enough for a city pigeon.
+  > 2. CENTER — FRIES: a generous bunch of golden french fries in a squat red paper carton with a cream folded rim, no logo and no text. Fries have varied heights but remain a compact connected pickup silhouette.
+  > 3. RIGHT — KEBAB: a large overstuffed Berlin-style döner sandwich in a toasted triangular pita, visibly packed with browned sliced meat, green lettuce, tomato, purple cabbage, and a pale garlic-sauce stripe. It must read immediately as a handheld döner, not a taco, burger, burrito, pizza, or meat skewer.
+  >
+  > Composition:
+  > - Wide landscape sheet, exactly three equal panels, no divider lines.
+  > - Flat three-quarter icon view, not strict side view and not top-down.
+  > - Each item centered in its panel, fully visible, generous clear margin from every frame edge.
+  > - All three occupy comparable visual footprint and share a common implied center/anchor; bread may be slightly smaller, kebab slightly fuller, to communicate value progression without making any item unreadably tiny.
+  > - No cast shadows, ground/contact shadows, plates, napkins, utensils, hands, faces, eyes, limbs, motion lines, badges, medallions, glows, sparkles, loose crumbs, or separate floating garnish.
+  > - Strong clean silhouette that remains readable when reduced to about 60 screen pixels.
+  >
+  > Palette and rendering:
+  > - Match Image 1's prop style only: thick clean dark outlines of consistent weight; warm painterly cel shading; 2–3 distinct tone blocks per material; subtle handmade texture; polished 2D game art; playful and slightly grubby/absurdist, never photorealistic.
+  > - Keep all food colors natural and distinct. Do not use pure magenta anywhere in the food or outlines.
+  >
+  > Background/cutout:
+  > - The ENTIRE sheet background must be perfectly uniform flat solid pure #ff00ff magenta for chroma-key removal.
+  > - Absolutely no background gradients, texture, lighting variation, floor plane, reflection, vignette, shadow, panel border, panel divider, watermark, signature, logo, or text.
+  > - Keep every food item and every dark outline well away from the image edges.
+  >
+  > Output intent:
+  > - One reusable high-resolution master sheet for assets/masters/food-pickups-sheet.png.
+  > - It will be chroma-keyed, split into three transparent sprites, normalized to common 144×144 canvases, and shipped as public/assets/sprites/pickup-bread.png, pickup-fries.png, and pickup-kebab.png.
