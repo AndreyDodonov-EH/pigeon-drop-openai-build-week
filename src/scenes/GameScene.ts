@@ -16,32 +16,73 @@ const GUANO_TINT = 0xf2ecd4;
 const COLOR_CREAM = '#f3ead8';
 const COLOR_INK = '#1d1f2a'; // outlines/strokes
 const COLOR_AMBER = '#ffd34e';
-const COLOR_PALE_GOLD = '#fff7bd';
 const COLOR_ORANGE = '#ff8a5c'; // outrage lines, blowout
 const COLOR_JOY_GREEN = '#7be07b'; // rainbow-delight reaction lines
 const COLOR_WATER = '#a8dcf2';
-/** red→violet spectrum used by the pickup burst (matches the arc sprite bands) */
+/** red→violet spectrum used by the rainbow pickup burst (matches the arc sprite bands) */
 const RAINBOW_COLORS = [0xff5b57, 0xff9d3e, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8];
 
 // ---- sprite scales ----
 const PIGEON_SCALE = 0.38;
 const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
-const PICKUP_SCALE = 0.42;
+const PICKUP_SCALE = 0.34;
 
-// Curated clothing/paint hues: blue, burgundy, green, violet, orange, teal,
-// ochre, and plum. The shared shader receives hue, source variant, and victim
-// kind through the sprite tint vertex data.
+// Curated clothing/paint/tie hues: blue, burgundy, green, violet, orange,
+// teal, ochre, and plum. The shared shader receives hue, accent hue, source
+// variant, and victim kind through the sprite tint vertex data.
 const VICTIM_PALETTE_HUES = [0.6, 0.97, 0.28, 0.75, 0.07, 0.5, 0.13, 0.88];
+// The runner's hair stays plausible while still adding visible variety.
+const RUNNER_HAIR_HUES = [0.03, 0.08, 0.13]; // red, brown, blonde
 
-// ---- rainbow pickup tuning ----
+// ---- pickup tuning ----
 const RAINBOW_DURATION = 60 * 10; // frames of rainbow goo per pickup
-const PICKUP_FIRST_MS = 2500; // first spawn after game start
-const PICKUP_MIN_MS = 12000; // respawn window
-const PICKUP_MAX_MS = 20000;
+const RAINBOW_PICKUP_FIRST_MS = 2500;
+const RAINBOW_PICKUP_MIN_MS = 12000;
+const RAINBOW_PICKUP_MAX_MS = 20000;
+const ITEM_PICKUP_FIRST_MS = 4200;
+const ITEM_PICKUP_MIN_MS = 5000;
+const ITEM_PICKUP_MAX_MS = 9000;
+const PEA_LOOK_FRAME_FRAMES = 18;
+const PASSIVE_DIGESTION_PER_FRAME = 0.035;
+const COFFEE_DURATION = 60 * 8;
+const COFFEE_FILL_MULTIPLIER = 3;
 /** collection hitbox half-extents around the pigeon */
-const PICKUP_GRAB_X = 40;
-const PICKUP_GRAB_Y = 38;
+const PICKUP_GRAB_X = 33;
+const PICKUP_GRAB_Y = 30;
+
+const ITEM_PICKUP_KINDS = ['bread', 'fries', 'kebab', 'chilli', 'coffee', 'pea'] as const;
+type ItemPickupKind = (typeof ITEM_PICKUP_KINDS)[number];
+type PickupKind = 'rainbow' | ItemPickupKind;
+
+interface ItemPickupEffect {
+  pressureGain?: number;
+  burstColors: number[];
+}
+
+const ITEM_PICKUP_EFFECTS: Record<ItemPickupKind, ItemPickupEffect> = {
+  bread: {
+    pressureGain: 5,
+    burstColors: [0x8c4d28, 0xd79649, 0xf1d79b],
+  },
+  fries: {
+    pressureGain: 8,
+    burstColors: [0xd93b2f, 0xffa83d, 0xffdb57],
+  },
+  kebab: {
+    pressureGain: 20,
+    burstColors: [0x8b4a2b, 0xe74f36, 0x68b94d, 0xf2dfb6, 0x9d3c89],
+  },
+  chilli: {
+    burstColors: [0xb91f24, 0xf03b26, 0xff7a24, 0xffce42],
+  },
+  coffee: {
+    burstColors: [0x4a2719, 0x794225, 0xb96f37, 0xe2a763],
+  },
+  pea: {
+    burstColors: [0x2c7a2f, 0x59ad3b, 0x8bd84c, 0xd6ef82],
+  },
+};
 
 interface Victim {
   sprite: Phaser.GameObjects.Sprite;
@@ -78,15 +119,15 @@ interface Hydrant {
   splashed: boolean; // pigeon already caught by this burst
 }
 
-type PickupKind = 'rainbow';
-
 interface Pickup {
   kind: PickupKind;
   sprite: Phaser.GameObjects.Image;
-  halo: Phaser.GameObjects.Arc;
   baseY: number;
   phase: number;
+  animT: number;
 }
+
+type PortraitKey = 'ready' | 'pleased' | 'strain' | 'panic' | 'damage';
 
 export class GameScene extends Phaser.Scene {
   private sim!: GooSim;
@@ -110,7 +151,8 @@ export class GameScene extends Phaser.Scene {
   private pedTimer = 0;
   private carTimer = 0;
   private hydrantTimer = 4000;
-  private pickupTimer = PICKUP_FIRST_MS;
+  private rainbowPickupTimer = RAINBOW_PICKUP_FIRST_MS;
+  private itemPickupTimer = ITEM_PICKUP_FIRST_MS;
 
   /** digestion pressure, 0–100: fills passively, spent by pooping, 100 = blowout */
   private meter = 40;
@@ -119,13 +161,14 @@ export class GameScene extends Phaser.Scene {
   private comboTimer = 0;
   private scoreText!: Phaser.GameObjects.Text;
   private comboText!: Phaser.GameObjects.Text;
-  private pickupStatusText!: Phaser.GameObjects.Text;
+  private effectMeters!: Phaser.GameObjects.Graphics;
   private meterFill!: Phaser.GameObjects.Graphics;
   private portrait!: Phaser.GameObjects.Image;
-  private portraitKey = 'normal';
+  private portraitKey: PortraitKey = 'ready';
   private portraitHold = 0;
   private batteredTimer = 0;
   private relievedTimer = 0;
+  private coffeeTimer = 0;
   private pooping = false;
   /** involuntary dump in progress (runs until the meter empties) */
   private dumpKind: 'none' | 'blowout' | 'scare' = 'none';
@@ -147,7 +190,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image('portrait-normal', 'assets/portraits/normal.png');
+    this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
     this.load.image('portrait-pleased', 'assets/portraits/pleased.png');
@@ -172,6 +215,14 @@ export class GameScene extends Phaser.Scene {
     this.load.image('water-col', 'assets/sprites/water-col.png');
     this.load.image('water-crown', 'assets/sprites/water-crown.png');
     this.load.image('pickup-rainbow', 'assets/sprites/pickup-rainbow.png');
+    for (const kind of ITEM_PICKUP_KINDS) {
+      if (kind === 'pea') {
+        this.load.image('pickup-pea-0', 'assets/sprites/pickup-pea-0.png');
+        this.load.image('pickup-pea-1', 'assets/sprites/pickup-pea-1.png');
+      } else {
+        this.load.image(`pickup-${kind}`, `assets/sprites/pickup-${kind}.png`);
+      }
+    }
   }
 
   create(): void {
@@ -210,7 +261,13 @@ export class GameScene extends Phaser.Scene {
       particleCount: () => this.sim.particles.length,
       spawnHydrant: () => this.spawnHydrant(),
       spawnRainbowPickup: (x = W + 60, y = this.pigeonY) => this.spawnPickup('rainbow', x, y),
+      spawnItemPickup: (
+        kind: ItemPickupKind = ITEM_PICKUP_KINDS[0],
+        x = W + 60,
+        y = this.pigeonY,
+      ) => this.spawnPickup(kind, x, y),
       rainbowRemaining: () => this.rainbowTimer,
+      coffeeRemaining: () => this.coffeeTimer,
       pigeonY: () => this.pigeonY,
     };
   }
@@ -219,7 +276,7 @@ export class GameScene extends Phaser.Scene {
     const px = 64;
     const py = 64;
     this.add.circle(px, py, 46, 0x1d1f2a).setDepth(10).setStrokeStyle(3, 0x0e0f16);
-    this.portrait = this.add.image(px, py, 'portrait-normal').setDepth(11).setDisplaySize(88, 88);
+    this.portrait = this.add.image(px, py, 'portrait-ready').setDepth(11).setDisplaySize(88, 88);
     const maskShape = this.make.graphics({}, false);
     maskShape.fillCircle(px, py, 43);
     this.portrait.setMask(maskShape.createGeometryMask());
@@ -227,6 +284,7 @@ export class GameScene extends Phaser.Scene {
     // pressure gauge: a ring around the portrait that fills clockwise from the
     // top as digestion builds — the face literally sits inside its own meter
     this.meterFill = this.add.graphics().setDepth(10);
+    this.effectMeters = this.add.graphics().setDepth(12);
 
     this.scoreText = this.add
       .text(W - 24, 18, '0', {
@@ -247,17 +305,6 @@ export class GameScene extends Phaser.Scene {
         strokeThickness: 4,
       })
       .setOrigin(1, 0)
-      .setDepth(10);
-
-    this.pickupStatusText = this.add
-      .text(W / 2, 20, '', {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '18px',
-        color: COLOR_PALE_GOLD,
-        stroke: COLOR_INK,
-        strokeThickness: 5,
-      })
-      .setOrigin(0.5, 0)
       .setDepth(10);
 
     this.add
@@ -347,33 +394,48 @@ export class GameScene extends Phaser.Scene {
     x = W + 60,
     y = 90 + Math.random() * (GROUND_Y - 210),
   ): void {
-    const halo = this.add
-      .circle(x, y, 36, 0xffffff, 0.07)
-      .setDepth(6.4)
-      .setBlendMode(Phaser.BlendModes.ADD);
-    const sprite = this.add.image(x, y, `pickup-${kind}`).setScale(PICKUP_SCALE).setDepth(6.5);
-    this.pickups.push({ kind, sprite, halo, baseY: y, phase: Math.random() * Math.PI * 2 });
+    const texture = kind === 'pea' ? 'pickup-pea-0' : `pickup-${kind}`;
+    const sprite = this.add.image(x, y, texture).setScale(PICKUP_SCALE).setDepth(6.5);
+    this.pickups.push({
+      kind,
+      sprite,
+      baseY: y,
+      phase: Math.random() * Math.PI * 2,
+      animT: 0,
+    });
   }
 
   private updatePickups(f: number, deltaMs: number): void {
-    this.pickupTimer -= deltaMs;
-    if (this.pickupTimer <= 0) {
+    this.rainbowPickupTimer -= deltaMs;
+    if (this.rainbowPickupTimer <= 0) {
       this.spawnPickup('rainbow');
-      this.pickupTimer = PICKUP_MIN_MS + Math.random() * (PICKUP_MAX_MS - PICKUP_MIN_MS);
+      this.rainbowPickupTimer =
+        RAINBOW_PICKUP_MIN_MS +
+        Math.random() * (RAINBOW_PICKUP_MAX_MS - RAINBOW_PICKUP_MIN_MS);
+    }
+
+    this.itemPickupTimer -= deltaMs;
+    if (this.itemPickupTimer <= 0) {
+      const kind = ITEM_PICKUP_KINDS[(Math.random() * ITEM_PICKUP_KINDS.length) | 0];
+      this.spawnPickup(kind);
+      this.itemPickupTimer =
+        ITEM_PICKUP_MIN_MS + Math.random() * (ITEM_PICKUP_MAX_MS - ITEM_PICKUP_MIN_MS);
     }
 
     this.pickups = this.pickups.filter((p) => {
       p.sprite.x -= SCROLL * f;
       p.phase += 0.055 * f;
+      p.animT += f;
       p.sprite.y = p.baseY + Math.sin(p.phase) * 9;
-      // a rainbow arc hangs in the sky — sway gently instead of coin-spinning
+      // Pickups hang in the air and sway gently instead of coin-spinning.
       p.sprite.setAngle(Math.sin(p.phase * 0.8) * 7);
       const pulse = 1 + Math.sin(p.phase * 1.7) * 0.05;
       p.sprite.setScale(PICKUP_SCALE * pulse);
-      p.halo
-        .setPosition(p.sprite.x, p.sprite.y)
-        .setScale(0.9 + Math.sin(p.phase * 1.7) * 0.12)
-        .setAlpha(0.45 + Math.sin(p.phase * 1.7) * 0.25);
+      if (p.kind === 'pea') {
+        const lookFrame = Math.floor(p.animT / PEA_LOOK_FRAME_FRAMES) % 2;
+        const texture = `pickup-pea-${lookFrame}`;
+        if (p.sprite.texture.key !== texture) p.sprite.setTexture(texture);
+      }
 
       const collected =
         Math.abs(p.sprite.x - this.pigeon.x) < PICKUP_GRAB_X &&
@@ -381,12 +443,10 @@ export class GameScene extends Phaser.Scene {
       if (collected) {
         this.collectPickup(p.kind, p.sprite.x, p.sprite.y);
         p.sprite.destroy();
-        p.halo.destroy();
         return false;
       }
       if (p.sprite.x < -80) {
         p.sprite.destroy();
-        p.halo.destroy();
         return false;
       }
       return true;
@@ -394,20 +454,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private collectPickup(kind: PickupKind, x: number, y: number): void {
-    switch (kind) {
-      case 'rainbow':
-        this.rainbowTimer = RAINBOW_DURATION;
-        this.rainbowHue = 0;
-        this.popup(x, y - 44, 'RAINBOW GOO!  10s', COLOR_PALE_GOLD, 20);
-        this.pickupBurst(x, y);
-        break;
+    if (kind === 'rainbow') {
+      this.rainbowTimer = RAINBOW_DURATION;
+      this.rainbowHue = 0;
+      this.pickupBurst(x, y, RAINBOW_COLORS);
+      return;
     }
+
+    const effect = ITEM_PICKUP_EFFECTS[kind];
+    if (effect.pressureGain !== undefined) {
+      this.meter = Math.min(100, this.meter + effect.pressureGain);
+    }
+    if (kind === 'coffee') this.coffeeTimer = COFFEE_DURATION;
+    this.pickupBurst(x, y, effect.burstColors);
   }
 
-  private pickupBurst(x: number, y: number): void {
+  private pickupBurst(x: number, y: number, colors: number[]): void {
     for (let i = 0; i < 12; i++) {
       const angle = (i / 12) * Math.PI * 2;
-      const dot = this.add.circle(x, y, 5, RAINBOW_COLORS[i % RAINBOW_COLORS.length]).setDepth(9);
+      const dot = this.add.circle(x, y, 5, colors[i % colors.length]).setDepth(9);
       this.tweens.add({
         targets: dot,
         x: x + Math.cos(angle) * (45 + (i % 3) * 8),
@@ -424,13 +489,23 @@ export class GameScene extends Phaser.Scene {
   private spawnPed(): void {
     const v = (Math.random() * 3) | 0;
     const dir = Math.random() < 0.5 ? -1 : 1;
-    const hue = VICTIM_PALETTE_HUES[(Math.random() * VICTIM_PALETTE_HUES.length) | 0];
+    const hueIndex = (Math.random() * VICTIM_PALETTE_HUES.length) | 0;
+    const hue = VICTIM_PALETTE_HUES[hueIndex];
+    // The businessman gets a contrasting tie; the runner instead picks a
+    // natural hair shade (red, brown, or blonde).
+    const accentHue =
+      v === 1
+        ? RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0]
+        : VICTIM_PALETTE_HUES[
+            (hueIndex + 1 + ((Math.random() * (VICTIM_PALETTE_HUES.length - 1)) | 0)) %
+              VICTIM_PALETTE_HUES.length
+          ];
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
       .setDepth(5)
       .setFlipX(dir > 0)
-      .setTint(victimPaletteTint(hue, v, 'ped'))
+      .setTint(victimPaletteTint(hue, v, 'ped', accentHue))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
     sprite.setY(GROUND_Y - sprite.displayHeight / 2);
     this.victims.push({
@@ -767,10 +842,12 @@ export class GameScene extends Phaser.Scene {
 
   private updateGuano(f: number): void {
     this.rainbowTimer = Math.max(0, this.rainbowTimer - f);
+    this.coffeeTimer = Math.max(0, this.coffeeTimer - f);
     if (Phaser.Input.Keyboard.JustDown(this.keys.damage)) this.scarePoop();
 
-    // passive digestion tick (food pickups will add the big jumps later)
-    this.meter = Math.min(100, this.meter + 0.12 * f);
+    const digestionRate =
+      PASSIVE_DIGESTION_PER_FRAME * (this.coffeeTimer > 0 ? COFFEE_FILL_MULTIPLIER : 1);
+    this.meter = Math.min(100, this.meter + digestionRate * f);
     if (this.meter >= 8) this.emptyLock = false;
 
     // full = involuntary blowout: one huge uncontrolled blast until empty
@@ -849,15 +926,44 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Portrait is a pure function of state, strict priority battered → panic →
-   * strain → pleased → normal. Escalations switch instantly; de-escalations
+   * strain → pleased → ready. Escalations switch instantly; de-escalations
    * wait out a minimum hold so competing states can't flicker frame-by-frame.
    */
-  private desiredPortrait(): string {
+  private desiredPortrait(): PortraitKey {
     if (this.batteredTimer > 0) return 'damage';
     if (this.dumpKind === 'blowout' || this.meter >= 92) return 'panic';
     if (this.pooping || this.dumpKind === 'scare' || this.meter > 85) return 'strain';
-    if (this.relievedTimer > 0) return 'pleased';
-    return 'normal';
+    if (this.relievedTimer > 0 || this.emptyLock) return 'pleased';
+    return 'ready';
+  }
+
+  private drawEffectMeter(
+    g: Phaser.GameObjects.Graphics,
+    y: number,
+    fraction: number,
+    colors: number[],
+  ): void {
+    const x = 20;
+    const w = 88;
+    const h = 7;
+    const fillW = Math.round(w * Phaser.Math.Clamp(fraction, 0, 1));
+
+    g.fillStyle(0x0e0f16, 0.95);
+    g.fillRoundedRect(x - 2, y - 2, w + 4, h + 4, 3);
+    g.fillStyle(0x292c39, 0.92);
+    g.fillRect(x, y, w, h);
+
+    for (let i = 0; i < colors.length; i++) {
+      const segmentX = x + Math.floor((i * w) / colors.length);
+      const segmentEnd = x + Math.floor(((i + 1) * w) / colors.length);
+      const visibleW = Math.min(segmentEnd, x + fillW) - segmentX;
+      if (visibleW <= 0) break;
+      g.fillStyle(colors[i], 1);
+      g.fillRect(segmentX, y, visibleW, h);
+    }
+
+    g.lineStyle(1, 0xf3ead8, 0.55);
+    g.strokeRoundedRect(x - 1, y - 1, w + 2, h + 2, 2);
   }
 
   private updateHud(f: number): void {
@@ -867,7 +973,13 @@ export class GameScene extends Phaser.Scene {
     this.relievedTimer -= f;
     this.portraitHold -= f;
 
-    const RANK: Record<string, number> = { normal: 0, pleased: 1, strain: 2, panic: 3, damage: 4 };
+    const RANK: Record<PortraitKey, number> = {
+      ready: 0,
+      pleased: 1,
+      strain: 2,
+      panic: 3,
+      damage: 4,
+    };
     const want = this.desiredPortrait();
     if (want !== this.portraitKey && (RANK[want] > RANK[this.portraitKey] || this.portraitHold <= 0)) {
       this.portraitKey = want;
@@ -880,9 +992,25 @@ export class GameScene extends Phaser.Scene {
 
     this.scoreText.setText(String(this.score));
     this.comboText.setText(this.combo > 1 ? `x${this.combo} COMBO` : '');
-    this.pickupStatusText.setText(
-      this.rainbowTimer > 0 ? `RAINBOW GOO  ${Math.ceil(this.rainbowTimer / 60)}s` : '',
-    );
+    this.effectMeters.clear();
+    let effectY = 118;
+    if (this.rainbowTimer > 0) {
+      this.drawEffectMeter(
+        this.effectMeters,
+        effectY,
+        this.rainbowTimer / RAINBOW_DURATION,
+        RAINBOW_COLORS,
+      );
+      effectY += 13;
+    }
+    if (this.coffeeTimer > 0) {
+      this.drawEffectMeter(
+        this.effectMeters,
+        effectY,
+        this.coffeeTimer / COFFEE_DURATION,
+        [0x5a2f1f, 0x8b4b2b, 0xc98445, 0xe1aa61],
+      );
+    }
 
     // pressure ring: fills clockwise from 12 o'clock, goes amber then pulsing
     // red as the blowout approaches

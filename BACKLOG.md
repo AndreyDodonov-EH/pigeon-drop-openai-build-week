@@ -2,14 +2,12 @@
 
 Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md`.
 
-## Next up — first engagement slice (prioritized 2026-07-18, not started)
+## Next up — engagement follow-ups (reprioritized 2026-07-18)
 
-The engagement gap is **pull + juice, not more threats**: nothing lures the player off
-the safe cruise line (optimal play is "hold the line and hold S"), and score chains have
-no spectacle. The hydrant already covers the dodge verb; a second hazard adds threat
-variety but no new decisions. Turbo is the biggest idea but lands best once food pickups
-complete the meter economy (one resource: ammo + boost + comedy). Ordered by
-payoff-per-effort:
+Food pickups now supply the missing **pull** and complete the basic meter economy (see
+CHANGELOG). The remaining engagement gap is score-chain spectacle and higher-skill target
+variety. The hydrant already covers the dodge verb; a second hazard adds threat variety but
+no new decisions. Ordered by payoff-per-effort:
 
 1. **Combo ranks** (zero assets, pure code): uncap the x8 combo counter in `onSplat()`;
    keep the score multiplier plateauing at x8 behind the scenes. Rank thresholds on
@@ -17,28 +15,19 @@ payoff-per-effort:
    HUD with escalating style (size/color, scale-punch on rank-up, small shake at
    SHITSTORM). Scare-poop already zeroes the combo — wiping a high rank makes the
    hydrant retroactively matter.
-2. **Food pickups** (bread crust / fries / kebab): extend `PickupKind`; separate,
-   more-frequent food spawn timer (~5–9s vs rainbow's 12–20s); place at awkward
-   altitudes — near the ground clamp, near the ceiling, occasionally in the hydrant
-   approach lane. Meter jumps roughly +15/+25/+40 — the kebab can shove you toward
-   blowout (reward with teeth). Add a `spawnFoodPickup` debug hook to `window.SP`.
-3. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
+2. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
    vx ~2.5–3.5 (vs 0.3–0.8 walkers), either direction, base score 40; extend
    `PED_LINES` / `PED_LINES_RAINBOW`; verify `VictimPalettePipeline` variant packing
    handles a 4th ped.
 - Freebie alongside: randomize the hydrant burst trigger distance
   (`pigeon.x + 230` → `+ 200 + rand()*80`, rolled at spawn).
 
-**Assets needed, in order:** none for ranks; then a food-pickup sheet
-(`pickup-bread/fries/kebab`, sized like `pickup-rainbow` at `PICKUP_SCALE`) and a skater
-sheet (`ped-3` / `ped-3-r` / `ped-3-rainbow`, matching the pedestrian sheet layout) —
-both via the codex-image → `ART_LOG.md` pipeline. Deferred to later slices: turbo pigeon
-set, open-beak blowout frame, terrified portrait, audio.
+**Next asset set:** skater sheet (`ped-3` / `ped-3-r` / `ped-3-rainbow`, matching the
+pedestrian sheet layout) via the codex-image → `ART_LOG.md` pipeline. Deferred to later
+slices: turbo pigeon set, open-beak blowout frame, terrified portrait, audio.
 
 ## Meter economy — remaining work (agreed 2026-07-14; core shipped, see CHANGELOG)
 
-- **Food pickups** for big meter jumps (bread crusts, fries, kebab; place at varying
-  altitude to lure the player off the safe line).
 - **Open-beak flight sprite** for the blowout telegraph (portrait + wobble only for now)
   + sound.
 - Ties into turbo (below): turbo spends meter as rocket fuel — one resource governs
@@ -74,9 +63,9 @@ this slot in alongside the normal flight frames.
   into a car, honk scares more peds…)
 
 **Pickups**
-- Pickups as food that changes the goo (`PickupKind` pattern is ready): coffee, chilli,
-  rainbow — each with its own behavioral twist (e.g. coffee = rapid-fire drip, chilli =
-  explosive/burning splat).
+- Special pickup effects (assets, spawning and collection are shipped): coffee =
+  accelerated meter is shipped; chilli = explosive burning/fire poo and frightened pea
+  pod = gas mode remain. Rainbow behavior is already shipped.
 
 **World & level design**
 - Higher platforms / screen layers — e.g. flying at balcony level, vertical screen

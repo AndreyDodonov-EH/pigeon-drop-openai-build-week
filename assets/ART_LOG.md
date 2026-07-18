@@ -245,3 +245,186 @@ extending a set — consistency depends on it.
 - **Scene changes:** pickup no longer coin-spins (a rainbow shouldn't); it sways ±7° with a
   gentle pulse, and the halo is a soft additive white glow (alpha 0.07 fill) instead of the
   gold ring.
+
+## assets/masters/food-pickups-sheet.png → public/assets/sprites/pickup-{bread,fries,kebab}.png — 2026-07-18
+
+- **References inspected:** `assets/masters/hydrant-sheet.png` (attached as a style-only
+  reference; no hydrant or reference subject appears) and
+  `public/assets/sprites/pickup-rainbow.png` (runtime footprint comparison only).
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); 1774×887 RGB master;
+  one-shot, no retries.
+- **Panel semantics:** left = torn rustic bread heel/crust (+15 pressure design intent),
+  center = fries in an unbranded red carton (+25), right = loaded Berlin-style döner in
+  pita (+40). The silhouettes become slightly fuller with value while sharing the same
+  center anchor.
+- **Post-processing:** keyed the whole master before splitting with ImageMagick 6
+  (`-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`). The
+  generated magenta field was visually uniform but its sampled corner RGB values were not
+  exact `#ff00ff`; the 10% fuzz cleared it without eating the food palette. Cropped the
+  three connected silhouettes at `424x387+76+292`, `466x606+577+127`, and
+  `598x560+1105+163`; resized them within 116×116, 124×124, and 130×130 respectively;
+  centered each on a common transparent 144×144 canvas; then ran pngquant 256 on the
+  shipping copies. The reusable master was not modified.
+- **Acceptance:** confirmed 144×144 sRGBA outputs and four fully transparent corner
+  pixels per sprite; inspected the cutouts over dark slate at both native and 42% scale;
+  then dynamically loaded all three into the live Phaser scene at `PICKUP_SCALE = 0.42`
+  beside `pickup-rainbow`. All silhouettes remained readable against the real skyline,
+  with no visible magenta fringe or anchor mismatch. No runtime code was changed.
+- **Prompt:**
+  > Use case: stylized-concept
+  >
+  > Asset type: three-panel pickup-item sprite sheet for a cartoon side-scrolling game
+  >
+  > References and role:
+  > - Image 1 is a STYLE-ONLY reference for the established prop rendering: thick clean near-black outlines, painterly cel shading with 2–3 value groups, warm slightly desaturated colors, tiny worn texture accents, chunky comic proportions.
+  > - Do NOT draw a fire hydrant, brass cap, water, pigeon, character, or any other subject from the reference.
+  >
+  > Primary request:
+  > Create one coherent FOOD PICKUP SPRITE SHEET with exactly THREE equal side-by-side panels. One complete isolated food item per panel, in this fixed order:
+  > 1. LEFT — BREAD: a small irregular torn heel/crust of rustic bread, golden-brown outer crust and clearly visible warm cream porous crumb on the torn face. One compact connected silhouette, appetizing but scrappy enough for a city pigeon.
+  > 2. CENTER — FRIES: a generous bunch of golden french fries in a squat red paper carton with a cream folded rim, no logo and no text. Fries have varied heights but remain a compact connected pickup silhouette.
+  > 3. RIGHT — KEBAB: a large overstuffed Berlin-style döner sandwich in a toasted triangular pita, visibly packed with browned sliced meat, green lettuce, tomato, purple cabbage, and a pale garlic-sauce stripe. It must read immediately as a handheld döner, not a taco, burger, burrito, pizza, or meat skewer.
+  >
+  > Composition:
+  > - Wide landscape sheet, exactly three equal panels, no divider lines.
+  > - Flat three-quarter icon view, not strict side view and not top-down.
+  > - Each item centered in its panel, fully visible, generous clear margin from every frame edge.
+  > - All three occupy comparable visual footprint and share a common implied center/anchor; bread may be slightly smaller, kebab slightly fuller, to communicate value progression without making any item unreadably tiny.
+  > - No cast shadows, ground/contact shadows, plates, napkins, utensils, hands, faces, eyes, limbs, motion lines, badges, medallions, glows, sparkles, loose crumbs, or separate floating garnish.
+  > - Strong clean silhouette that remains readable when reduced to about 60 screen pixels.
+  >
+  > Palette and rendering:
+  > - Match Image 1's prop style only: thick clean dark outlines of consistent weight; warm painterly cel shading; 2–3 distinct tone blocks per material; subtle handmade texture; polished 2D game art; playful and slightly grubby/absurdist, never photorealistic.
+  > - Keep all food colors natural and distinct. Do not use pure magenta anywhere in the food or outlines.
+  >
+  > Background/cutout:
+  > - The ENTIRE sheet background must be perfectly uniform flat solid pure #ff00ff magenta for chroma-key removal.
+  > - Absolutely no background gradients, texture, lighting variation, floor plane, reflection, vignette, shadow, panel border, panel divider, watermark, signature, logo, or text.
+  > - Keep every food item and every dark outline well away from the image edges.
+  >
+  > Output intent:
+  > - One reusable high-resolution master sheet for assets/masters/food-pickups-sheet.png.
+  > - It will be chroma-keyed, split into three transparent sprites, normalized to common 144×144 canvases, and shipped as public/assets/sprites/pickup-bread.png, pickup-fries.png, and pickup-kebab.png.
+
+## Special-effect pickups: chilli, coffee, and living pea pod — 2026-07-18
+
+- **Masters:** `assets/masters/special-pickups-sheet.png` and
+  `assets/masters/pea-pod-pickup-sheet.png`, both untouched 1774×887 RGB PNGs.
+- **Shipping assets:** `public/assets/sprites/pickup-chilli.png`,
+  `public/assets/sprites/pickup-coffee.png`, and animated
+  `public/assets/sprites/pickup-pea-{0,1}.png`; all are 144×144 sRGBA PNGs.
+- **References inspected/attached:** `assets/masters/food-pickups-sheet.png` defined the
+  established pickup style, rendering, footprint, and magenta-sheet layout. The first
+  `special-pickups-sheet.png` was also attached when generating the replacement pod, to
+  retain its frightened face language while explicitly rejecting the round silhouette.
+- **Tool:** Codex built-in `image_gen` (model name not surfaced), one generation for the
+  four-panel special sheet plus one user-directed pea-pod replacement generation; no
+  retries within either prompt.
+- **Frame semantics:** chilli = ordinary curved red chilli with heat-blistered tip (future
+  fire-poo intent); coffee = one oversized roasted bean (future accelerated meter-fill
+  intent); pea-0 = living central pea inside a three-pea pod looking left; pea-1 = the same
+  pod looking right (future gas-mode intent). The initial round pea in panels 3–4 of
+  `special-pickups-sheet.png` is **SUPERSEDED** by the clearer pod direction and is not
+  shipped; its master remains as factual generation history.
+- **Post-processing:** keyed each whole master with ImageMagick 6
+  (`-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`) before
+  splitting. The generated magenta fields were visually uniform but not exact `#ff00ff`
+  at sampled corners; 10% fuzz cleared them without harming the subjects. Chilli crop:
+  `356x434+80+196`; coffee crop: `339x400+496+235`; each resized within 126×126 and
+  centered on 144×144. Accepted pod crops: `687x529+119+160` and `686x529+960+160`;
+  each resized within 132×132 and centered on the same 144×144 canvas. Shipping copies
+  were compressed with pngquant 256; masters were not modified.
+- **Acceptance:** confirmed sRGBA output, four fully transparent corners per sprite, no
+  visible magenta fringe, and clear silhouettes over dark slate at native and 42% scale.
+  Dynamically loaded chilli, coffee, both pod frames, and `pickup-rainbow` into the live
+  Phaser scene at `PICKUP_SCALE = 0.42`; all matched the existing pickup footprint. The
+  three peas and opened shell remained legible at runtime size, while the pupil direction
+  read clearly and the pair kept a stable center/halo anchor. No runtime code was changed.
+- **Prompt 1 — chilli, coffee, and superseded round-pea concept:**
+  > Use case: stylized-concept
+  >
+  > Asset type: four-panel special pickup-item sprite sheet for a cartoon side-scrolling game
+  >
+  > References and role:
+  > - Image 1 is a STYLE, RENDERING, SCALE, and LAYOUT reference for the existing pickup family: thick clean near-black outlines, warm painterly cel shading with 2–3 value groups, slightly worn handmade texture, chunky readable silhouettes, one centered isolated pickup per panel on magenta.
+  > - This is a NEW sheet, not an edit. Do NOT repeat the bread, fries, döner, carton, pita, meat, or any other subject from Image 1.
+  >
+  > Primary request:
+  > Create one coherent SPECIAL PICKUP SPRITE SHEET with exactly FOUR equal side-by-side panels. One complete isolated pickup per panel, in this fixed order:
+  > 1. FAR LEFT — CHILLI: one whole curved hot red chilli pepper, diagonal and slightly curled, with a stout natural green stem. Deep scarlet body, warm orange-red highlight along the curve, a few subtle dark blistered speckles close to the pointed tip so it suggests intense heat and a future fire-poo effect. No literal flame, fire, smoke, face, eyes, mouth, arms, or legs.
+  > 2. LEFT-CENTER — COFFEE: one single oversized roasted coffee bean, plump oval and tilted diagonally, rich espresso brown with a clearly readable deep S-shaped center groove, copper-gold cel-shaded highlight, and a few natural roast texture marks. It must unmistakably read as a coffee bean, not cocoa, a nut, seed, rock, cup, mug, or bag. No face, eyes, mouth, arms, or legs.
+  > 3. RIGHT-CENTER — PEA FRAME 0 / LOOK LEFT: one single anthropomorphic bright-green garden pea, almost spherical with a tiny leafy nub at the top, huge white cartoon eye whites set close together, tiny worried downturned mouth, and a frightened tense expression. Both dark pupils are pushed clearly toward the LEFT edges of the eye whites, anxiously watching for the pigeon. The pea has no arms or legs and must still read first as a pea.
+  > 4. FAR RIGHT — PEA FRAME 1 / LOOK RIGHT: the EXACT SAME pea as panel 3 at the exact same size, position, rotation, silhouette, leafy nub, outline, green shading, highlights, eye-white shapes, eyelids, brows, and worried mouth. Change ONLY both pupils: push them clearly toward the RIGHT edges of the eye whites. No body movement, squash, turn, pose change, lighting change, or expression change.
+  >
+  > Composition:
+  > - Wide landscape sheet, exactly four equal side-by-side panels, no panel borders or divider lines.
+  > - Flat three-quarter game-icon view matching Image 1, not photorealistic, not strict side view, not top-down.
+  > - Each pickup centered in its panel, fully visible, with generous clear margin from all frame edges.
+  > - Chilli, coffee bean, and pea should have comparable visual weight and fill roughly the same pickup footprint as Image 1's items.
+  > - Pea panels 3 and 4 must share one pixel-stable implied center and identical body geometry so a later texture swap animates only the pupils without any wobble.
+  > - Strong compact silhouettes readable at roughly 50–60 screen pixels.
+  > - No cast/contact shadows, floor, plates, bowls, pods, loose peas, cups, packaging, badges, medallions, glows, sparkles, motion lines, sweat droplets, separate floating pieces, text, logos, signatures, or watermarks.
+  > - ONLY the pea is alive or has a face. The chilli and coffee bean are ordinary food objects.
+  >
+  > Palette and rendering:
+  > - Match Image 1's pickup style: thick clean dark outlines of consistent weight; warm painterly cel shading; 2–3 distinct tone blocks per material; subtle handmade texture; polished 2D game art; playful slightly grubby absurdist tone.
+  > - Keep natural material colors distinct. Do not use pure magenta anywhere in any subject or outline.
+  > - Pea: saturated garden green body, pale green highlight, deeper leaf-green shadow, clean cream-white eye whites, very dark charcoal pupils with one tiny white catchlight each.
+  >
+  > Background/cutout:
+  > - The ENTIRE sheet background must be perfectly uniform flat solid pure #ff00ff magenta for chroma-key removal.
+  > - Absolutely no background gradient, texture, lighting variation, floor plane, reflection, vignette, shadow, panel border, divider, or content touching the image edges.
+  > - Keep every subject and every dark outline well separated from the background and away from all image edges.
+  >
+  > Output intent:
+  > - One reusable high-resolution master sheet for assets/masters/special-pickups-sheet.png.
+  > - It will be chroma-keyed, split, and normalized to transparent 144×144 sprites shipped as public/assets/sprites/pickup-chilli.png, pickup-coffee.png, pickup-pea-0.png, and pickup-pea-1.png.
+- **Prompt 2 — accepted pea-pod replacement:**
+  > Use case: stylized-concept
+  >
+  > Asset type: two-frame animated pea-pod pickup sprite sheet for a cartoon side-scrolling game
+  >
+  > References and role:
+  > - Image 1 defines the new special-pickup rendering style and contains a round anthropomorphic pea that is now SUPERSEDED. Keep its frightened comic face language and rendering quality, but do NOT repeat its round loose-pea silhouette, chilli, or coffee bean.
+  > - Image 2 defines the established pickup-family scale and rendering: thick clean near-black outlines, warm painterly cel shading with 2–3 value groups, slightly worn handmade texture, chunky silhouettes readable at small game size. Do NOT repeat its bread, fries, döner, carton, pita, or meat.
+  > - This is a NEW two-frame pea-pod sheet, not an edit of either reference.
+  >
+  > Primary request:
+  > Create an unmistakable living PEA POD pickup as exactly TWO animation frames:
+  > 1. LEFT PANEL — LOOK LEFT.
+  > 2. RIGHT PANEL — LOOK RIGHT.
+  >
+  > Subject:
+  > - One plump bright-green garden pea pod, gently curved and tilted diagonally upward, shown in flat three-quarter game-icon view.
+  > - The pod is slightly opened along its front seam so exactly THREE round green peas are clearly visible nestled inside a lighter green pod lining. It must instantly read as a pea pod, not a chilli, green bean, edamame, leaf, canoe, mouth, or generic green creature.
+  > - The large CENTRAL pea inside the pod is alive: two oversized cream-white cartoon eye whites close together, tiny worried downturned mouth, subtly tense brows, frightened of the pigeon. The other two peas have no faces.
+  > - No arms or legs. The pea pod remains food first, character second.
+  >
+  > Frame invariants:
+  > - The pod shell, pointed stem and tip, opening, seam, all three pea bodies, central face position, eye-white shapes, brows, worried mouth, shading, texture, highlights, size, rotation, center anchor, and silhouette must be IDENTICAL in both panels.
+  > - Change ONLY the two dark pupils:
+  >   - left panel: both pupils pushed clearly toward the LEFT edges of the eye whites;
+  >   - right panel: both pupils pushed clearly toward the RIGHT edges of the eye whites.
+  > - No blink, squash, turn, bob, pose change, expression change, lighting change, or body movement between frames.
+  >
+  > Composition:
+  > - Wide landscape sheet with exactly TWO equal side-by-side panels, no divider line.
+  > - The complete pea pod is centered at the exact same position and scale in both panels, fully visible, with generous clear margin from every image edge.
+  > - Both panels share one pixel-stable implied center/anchor so a later texture swap animates only the pupils without visual wobble.
+  > - Strong compact silhouette and large readable eyes suitable for reduction to roughly 50–60 screen pixels.
+  > - No cast/contact shadow, floor, plate, bowl, extra pods, loose peas, badges, medallion, glow, sparkles, motion lines, sweat drops, gas cloud, text, logo, signature, or watermark.
+  >
+  > Palette and rendering:
+  > - Match the references' pickup style: thick clean dark outlines of consistent weight; warm painterly cel shading; 2–3 distinct tone blocks per material; subtle handmade texture; polished 2D game art; playful slightly grubby absurdist tone.
+  > - Pod shell: saturated garden green, pale yellow-green highlight, deeper leaf-green shadow. Inner lining: lighter fresh green. Three peas: distinct round medium greens.
+  > - Eye whites: warm cream-white. Pupils: very dark charcoal with one tiny white catchlight each.
+  > - Do not use pure magenta anywhere in the subject or outline.
+  >
+  > Background/cutout:
+  > - The ENTIRE sheet background must be perfectly uniform flat solid pure #ff00ff magenta for chroma-key removal.
+  > - Absolutely no background gradient, texture, lighting variation, floor plane, reflection, vignette, shadow, border, divider, or content touching the image edges.
+  > - Keep the full pod and every dark outline well away from all image edges.
+  >
+  > Output intent:
+  > - One reusable high-resolution master sheet for assets/masters/pea-pod-pickup-sheet.png.
+  > - It will be chroma-keyed, split, normalized, and replace the earlier round-pea shipping sprites as public/assets/sprites/pickup-pea-0.png and pickup-pea-1.png on identical transparent 144×144 canvases.
