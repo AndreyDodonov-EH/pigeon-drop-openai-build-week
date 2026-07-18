@@ -55,6 +55,9 @@ const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
+const CHILLI_DURATION = 60 * 8;
+/** extra downward speed while the chilli fire jet is active — reads as thrust, not drip */
+const CHILLI_JET_BOOST = 2.6;
 const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
 // A continuous goo stream lands as one shifting puddle, not a machine-gun row
 // of discrete drops. Keep street impacts far enough apart that the short sample
@@ -202,6 +205,9 @@ export class GameScene extends Phaser.Scene {
   private batteredTimer = 0;
   private relievedTimer = 0;
   private coffeeTimer = 0;
+  private chilliTimer = 0;
+  private fireEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private sparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private gasTimer = 0;
   private gasEmitCarry = 0;
   private gasHeave?: AdjustableSound;
@@ -309,6 +315,45 @@ export class GameScene extends Phaser.Scene {
     this.gasSim.worldVx = SCROLL;
     this.gasLayer = new GasLayer(this, W, H, 6.6);
 
+    // soft radial dot for the chilli flames — concentric fills fake the falloff
+    const flameG = this.make.graphics({ x: 0, y: 0 }, false);
+    for (let r = 8; r > 0; r--) flameG.fillStyle(0xffffff, 0.14).fillCircle(8, 8, r);
+    flameG.generateTexture('flame-dot', 16, 16);
+    flameG.destroy();
+    // flames lick upward off fire goo: fast, additive, dying to nothing
+    this.fireEmitter = this.add
+      .particles(0, 0, 'flame-dot', {
+        speedX: { min: -20, max: 20 },
+        speedY: { min: -110, max: -30 },
+        scale: { start: 1.8, end: 0.2 },
+        alpha: { start: 0.95, end: 0 },
+        lifespan: { min: 250, max: 600 },
+        // born white-hot, cooling through orange to ember red as they rise
+        color: [0xfff7cf, 0xffce42, 0xff7a24, 0xb91f24],
+        colorEase: 'quad.out',
+        quantity: 0,
+        emitting: false,
+        maxAliveParticles: 300,
+        blendMode: Phaser.BlendModes.ADD,
+      })
+      .setDepth(6.5);
+    // hot sparks thrown clear of the jet, falling under gravity as they die
+    this.sparkEmitter = this.add
+      .particles(0, 0, 'flame-dot', {
+        speedX: { min: -70, max: 70 },
+        speedY: { min: -140, max: 10 },
+        gravityY: 280,
+        scale: { start: 0.4, end: 0 },
+        alpha: { start: 1, end: 0.2 },
+        lifespan: { min: 300, max: 750 },
+        tint: [0xfff2b0, 0xffce42, 0xff7a24],
+        quantity: 0,
+        emitting: false,
+        maxAliveParticles: 140,
+        blendMode: Phaser.BlendModes.ADD,
+      })
+      .setDepth(6.5);
+
     this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
     this.pigeon = this.add.container(240, this.pigeonY, [this.pigeonImg]).setDepth(7);
 
@@ -335,6 +380,7 @@ export class GameScene extends Phaser.Scene {
       ) => this.spawnPickup(kind, x, y),
       rainbowRemaining: () => this.rainbowTimer,
       coffeeRemaining: () => this.coffeeTimer,
+      chilliRemaining: () => this.chilliTimer,
       gasRemaining: () => this.gasTimer,
       pigeonY: () => this.pigeonY,
       setCombo: (v: number) => {
@@ -594,6 +640,10 @@ export class GameScene extends Phaser.Scene {
       this.meter = Math.min(100, this.meter + effect.pressureGain);
     }
     if (kind === 'coffee') this.coffeeTimer = COFFEE_DURATION;
+    if (kind === 'chilli') {
+      this.chilliTimer = CHILLI_DURATION;
+      this.popup(x, y - 30, 'FIRE JET!!', COLOR_ORANGE, 20);
+    }
     if (kind === 'pea') this.activateGas();
     this.pickupBurst(x, y, effect.burstColors);
   }
@@ -1050,6 +1100,7 @@ export class GameScene extends Phaser.Scene {
   private updateGuano(f: number): void {
     this.rainbowTimer = Math.max(0, this.rainbowTimer - f);
     this.coffeeTimer = Math.max(0, this.coffeeTimer - f);
+    this.chilliTimer = Math.max(0, this.chilliTimer - f);
     this.gasTimer = Math.max(0, this.gasTimer - f);
     if (this.gasTimer <= 0) this.stopGasStream();
     if (Phaser.Input.Keyboard.JustDown(this.keys.damage)) this.scarePoop();
@@ -1097,6 +1148,7 @@ export class GameScene extends Phaser.Scene {
       ...this.hydrants.map((h) => h.collider),
     ]);
     this.gooLayer.render(this.sim.particles);
+    this.updateFireFx();
     this.gasSim.step(
       f,
       this.victims.map((v) => ({
@@ -1131,16 +1183,51 @@ export class GameScene extends Phaser.Scene {
       if (gasCount > 0) this.gasSim.emit(tailX, tailY, wild, gasCount);
       return;
     }
+    const fire = !rainbow && this.chilliTimer > 0;
+    if (fire) {
+      // spawn above the emit point: big rising flames should lick up past the
+      // tail, never hang below the pigeon
+      this.fireEmitter.emitParticleAt(tailX, tailY - 16, 3);
+      this.sparkEmitter.emitParticleAt(tailX, tailY - 10, 1);
+    }
     for (let i = 0; i < n; i++) {
       let tint = GUANO_TINT;
       if (rainbow) {
         // advance per drop, not per frame, so even a short burst spans the spectrum
         this.rainbowHue = (this.rainbowHue + 0.035) % 1;
         tint = Phaser.Display.Color.HSVToRGB(this.rainbowHue, 0.75, 1).color;
+      } else if (fire) {
+        // narrow red→yellow band; per-drop jitter is the flame's flicker,
+        // with the odd washed-out drop reading as molten white-hot
+        const whiteHot = Math.random() < 0.25;
+        tint = Phaser.Display.Color.HSVToRGB(
+          0.01 + Math.random() * 0.11,
+          whiteHot ? 0.35 : 0.92,
+          1,
+        ).color;
       }
       const vx = wild ? -0.4 + (Math.random() - 0.5) * 4.5 : -0.4;
-      const vy = wild ? 2.5 + Math.random() * 3.5 : this.pigeonVy * 0.35 + 4.2;
-      this.sim.emit(tailX, tailY, vx, vy, tint, 1, rainbow);
+      let vy = wild ? 2.5 + Math.random() * 3.5 : this.pigeonVy * 0.35 + 4.2;
+      if (fire) vy += CHILLI_JET_BOOST;
+      this.sim.emit(tailX, tailY, vx, vy, tint, 1, rainbow, rainbow || fire, fire);
+    }
+  }
+
+  /**
+   * Dress live fire goo with flames so the jet and its puddles read as burning.
+   * Random draws, not a scan: emission stays bounded and unbiased however many
+   * fire drops are in flight.
+   */
+  private updateFireFx(): void {
+    const ps = this.sim.particles;
+    if (ps.length === 0) return;
+    for (let i = 0; i < 24; i++) {
+      const p = ps[(Math.random() * ps.length) | 0];
+      if (!p.fire || p.dead) continue;
+      if (Math.random() < 0.7) {
+        this.fireEmitter.emitParticleAt(p.x + (Math.random() - 0.5) * 6, p.y - 3);
+      }
+      if (Math.random() < 0.12) this.sparkEmitter.emitParticleAt(p.x, p.y - 2);
     }
   }
 
