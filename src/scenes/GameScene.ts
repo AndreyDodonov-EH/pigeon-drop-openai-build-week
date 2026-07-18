@@ -20,7 +20,7 @@ const COLOR_PALE_GOLD = '#fff7bd';
 const COLOR_ORANGE = '#ff8a5c'; // outrage lines, blowout
 const COLOR_JOY_GREEN = '#7be07b'; // rainbow-delight reaction lines
 const COLOR_WATER = '#a8dcf2';
-/** red→violet spectrum used by the pickup burst (matches the arc sprite bands) */
+/** red→violet spectrum used by the rainbow pickup burst (matches the arc sprite bands) */
 const RAINBOW_COLORS = [0xff5b57, 0xff9d3e, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8];
 
 // ---- sprite scales ----
@@ -36,14 +36,65 @@ const VICTIM_PALETTE_HUES = [0.6, 0.97, 0.28, 0.75, 0.07, 0.5, 0.13, 0.88];
 // The runner's hair stays plausible while still adding visible variety.
 const RUNNER_HAIR_HUES = [0.03, 0.08, 0.13]; // red, brown, blonde
 
-// ---- rainbow pickup tuning ----
+// ---- pickup tuning ----
 const RAINBOW_DURATION = 60 * 10; // frames of rainbow goo per pickup
-const PICKUP_FIRST_MS = 2500; // first spawn after game start
-const PICKUP_MIN_MS = 12000; // respawn window
-const PICKUP_MAX_MS = 20000;
+const RAINBOW_PICKUP_FIRST_MS = 2500;
+const RAINBOW_PICKUP_MIN_MS = 12000;
+const RAINBOW_PICKUP_MAX_MS = 20000;
+const ITEM_PICKUP_FIRST_MS = 4200;
+const ITEM_PICKUP_MIN_MS = 5000;
+const ITEM_PICKUP_MAX_MS = 9000;
+const PEA_LOOK_FRAME_FRAMES = 18;
 /** collection hitbox half-extents around the pigeon */
 const PICKUP_GRAB_X = 40;
 const PICKUP_GRAB_Y = 38;
+
+const ITEM_PICKUP_KINDS = ['bread', 'fries', 'kebab', 'chilli', 'coffee', 'pea'] as const;
+type ItemPickupKind = (typeof ITEM_PICKUP_KINDS)[number];
+type PickupKind = 'rainbow' | ItemPickupKind;
+
+interface ItemPickupFeedback {
+  label: string;
+  textColor: string;
+  pressureGain?: number;
+  burstColors: number[];
+}
+
+const ITEM_PICKUP_FEEDBACK: Record<ItemPickupKind, ItemPickupFeedback> = {
+  bread: {
+    label: 'BREAD!  +15',
+    textColor: '#f2c979',
+    pressureGain: 15,
+    burstColors: [0x8c4d28, 0xd79649, 0xf1d79b],
+  },
+  fries: {
+    label: 'FRIES!  +25',
+    textColor: '#ffd34e',
+    pressureGain: 25,
+    burstColors: [0xd93b2f, 0xffa83d, 0xffdb57],
+  },
+  kebab: {
+    label: 'KEBAB!  +40',
+    textColor: '#ffb36b',
+    pressureGain: 40,
+    burstColors: [0x8b4a2b, 0xe74f36, 0x68b94d, 0xf2dfb6, 0x9d3c89],
+  },
+  chilli: {
+    label: 'CHILLI!',
+    textColor: '#ff694f',
+    burstColors: [0xb91f24, 0xf03b26, 0xff7a24, 0xffce42],
+  },
+  coffee: {
+    label: 'COFFEE!',
+    textColor: '#d99b61',
+    burstColors: [0x4a2719, 0x794225, 0xb96f37, 0xe2a763],
+  },
+  pea: {
+    label: 'PEA POD!',
+    textColor: '#8ee05f',
+    burstColors: [0x2c7a2f, 0x59ad3b, 0x8bd84c, 0xd6ef82],
+  },
+};
 
 interface Victim {
   sprite: Phaser.GameObjects.Sprite;
@@ -80,14 +131,12 @@ interface Hydrant {
   splashed: boolean; // pigeon already caught by this burst
 }
 
-type PickupKind = 'rainbow';
-
 interface Pickup {
   kind: PickupKind;
   sprite: Phaser.GameObjects.Image;
-  halo: Phaser.GameObjects.Arc;
   baseY: number;
   phase: number;
+  animT: number;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -112,7 +161,8 @@ export class GameScene extends Phaser.Scene {
   private pedTimer = 0;
   private carTimer = 0;
   private hydrantTimer = 4000;
-  private pickupTimer = PICKUP_FIRST_MS;
+  private rainbowPickupTimer = RAINBOW_PICKUP_FIRST_MS;
+  private itemPickupTimer = ITEM_PICKUP_FIRST_MS;
 
   /** digestion pressure, 0–100: fills passively, spent by pooping, 100 = blowout */
   private meter = 40;
@@ -174,6 +224,14 @@ export class GameScene extends Phaser.Scene {
     this.load.image('water-col', 'assets/sprites/water-col.png');
     this.load.image('water-crown', 'assets/sprites/water-crown.png');
     this.load.image('pickup-rainbow', 'assets/sprites/pickup-rainbow.png');
+    for (const kind of ITEM_PICKUP_KINDS) {
+      if (kind === 'pea') {
+        this.load.image('pickup-pea-0', 'assets/sprites/pickup-pea-0.png');
+        this.load.image('pickup-pea-1', 'assets/sprites/pickup-pea-1.png');
+      } else {
+        this.load.image(`pickup-${kind}`, `assets/sprites/pickup-${kind}.png`);
+      }
+    }
   }
 
   create(): void {
@@ -212,6 +270,11 @@ export class GameScene extends Phaser.Scene {
       particleCount: () => this.sim.particles.length,
       spawnHydrant: () => this.spawnHydrant(),
       spawnRainbowPickup: (x = W + 60, y = this.pigeonY) => this.spawnPickup('rainbow', x, y),
+      spawnItemPickup: (
+        kind: ItemPickupKind = ITEM_PICKUP_KINDS[0],
+        x = W + 60,
+        y = this.pigeonY,
+      ) => this.spawnPickup(kind, x, y),
       rainbowRemaining: () => this.rainbowTimer,
       pigeonY: () => this.pigeonY,
     };
@@ -349,33 +412,48 @@ export class GameScene extends Phaser.Scene {
     x = W + 60,
     y = 90 + Math.random() * (GROUND_Y - 210),
   ): void {
-    const halo = this.add
-      .circle(x, y, 36, 0xffffff, 0.07)
-      .setDepth(6.4)
-      .setBlendMode(Phaser.BlendModes.ADD);
-    const sprite = this.add.image(x, y, `pickup-${kind}`).setScale(PICKUP_SCALE).setDepth(6.5);
-    this.pickups.push({ kind, sprite, halo, baseY: y, phase: Math.random() * Math.PI * 2 });
+    const texture = kind === 'pea' ? 'pickup-pea-0' : `pickup-${kind}`;
+    const sprite = this.add.image(x, y, texture).setScale(PICKUP_SCALE).setDepth(6.5);
+    this.pickups.push({
+      kind,
+      sprite,
+      baseY: y,
+      phase: Math.random() * Math.PI * 2,
+      animT: 0,
+    });
   }
 
   private updatePickups(f: number, deltaMs: number): void {
-    this.pickupTimer -= deltaMs;
-    if (this.pickupTimer <= 0) {
+    this.rainbowPickupTimer -= deltaMs;
+    if (this.rainbowPickupTimer <= 0) {
       this.spawnPickup('rainbow');
-      this.pickupTimer = PICKUP_MIN_MS + Math.random() * (PICKUP_MAX_MS - PICKUP_MIN_MS);
+      this.rainbowPickupTimer =
+        RAINBOW_PICKUP_MIN_MS +
+        Math.random() * (RAINBOW_PICKUP_MAX_MS - RAINBOW_PICKUP_MIN_MS);
+    }
+
+    this.itemPickupTimer -= deltaMs;
+    if (this.itemPickupTimer <= 0) {
+      const kind = ITEM_PICKUP_KINDS[(Math.random() * ITEM_PICKUP_KINDS.length) | 0];
+      this.spawnPickup(kind);
+      this.itemPickupTimer =
+        ITEM_PICKUP_MIN_MS + Math.random() * (ITEM_PICKUP_MAX_MS - ITEM_PICKUP_MIN_MS);
     }
 
     this.pickups = this.pickups.filter((p) => {
       p.sprite.x -= SCROLL * f;
       p.phase += 0.055 * f;
+      p.animT += f;
       p.sprite.y = p.baseY + Math.sin(p.phase) * 9;
-      // a rainbow arc hangs in the sky — sway gently instead of coin-spinning
+      // Pickups hang in the air and sway gently instead of coin-spinning.
       p.sprite.setAngle(Math.sin(p.phase * 0.8) * 7);
       const pulse = 1 + Math.sin(p.phase * 1.7) * 0.05;
       p.sprite.setScale(PICKUP_SCALE * pulse);
-      p.halo
-        .setPosition(p.sprite.x, p.sprite.y)
-        .setScale(0.9 + Math.sin(p.phase * 1.7) * 0.12)
-        .setAlpha(0.45 + Math.sin(p.phase * 1.7) * 0.25);
+      if (p.kind === 'pea') {
+        const lookFrame = Math.floor(p.animT / PEA_LOOK_FRAME_FRAMES) % 2;
+        const texture = `pickup-pea-${lookFrame}`;
+        if (p.sprite.texture.key !== texture) p.sprite.setTexture(texture);
+      }
 
       const collected =
         Math.abs(p.sprite.x - this.pigeon.x) < PICKUP_GRAB_X &&
@@ -383,12 +461,10 @@ export class GameScene extends Phaser.Scene {
       if (collected) {
         this.collectPickup(p.kind, p.sprite.x, p.sprite.y);
         p.sprite.destroy();
-        p.halo.destroy();
         return false;
       }
       if (p.sprite.x < -80) {
         p.sprite.destroy();
-        p.halo.destroy();
         return false;
       }
       return true;
@@ -396,20 +472,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private collectPickup(kind: PickupKind, x: number, y: number): void {
-    switch (kind) {
-      case 'rainbow':
-        this.rainbowTimer = RAINBOW_DURATION;
-        this.rainbowHue = 0;
-        this.popup(x, y - 44, 'RAINBOW GOO!  10s', COLOR_PALE_GOLD, 20);
-        this.pickupBurst(x, y);
-        break;
+    if (kind === 'rainbow') {
+      this.rainbowTimer = RAINBOW_DURATION;
+      this.rainbowHue = 0;
+      this.popup(x, y - 44, 'RAINBOW GOO!  10s', COLOR_PALE_GOLD, 20);
+      this.pickupBurst(x, y, RAINBOW_COLORS);
+      return;
     }
+
+    const feedback = ITEM_PICKUP_FEEDBACK[kind];
+    if (feedback.pressureGain !== undefined) {
+      this.meter = Math.min(100, this.meter + feedback.pressureGain);
+    }
+    this.popup(x, y - 44, feedback.label, feedback.textColor, 18);
+    this.pickupBurst(x, y, feedback.burstColors);
   }
 
-  private pickupBurst(x: number, y: number): void {
+  private pickupBurst(x: number, y: number, colors: number[]): void {
     for (let i = 0; i < 12; i++) {
       const angle = (i / 12) * Math.PI * 2;
-      const dot = this.add.circle(x, y, 5, RAINBOW_COLORS[i % RAINBOW_COLORS.length]).setDepth(9);
+      const dot = this.add.circle(x, y, 5, colors[i % colors.length]).setDepth(9);
       this.tweens.add({
         targets: dot,
         x: x + Math.cos(angle) * (45 + (i % 3) * 8),

@@ -114,3 +114,20 @@ byte. Cars now choose from the same eight hues at spawn. Per-vehicle source pale
 select only the sedan, taxi, or van paint while retaining the sedan's mismatched door,
 taxi checker/sign, van side panel, glass, chrome, wheels, lights, drivers, rust, and
 shading. The tint also persists across angry and rainbow reaction textures.
+
+## Food and special pickup roster (shipped 2026-07-18)
+
+The complete pickup art roster now runs in the scene. Rainbow retains its independent
+12–20 s rare spawn timer; bread, fries, kebab, chilli, coffee and the living pea pod share
+a faster 5–9 s item timer, with a first item after 4.2 s. All pickups use the existing
+altitude range, scroll/bob/sway behavior and collection hitbox. The old additive white halo
+was removed entirely; the silhouettes now float cleanly against the sky.
+
+Bread/fries/kebab immediately add +15/+25/+40 digestion pressure and can push the player
+into a blowout. Chilli, coffee and pea already spawn, collect, and produce item-colored
+feedback bursts, but their fire-poo, accelerated-meter and gas-mode behaviors remain
+deliberately deferred. The frightened pod swaps `pickup-pea-0`/`pickup-pea-1` every 18
+normalized frames so only its pupils dart left/right. `window.SP.spawnItemPickup(kind,x,y)`
+provides deterministic scene testing. Verified in live Phaser with every pickup visible,
+opposite pea frames forced side-by-side, automatic frame alternation observed, bread's
+pressure delta checked, and chilli collection checked.
