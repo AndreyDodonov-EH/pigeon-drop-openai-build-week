@@ -9,7 +9,7 @@ import {
   victimPaletteTint,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
-import { buildTextures, W, H, GROUND_Y } from '../world/textures';
+import { buildTextures, W, H, GROUND_Y, BUILDING_COUNT } from '../world/textures';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 
@@ -179,6 +179,10 @@ export class GameScene extends Phaser.Scene {
   private bgFar!: Phaser.GameObjects.TileSprite;
   private bgNear!: Phaser.GameObjects.TileSprite;
   private streetTs!: Phaser.GameObjects.TileSprite;
+  private clouds: Phaser.GameObjects.Image[] = [];
+  /** decorative sidewalk furniture (lamps/trees/mailboxes), ground-scrolled */
+  private props: Phaser.GameObjects.Image[] = [];
+  private propTimer = 1200;
 
   private victims: Victim[] = [];
   private hydrants: Hydrant[] = [];
@@ -274,6 +278,15 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
+    for (let i = 0; i < BUILDING_COUNT; i++) {
+      this.load.image(`bg-building-${i}`, `assets/sprites/bg-building-${i}.png`);
+    }
+    for (let i = 0; i < 3; i++) {
+      this.load.image(`bg-cloud-${i}`, `assets/sprites/bg-cloud-${i}.png`);
+    }
+    this.load.image('bg-lamp', 'assets/sprites/bg-lamp.png');
+    this.load.image('bg-tree', 'assets/sprites/bg-tree.png');
+    this.load.image('bg-mailbox', 'assets/sprites/bg-mailbox.png');
     this.load.image('hydrant-0', 'assets/sprites/hydrant-0.png');
     this.load.image('hydrant-1', 'assets/sprites/hydrant-1.png');
     this.load.image('water-col', 'assets/sprites/water-col.png');
@@ -294,6 +307,16 @@ export class GameScene extends Phaser.Scene {
     ensureVictimPalettePipeline(this);
 
     this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(W, H).setDepth(0);
+    // clouds live between the sky and the far skyline, each with its own drift
+    for (let i = 0; i < 5; i++) {
+      const cloud = this.add
+        .image(Math.random() * W, 36 + Math.random() * 150, `bg-cloud-${i % 3}`)
+        .setDepth(0.5)
+        .setAlpha(0.7 + Math.random() * 0.2)
+        .setScale(0.45 + Math.random() * 0.6);
+      cloud.setData('drift', 0.1 + Math.random() * 0.12);
+      this.clouds.push(cloud);
+    }
     this.bgFar = this.add.tileSprite(0, 0, W, H, 'bg-far').setOrigin(0, 0).setDepth(1);
     this.bgNear = this.add.tileSprite(0, 0, W, H, 'bg-near').setOrigin(0, 0).setDepth(2);
     this.streetTs = this.add
@@ -516,6 +539,7 @@ export class GameScene extends Phaser.Scene {
     const f = Math.min(deltaMs / (1000 / 60), 2);
 
     this.scrollWorld(f);
+    this.updateProps(f, deltaMs);
     this.updatePigeon(f);
     this.updatePickups(f, deltaMs);
     this.updateVictims(f, deltaMs);
@@ -528,6 +552,39 @@ export class GameScene extends Phaser.Scene {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
     this.bgNear.tilePositionX += SCROLL * 0.55 * f;
     this.streetTs.tilePositionX += SCROLL * f;
+    for (const cloud of this.clouds) {
+      cloud.x -= (SCROLL * 0.06 + cloud.getData('drift')) * f;
+      if (cloud.x < -170) {
+        cloud.x = W + 170;
+        cloud.y = 36 + Math.random() * 150;
+        cloud.setScale(0.45 + Math.random() * 0.6);
+      }
+    }
+  }
+
+  /** sidewalk furniture scrolls with the ground, behind the pedestrians */
+  private updateProps(f: number, deltaMs: number): void {
+    this.propTimer -= deltaMs;
+    if (this.propTimer <= 0) {
+      const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
+      const key = kinds[(Math.random() * kinds.length) | 0];
+      const prop = this.add
+        .image(W + 90, 0, key)
+        .setDepth(4.5)
+        .setScale(0.21 + Math.random() * 0.03);
+      if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
+      prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
+      this.props.push(prop);
+      this.propTimer = 2400 + Math.random() * 3600;
+    }
+    this.props = this.props.filter((p) => {
+      p.x -= SCROLL * f;
+      if (p.x < -140) {
+        p.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   private updatePigeon(f: number): void {

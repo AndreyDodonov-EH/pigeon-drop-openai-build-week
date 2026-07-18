@@ -517,3 +517,76 @@ extending a set — consistency depends on it.
   > Background: perfectly uniform flat pure magenta #ff00ff over the entire image, with no gradient, texture, shadow, glow, floor, panel divider, label, or scenery. Nothing touches any image edge.
   >
   > Output intent: preserve the untouched source as assets/masters/pedestrians-rainbow-sheet-2.png, then chroma-key, split, normalize by walk-sheet scale and foot anchor, and ship public/assets/sprites/ped-3-rainbow.png, ped-4-rainbow.png, and ped-5-rainbow.png.
+
+## assets/masters/bg-props-sheet.png → public/assets/sprites/bg-{lamp,tree,mailbox}.png — 2026-07-18
+
+- **References inspected:** `assets/masters/pedestrians-sheet.png` and `public/assets/sprites/hydrant-0.png` for style only (cartoon proportions, thick clean dark outlines, painterly cel shading, warm slightly absurdist city palette); their people and hydrant were explicitly excluded from the render.
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); one-shot, no retries.
+- **Master:** untouched 1536×1024 RGB PNG at `assets/masters/bg-props-sheet.png`.
+- **Panel semantics:** left = ornate dark teal-green cast-iron lamppost; middle = dusty-green leafy tree in a square concrete planter; right = dented blue US curbside mailbox. The generated sheet uses a shared baseline and approximate height ratio 100% / 83% / 35%.
+- **Post-processing:** sliced at the exact nominal thirds (`512×1024+0+0`, `+512+0`, `+1024+0`); each slice processed with `convert in.png -fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel out.png`; transparent trim; proportional resize to content heights 552/442/162 px; 4 px transparent border for final 94×560, 267×450, and 115×170 canvases; `pngquant --force --skip-if-larger --output small.png 256 big.png` on each shipping copy.
+- **QA:** composited each shipped sprite over 400×600 `#3a405a` slate at `assets/masters/bg-prop-{1,2,3}-qa.png`. Corner alpha (top-left, top-right, bottom-left, bottom-right) is `0,0,0,0` for every sprite. Pixels within ImageMagick 10% fuzz of `#ff00ff` with nonzero alpha: lamp `0`, tree `0`, mailbox `0`.
+- **Prompt:**
+  > Study both supplied images first as STYLE-ONLY references. Do not include any people, pedestrians, pigeons, birds, fire hydrants, text, labels, panel borders, or extra objects from the references.
+  >
+  > Create ONE coherent landscape sprite sheet, approximately 1536x1024, containing exactly three pieces of slightly absurdist city street furniture arranged side by side in this exact left-to-right order:
+  > 1) An old cast-iron street lamppost: dark teal-green painted metal with subtle worn highlights, ornate traditional base, slender tall shaft, and one ornate single lamp head. This is the tallest item.
+  > 2) A small leafy city tree growing from a square concrete planter: lively but slightly dusty green foliage, a warm brown trunk, readable clusters of leaves, and a chunky square gray-beige concrete planter. Total height is about 80% of the lamppost height.
+  > 3) A squat blue United States curbside collection mailbox: classic rounded-top postal mailbox silhouette, slightly dented and scuffed, no readable lettering or logos. Total height is about 30% of the lamppost height.
+  >
+  > Composition: all three objects shown in clean side/profile-friendly game-sprite views, fully visible, centered within generous separate zones, nothing touching the frame edges or another object. All stand on the same common invisible ground line at exactly the same baseline. Maintain the stated relative heights. No cast shadows and no visible ground surface.
+  >
+  > Rendering: match the references' cartoon game-art style—thick clean dark brown-black outlines, painterly cel shading, crisp silhouettes, warm city palette, hand-painted texture, charming exaggerated proportions, slightly absurdist urban character. Keep small details readable after downscaling.
+  >
+  > Background: a perfectly flat, uniform, solid pure #ff00ff magenta chroma-key field across the entire image, with no gradient, texture, glow, shadow, vignette, dividers, or stray marks. Preserve generous pure-magenta clearance around every silhouette.
+  >
+  > Output intent: untouched high-resolution master for assets/masters/bg-props-sheet.png; later separate shipping sprites will be bg-lamp.png at about 560 px tall, bg-tree.png at about 450 px tall, and bg-mailbox.png at about 170 px tall.
+
+## assets/masters/bg-clouds-sheet.png → public/assets/sprites/bg-cloud-{0,1,2}.png — 2026-07-18
+
+- **References inspected:** `assets/masters/cars-sheet.png` and `public/assets/sprites/hydrant-0.png`, both for rendering style only; their subjects were explicitly excluded.
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); one-shot, no retries.
+- **Master:** untouched 2172×724 RGB PNG containing three left-to-right cloud panels: wide flat-bottomed cumulus / tall lumpy puff / small wispy cloud.
+- **Post-processing:** content-safe x splits at 920 and 1595; each slice independently keyed with ImageMagick 6 using `-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`; transparent trim; proportional resize to 260 px width; `pngquant --force --skip-if-larger --output small.png 256 big.png`. Final sprites are 260×86, 260×175, and 260×88.
+- **QA:** composited each sprite over `#3a405a` at 300×200 to `assets/masters/bg-cloud-{0,1,2}-qa.png`. Corner alphas (TL/TR/BL/BR, 0–255) are `0/0/0/0` for every sprite. Pixels within 10% per RGB channel of `#ff00ff` with nonzero alpha: `0`, `0`, `0`.
+- **Prompt:**
+  > References and role: Inspect both supplied references before generating. Use /home/aadod/_PROJECTS/pigeon_drop/assets/masters/cars-sheet.png and /home/aadod/_PROJECTS/pigeon_drop/public/assets/sprites/hydrant-0.png strictly as STYLE references for cartoon forms, clean outlines, painterly cel shading, and warm color handling. Do not include any reference subjects: no cars, drivers, people, taxi, van, hydrant, street props, text, logos, signatures, or watermark.
+  >
+  > Subject and state: Generate ONE coherent game-art sprite sheet containing exactly 3 distinct puffy daytime cartoon cumulus clouds.
+  >
+  > Composition: Landscape sheet, about 1536x512, with the three clouds arranged side by side in this exact left-to-right order. Cloud 1: a wide, broad, horizontally stretched cumulus with a clean flat bottom. Cloud 2: a taller, vertically lumpy multi-puff cumulus. Cloud 3: a smaller delicate wispy cloud, clearly less massive than the other two. Each cloud must be completely isolated, with generous empty space around it. Nothing touches the image frame edges. Clouds do not touch or overlap each other. No panel dividers, labels, ground, cast shadows, weather effects, scenery, sky, extra cloud fragments, or decorative elements.
+  >
+  > Palette and rendering: Soft cream-white cloud tops with warm tan and muted lavender underside shading. Painterly cel shading with readable clustered shape planes, soft warm daytime lighting, and a thin soft darker outline that is clearly lighter-weight and less dark than the reference outlines because these are distant background elements. Warm, friendly cartoon palette. Avoid photorealism, gradients in the background, heavy black outlines, neon contamination on the clouds, or harsh storm-cloud values.
+  >
+  > Invariants: Exactly three clouds; distinct silhouettes; order and proportions as specified; clouds only.
+  >
+  > Background/cutout: Fill the entire background with one perfectly uniform solid pure #ff00ff chroma-key field. No texture, gradient, vignette, shadows, halos, magenta reflections, or content touching the frame edge.
+  >
+  > Outputs: High-resolution reusable master intended for assets/masters/bg-clouds-sheet.png, later sliced into three transparent sprites and downscaled to about 260px width each for public/assets/sprites/bg-cloud-0.png, bg-cloud-1.png, and bg-cloud-2.png.
+
+## assets/masters/bg-buildings-sheet.png → public/assets/sprites/bg-building-{0,1,2,3,4}.png — 2026-07-18
+
+- **References inspected:** `assets/masters/cars-sheet.png`, `assets/masters/pedestrians-sheet.png`, and `public/assets/sprites/hydrant-0.png`, all for rendering style only. Cars, pedestrians, drivers, and hydrants were explicitly excluded from the render.
+- **Tool:** Codex built-in `image_gen` (model name not surfaced); one-shot, no retries.
+- **Master:** untouched generated 1774×887 RGB PNG at `assets/masters/bg-buildings-sheet.png`.
+- **Panel semantics:** left to right: red-brick walk-up/fire escape; warm tan brownstone/stoop; corner café/striped awning; slate-blue office block/rooftop AC; narrow purple-grey apartment/water tower and pigeons. The five silhouettes share a generated baseline and remain independently separated.
+- **Post-processing:** content-safe x slices `377×887+0+0`, `317×887+377+0`, `395×887+694+0`, `355×887+1089+0`, and `330×887+1444+0`; each slice processed with `convert in.png -fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel out.png`; transparent trim; uniform `-resize 77.3109%`; 4 px transparent border; cleanup re-key at 15% fuzz plus selective saturated-magenta despill to muted purple for generator-contaminated wire/sign edge colors; `pngquant --force --skip-if-larger --output small.png 256 big.png`. Final sprites are 252×461, 226×426, 281×359, 252×442, and 208×468.
+- **QA:** composited each shipped sprite over a 400×500 `#3a405a` slate canvas at `assets/masters/bg-building-{0,1,2,3,4}-qa.png`. Corner alpha (top-left, top-right, bottom-left, bottom-right; 0–255) is `0,0,0,0` for every shipped sprite. Pixels within ImageMagick 10% fuzz of `#ff00ff` with nonzero alpha: `0`, `0`, `0`, `0`, `0`.
+- **Prompt:**
+  > Use case: stylized-concept
+  > Asset type: high-resolution game-art sprite sheet master for a parallax city street layer
+  > Input images: Reference 1 (cars-sheet.png) is style-only for thick clean dark outlines, painterly cel shading, texture, and warm palette; Reference 2 (pedestrians-sheet.png) is style-only for contour weight, warm upper-left lighting, expressive slightly absurdist character, and color handling; Reference 3 (hydrant-0.png) is style-only for the compact isolated game-sprite finish. Do not depict any cars, pedestrians, drivers, hydrants, or other subjects from the references.
+  > Primary request: Create ONE landscape sprite sheet containing exactly five distinct city building facades, arranged side by side in this exact left-to-right order:
+  > 1. A red-brick walk-up apartment with a clearly visible zigzag metal fire escape and mismatched curtains in its windows.
+  > 2. A warm tan brownstone with a front stoop, ornate cornice, and window flower boxes.
+  > 3. A corner shop/café with a striped awning, hanging sign, and large shopfront window.
+  > 4. A slate-blue mid-rise office block with a grid of glass windows catching warm light and rooftop AC units.
+  > 5. A narrow purple-grey apartment building with a wooden water tower on the roof and a few pigeons perched on wires.
+  > Scene/backdrop: Every building is isolated against a perfectly flat, uniform, pure solid #ff00ff chroma-key field. The background must contain absolutely no gradient, texture, floor plane, horizon, skyline, street, pavement, shadow, glow, reflection, dividers, labels, or other marks.
+  > Composition/framing: Wide landscape sheet, approximately 2048x1024 aspect ratio. Exactly five complete non-overlapping buildings side by side with generous visible magenta gaps between them. Nothing may touch the outer frame edges and no building or accessory may touch another building. All five buildings stand on one identical invisible ground line: their lowest flat bottom edges align to exactly the same horizontal baseline. Do not draw a visible ground line. Vary widths naturally and vary total heights from roughly 55% to 95% of the sheet height while preserving the common baseline. Keep rooftop details, awning, stoop, fire escape, signs, wires, pigeons, and water tower fully inside each building's own separated silhouette with ample frame clearance.
+  > Style/medium: polished 2D cartoon game illustration matching the three references; thick clean near-black outlines; painterly cel shading; subtle hand-painted surface texture; warm, slightly absurdist city personality; readable silhouette at game-sprite scale.
+  > Lighting/mood: warm afternoon light from the upper left, with soft painted highlights and cooler lower-right shadows.
+  > Color palette: red brick, warm tan and brown, cream and muted awning accents, slate-blue glass, purple-grey masonry, warm gold highlights; coherent with the reference palette.
+  > Constraints: exactly five buildings and no extra buildings; front/elevation facades suitable for a side-scrolling parallax layer; consistent perspective; identical flat baseline; strong separation; crisp chroma-key edges; no cast or contact shadows; no text except minimal unreadable decorative café sign marks if necessary.
+  > Avoid: reference subjects, people, vehicles, hydrants, street furniture, trees, roads, sidewalks, visible ground, readable lettering, logos, watermarks, panel frames, gutters other than the magenta background, magenta in the building artwork, cropped content, edge contact, overlap, photorealism, isometric perspective, 3D rendering.
+  > Intended outputs: untouched master at assets/masters/bg-buildings-sheet.png; five keyed, tightly cropped, uniformly downscaled shipped sprites at public/assets/sprites/bg-building-0.png through bg-building-4.png.
