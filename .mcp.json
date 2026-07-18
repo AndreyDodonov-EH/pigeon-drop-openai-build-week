@@ -1,9 +1,15 @@
 {
   "mcpServers": {
-    "agy": {
+    "codex": {
       "type": "stdio",
-      "command": "node",
-      "args": ["scripts/agy-mcp.mjs"],
+      "command": "codex",
+      "args": [
+        "mcp-server",
+        "-c",
+        "model=\"gpt-5.6-sol\"",
+        "-c",
+        "model_reasoning_effort=\"high\""
+      ],
       "env": {}
     }
   }
