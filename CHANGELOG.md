@@ -161,3 +161,19 @@ asset and texture key to `ready.png` / `portrait-ready`. After the pigeon runs d
 short relief timer expires. Crossing the existing meter-8 firing threshold clears the lock
 and returns the portrait to `ready` after the normal anti-flicker hold. Historical
 `images/normal.png` generation references remain named as originally recorded.
+
+## Splat audio (shipped 2026-07-18)
+
+The shipped wet splat SFX now plays when goo scores an accepted hit on a pedestrian or
+car. Playback shares the existing per-victim hit cooldown, preventing dense blobs from
+stacking many copies at once, and gets a subtle randomized rate so repeated impacts do not
+sound mechanically identical. Gas hits remain intentionally silent. The initial v2 sound
+was subsequently replaced with a tighter 0.17-second cut of the fuller third impact in the
+user-supplied `splat-v3.mp3` master.
+
+**Surface variants (2026-07-18):** ElevenLabs-generated car and asphalt one-shots expand
+the set to three distinct impacts. Pedestrians retain the short wet v3 cut; cars get a
+0.45-second hollow metal-roof splat; street landings get a dry 0.22-second slap. GooSim now
+reports each particle's first street contact, and the scene applies an impact threshold plus
+a 420 ms global cooldown so a fluid blob sounds cohesive instead of triggering an aggressive
+row of samples. Pedestrian/car routing continues to share the existing per-victim cooldown.

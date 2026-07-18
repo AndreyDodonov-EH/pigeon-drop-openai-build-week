@@ -10,6 +10,8 @@ import {
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
 import { buildTextures, W, H, GROUND_Y } from '../world/textures';
+import { MusicManager } from '../audio/MusicManager';
+import { SFX_VOLUME } from '../audio/mix';
 
 const SCROLL = 2.1; // world scroll, px/frame
 const GUANO_TINT = 0xf2ecd4;
@@ -51,6 +53,10 @@ const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
 const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
+// A continuous goo stream lands as one shifting puddle, not a machine-gun row
+// of discrete drops. Keep street impacts far enough apart that the short sample
+// fully clears and each replay reads as a new landing cluster.
+const ASPHALT_SPLAT_COOLDOWN_MS = 420;
 /** collection hitbox half-extents around the pigeon */
 const PICKUP_GRAB_X = 33;
 const PICKUP_GRAB_Y = 30;
@@ -192,12 +198,22 @@ export class GameScene extends Phaser.Scene {
   private rainbowTimer = 0;
   private rainbowHue = 0;
   private emitCarry = 0;
+  private nextAsphaltSplatAt = 0;
+  private music!: MusicManager;
 
   constructor() {
     super('game');
   }
 
   preload(): void {
+    this.load.audio('music-sneaky', ['assets/audio/music-sneaky.ogg', 'assets/audio/music-sneaky.mp3']);
+    this.load.audio('music-klezmer', ['assets/audio/music-klezmer.ogg', 'assets/audio/music-klezmer.mp3']);
+    this.load.audio('sfx-splat-ped', ['assets/audio/splat.ogg', 'assets/audio/splat.mp3']);
+    this.load.audio('sfx-splat-car', ['assets/audio/splat-car.ogg', 'assets/audio/splat-car.mp3']);
+    this.load.audio('sfx-splat-asphalt', [
+      'assets/audio/splat-asphalt.ogg',
+      'assets/audio/splat-asphalt.mp3',
+    ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
@@ -252,6 +268,7 @@ export class GameScene extends Phaser.Scene {
     this.sim.groundY = GROUND_Y;
     this.sim.boundsW = W;
     this.sim.worldVx = SCROLL;
+    this.sim.onGroundHit = (_p, impact) => this.onAsphaltSplat(impact);
     this.gooLayer = new GooLayer(this, W, H, 6);
     this.gasSim = new GasSim();
     this.gasSim.boundsW = W;
@@ -264,6 +281,8 @@ export class GameScene extends Phaser.Scene {
     this.createHud();
     this.createInput();
     this.createDebugMenu();
+    this.music = new MusicManager(this);
+    this.music.start();
 
     // expose hooks for headless screenshot driving
     (window as unknown as Record<string, unknown>).SP = {
@@ -284,6 +303,11 @@ export class GameScene extends Phaser.Scene {
       coffeeRemaining: () => this.coffeeTimer,
       gasRemaining: () => this.gasTimer,
       pigeonY: () => this.pigeonY,
+      setCombo: (v: number) => {
+        this.combo = v;
+        this.comboTimer = 120;
+      },
+      musicFrantic: () => this.music.franticNow,
     };
   }
 
@@ -855,6 +879,16 @@ export class GameScene extends Phaser.Scene {
     if (v.hitCooldown > 0) return;
     v.hitCooldown = 30;
 
+    // This path is already cooldown-gated per victim, so a dense fluid blob
+    // reads as one impact instead of layering dozens of identical one-shots.
+    // Gas has its own collision reaction and deliberately does not splat.
+    if (source === 'goo') {
+      this.sound.play(v.kind === 'car' ? 'sfx-splat-car' : 'sfx-splat-ped', {
+        volume: (v.kind === 'car' ? 0.58 : 0.65) * SFX_VOLUME,
+        rate: Phaser.Math.FloatBetween(0.94, 1.06),
+      });
+    }
+
     this.comboTimer = 120;
     this.combo = Math.min(this.combo + 1, 8);
     const base = v.kind === 'car' ? 25 : 10;
@@ -901,6 +935,15 @@ export class GameScene extends Phaser.Scene {
       const line = joyful ? CAR_LINES_RAINBOW[v.variant] : CAR_LINES[v.variant];
       this.popup(v.sprite.x - 30, v.sprite.y - 40, line, joyful ? COLOR_JOY_GREEN : COLOR_AMBER, 15);
     }
+  }
+
+  private onAsphaltSplat(impact: number): void {
+    if (impact < 2.2 || this.time.now < this.nextAsphaltSplatAt) return;
+    this.nextAsphaltSplatAt = this.time.now + ASPHALT_SPLAT_COOLDOWN_MS;
+    this.sound.play('sfx-splat-asphalt', {
+      volume: Phaser.Math.Clamp(0.34 + impact * 0.025, 0.42, 0.62) * SFX_VOLUME,
+      rate: Phaser.Math.FloatBetween(0.95, 1.05),
+    });
   }
 
   private popup(x: number, y: number, msg: string, color = COLOR_CREAM, size = 19): void {
@@ -1098,6 +1141,7 @@ export class GameScene extends Phaser.Scene {
 
     this.scoreText.setText(String(this.score));
     this.comboText.setText(this.combo > 1 ? `x${this.combo} COMBO` : '');
+    this.music.setCombo(this.combo);
     this.effectMeters.clear();
     let effectY = 118;
     if (this.rainbowTimer > 0) {

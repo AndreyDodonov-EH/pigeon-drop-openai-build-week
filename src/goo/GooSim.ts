@@ -42,6 +42,8 @@ export interface Particle {
   stickHold: number;
   /** short-lived sideways smear from the impact, in collider-local px/frame */
   surfaceVx: number;
+  /** prevents a settled or bouncing drop from reporting the same street landing again */
+  groundHit: boolean;
   dead: boolean;
 }
 
@@ -113,6 +115,7 @@ export class GooSim {
   worldVx = 0;
   groundY = 480;
   boundsW = 960;
+  onGroundHit?: (p: Particle, impactSpeed: number) => void;
 
   private grid = new Map<number, number[]>();
   private pool: Particle[] = [];
@@ -152,6 +155,7 @@ export class GooSim {
       p.sy = 0;
       p.stickHold = 0;
       p.surfaceVx = 0;
+      p.groundHit = false;
       p.dead = false;
       this.particles.push(p);
     }
@@ -460,6 +464,10 @@ export class GooSim {
       if (p.state !== PState.Free) continue;
       const floor = this.groundY - p.r * 0.5;
       if (p.y > floor) {
+        if (!p.groundHit) {
+          p.groundHit = true;
+          this.onGroundHit?.(p, Math.hypot(p.x - p.px, p.y - p.py));
+        }
         p.y = floor;
         // tangential friction drags puddles along with the scrolling ground
         const groundVx = -this.worldVx;
