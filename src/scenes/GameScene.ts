@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GooSim, type Collider, type Particle } from '../goo/GooSim';
 import { GooLayer } from '../goo/GooLayer';
+import { GasSim } from '../gas/GasSim';
+import { GasLayer } from '../gas/GasLayer';
 import { getAlphaMask } from '../goo/alphaMask';
 import {
   ensureVictimPalettePipeline,
@@ -8,6 +10,8 @@ import {
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
 import { buildTextures, W, H, GROUND_Y } from '../world/textures';
+import { MusicManager } from '../audio/MusicManager';
+import { SFX_VOLUME } from '../audio/mix';
 
 const SCROLL = 2.1; // world scroll, px/frame
 const GUANO_TINT = 0xf2ecd4;
@@ -27,6 +31,7 @@ const PIGEON_SCALE = 0.38;
 const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.34;
+const PED_VARIANT_COUNT = 6;
 
 // Curated clothing/paint/tie hues: blue, burgundy, green, violet, orange,
 // teal, ochre, and plum. The shared shader receives hue, accent hue, source
@@ -47,6 +52,12 @@ const PEA_LOOK_FRAME_FRAMES = 18;
 const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
+const GAS_DURATION = 60 * 8;
+const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
+// A continuous goo stream lands as one shifting puddle, not a machine-gun row
+// of discrete drops. Keep street impacts far enough apart that the short sample
+// fully clears and each replay reads as a new landing cluster.
+const ASPHALT_SPLAT_COOLDOWN_MS = 420;
 /** collection hitbox half-extents around the pigeon */
 const PICKUP_GRAB_X = 33;
 const PICKUP_GRAB_Y = 30;
@@ -96,9 +107,23 @@ interface Victim {
 }
 
 // per-variant splat reactions: outraged one-liner + how the sprite acts out
-const PED_LINES = ['MY SUIT!', 'EW EW EW!', 'CONSARN IT!'];
+const PED_LINES = [
+  'MY SUIT!',
+  'EW EW EW!',
+  'CONSARN IT!',
+  'NOT THE BAG!',
+  'MY MAP!',
+  'BRO! SERIOUSLY?!',
+];
 // rainbow goo delights instead of disgusts — same characters, opposite mood
-const PED_LINES_RAINBOW = ['FABULOUS!', 'SO PRETTY!!', 'HOT DIGGITY!'];
+const PED_LINES_RAINBOW = [
+  'FABULOUS!',
+  'SO PRETTY!!',
+  'HOT DIGGITY!',
+  'CONTENT GOLD!',
+  'BEST TRIP EVER!',
+  'SICK COLORS!',
+];
 const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
 const REACT_FRAMES = 90;
@@ -117,6 +142,7 @@ interface Hydrant {
   jetH: number; // current jet height, px above the cap
   jetMaxH: number; // this burst's full height
   splashed: boolean; // pigeon already caught by this burst
+  jetSound?: AdjustableSound;
 }
 
 interface Pickup {
@@ -127,11 +153,16 @@ interface Pickup {
   animT: number;
 }
 
+/** Phaser's manager returns a WebAudio/HTML5 sound with mutable volume at runtime. */
+type AdjustableSound = Phaser.Sound.BaseSound & { volume: number; rate: number };
+
 type PortraitKey = 'ready' | 'pleased' | 'strain' | 'panic' | 'damage';
 
 export class GameScene extends Phaser.Scene {
   private sim!: GooSim;
   private gooLayer!: GooLayer;
+  private gasSim!: GasSim;
+  private gasLayer!: GasLayer;
 
   private pigeon!: Phaser.GameObjects.Container;
   private pigeonImg!: Phaser.GameObjects.Image;
@@ -169,6 +200,11 @@ export class GameScene extends Phaser.Scene {
   private batteredTimer = 0;
   private relievedTimer = 0;
   private coffeeTimer = 0;
+  private gasTimer = 0;
+  private gasEmitCarry = 0;
+  private gasHeave?: AdjustableSound;
+  private gasHeavePlayedThisPress = false;
+  private gasLoop?: AdjustableSound;
   private pooping = false;
   /** involuntary dump in progress (runs until the meter empties) */
   private dumpKind: 'none' | 'blowout' | 'scare' = 'none';
@@ -184,12 +220,32 @@ export class GameScene extends Phaser.Scene {
   private rainbowTimer = 0;
   private rainbowHue = 0;
   private emitCarry = 0;
+  private nextAsphaltSplatAt = 0;
+  private music!: MusicManager;
 
   constructor() {
     super('game');
   }
 
   preload(): void {
+    this.load.audio('music-sneaky', ['assets/audio/music-sneaky.ogg', 'assets/audio/music-sneaky.mp3']);
+    this.load.audio('music-klezmer', ['assets/audio/music-klezmer.ogg', 'assets/audio/music-klezmer.mp3']);
+    this.load.audio('sfx-splat-ped', ['assets/audio/splat.ogg', 'assets/audio/splat.mp3']);
+    this.load.audio('sfx-splat-car', ['assets/audio/splat-car.ogg', 'assets/audio/splat-car.mp3']);
+    this.load.audio('sfx-splat-asphalt', [
+      'assets/audio/splat-asphalt.ogg',
+      'assets/audio/splat-asphalt.mp3',
+    ]);
+    this.load.audio('sfx-gas-whoosh', ['assets/audio/gas-whoosh.ogg', 'assets/audio/gas-whoosh.mp3']);
+    this.load.audio('sfx-gas-loop', ['assets/audio/gas-loop.ogg', 'assets/audio/gas-loop.mp3']);
+    this.load.audio('sfx-hydrant-clank', [
+      'assets/audio/hydrant-clank.ogg',
+      'assets/audio/hydrant-clank.mp3',
+    ]);
+    this.load.audio('sfx-hydrant-jet-loop', [
+      'assets/audio/hydrant-jet-loop.ogg',
+      'assets/audio/hydrant-jet-loop.mp3',
+    ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
@@ -198,15 +254,15 @@ export class GameScene extends Phaser.Scene {
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
-    this.load.image('ped-0', 'assets/sprites/ped-0.png');
-    this.load.image('ped-1', 'assets/sprites/ped-1.png');
-    this.load.image('ped-2', 'assets/sprites/ped-2.png');
     this.load.image('car-0', 'assets/sprites/car-0.png');
     this.load.image('car-1', 'assets/sprites/car-1.png');
     this.load.image('car-2', 'assets/sprites/car-2.png');
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < PED_VARIANT_COUNT; i++) {
+      this.load.image(`ped-${i}`, `assets/sprites/ped-${i}.png`);
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
       this.load.image(`ped-${i}-rainbow`, `assets/sprites/ped-${i}-rainbow.png`);
+    }
+    for (let i = 0; i < 3; i++) {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
@@ -244,13 +300,21 @@ export class GameScene extends Phaser.Scene {
     this.sim.groundY = GROUND_Y;
     this.sim.boundsW = W;
     this.sim.worldVx = SCROLL;
+    this.sim.onGroundHit = (_p, impact) => this.onAsphaltSplat(impact);
     this.gooLayer = new GooLayer(this, W, H, 6);
+    this.gasSim = new GasSim();
+    this.gasSim.boundsW = W;
+    this.gasSim.worldVx = SCROLL;
+    this.gasLayer = new GasLayer(this, W, H, 6.6);
 
     this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
     this.pigeon = this.add.container(240, this.pigeonY, [this.pigeonImg]).setDepth(7);
 
     this.createHud();
     this.createInput();
+    this.createDebugMenu();
+    this.music = new MusicManager(this);
+    this.music.start();
 
     // expose hooks for headless screenshot driving
     (window as unknown as Record<string, unknown>).SP = {
@@ -259,6 +323,7 @@ export class GameScene extends Phaser.Scene {
       setPoop: (v: boolean) => (this.pointerPoop = v),
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
       particleCount: () => this.sim.particles.length,
+      gasParticleCount: () => this.gasSim.particles.length,
       spawnHydrant: () => this.spawnHydrant(),
       spawnRainbowPickup: (x = W + 60, y = this.pigeonY) => this.spawnPickup('rainbow', x, y),
       spawnItemPickup: (
@@ -268,7 +333,13 @@ export class GameScene extends Phaser.Scene {
       ) => this.spawnPickup(kind, x, y),
       rainbowRemaining: () => this.rainbowTimer,
       coffeeRemaining: () => this.coffeeTimer,
+      gasRemaining: () => this.gasTimer,
       pigeonY: () => this.pigeonY,
+      setCombo: (v: number) => {
+        this.combo = v;
+        this.comboTimer = 120;
+      },
+      musicFrantic: () => this.music.franticNow,
     };
   }
 
@@ -335,6 +406,61 @@ export class GameScene extends Phaser.Scene {
       if (!p.rightButtonDown()) this.pointerFly = false;
       this.pointerPoop = false;
     });
+  }
+
+  /** Compact always-on development palette for testing scene objects on demand. */
+  private createDebugMenu(): void {
+    const x = W - 174;
+    const y = 106;
+    const buttonW = 48;
+    const buttonH = 22;
+    const gap = 4;
+
+    this.add
+      .text(x, y - 19, 'DEBUG SPAWN', {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: COLOR_CREAM,
+        stroke: COLOR_INK,
+        strokeThickness: 3,
+      })
+      .setDepth(20);
+
+    const addButton = (label: string, col: number, row: number, action: () => void): void => {
+      const bx = x + col * (buttonW + gap);
+      const by = y + row * (buttonH + gap);
+      const bg = this.add
+        .rectangle(bx, by, buttonW, buttonH, 0x1d1f2a, 0.9)
+        .setOrigin(0)
+        .setStrokeStyle(1, 0xf3ead8, 0.65)
+        .setDepth(20)
+        .setInteractive({ useHandCursor: true });
+      this.add
+        .text(bx + buttonW / 2, by + buttonH / 2, label, {
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: COLOR_CREAM,
+        })
+        .setOrigin(0.5)
+        .setDepth(21);
+      bg.on('pointerdown', () => action());
+      bg.on('pointerover', () => bg.setFillStyle(0x394257, 1));
+      bg.on('pointerout', () => bg.setFillStyle(0x1d1f2a, 0.9));
+    };
+
+    const spawnHere = (kind: PickupKind): void =>
+      this.spawnPickup(kind, this.pigeon.x + PICKUP_GRAB_X - 2, this.pigeonY);
+    addButton('PED', 0, 0, () => this.spawnPed());
+    addButton('CAR', 1, 0, () => this.spawnCar());
+    addButton('HYDRA', 2, 0, () => this.spawnHydrant());
+    addButton('RAIN', 0, 1, () => spawnHere('rainbow'));
+    addButton('BREAD', 1, 1, () => spawnHere('bread'));
+    addButton('FRIES', 2, 1, () => spawnHere('fries'));
+    addButton('KEBAB', 0, 2, () => spawnHere('kebab'));
+    addButton('CHILI', 1, 2, () => spawnHere('chilli'));
+    addButton('COFF', 2, 2, () => spawnHere('coffee'));
+    addButton('POD', 0, 3, () => spawnHere('pea'));
+    addButton('GAS', 1, 3, () => this.activateGas());
   }
 
   update(_time: number, deltaMs: number): void {
@@ -466,7 +592,14 @@ export class GameScene extends Phaser.Scene {
       this.meter = Math.min(100, this.meter + effect.pressureGain);
     }
     if (kind === 'coffee') this.coffeeTimer = COFFEE_DURATION;
+    if (kind === 'pea') this.activateGas();
     this.pickupBurst(x, y, effect.burstColors);
+  }
+
+  private activateGas(): void {
+    this.gasTimer = GAS_DURATION;
+    // A fresh pod re-arms the opening heave even mid-hold.
+    this.gasHeavePlayedThisPress = false;
   }
 
   private pickupBurst(x: number, y: number, colors: number[]): void {
@@ -487,19 +620,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnPed(): void {
-    const v = (Math.random() * 3) | 0;
+    const v = (Math.random() * PED_VARIANT_COUNT) | 0;
     const dir = Math.random() < 0.5 ? -1 : 1;
     const hueIndex = (Math.random() * VICTIM_PALETTE_HUES.length) | 0;
     const hue = VICTIM_PALETTE_HUES[hueIndex];
-    // The businessman gets a contrasting tie; the runner instead picks a
-    // natural hair shade (red, brown, or blonde).
-    const accentHue =
-      v === 1
-        ? RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0]
-        : VICTIM_PALETTE_HUES[
+    // Only the first two pedestrians use the shader's secondary material:
+    // a contrasting businessman tie and a natural runner hair shade.
+    let accentHue = 0;
+    if (v === 0) {
+      accentHue =
+        VICTIM_PALETTE_HUES[
             (hueIndex + 1 + ((Math.random() * (VICTIM_PALETTE_HUES.length - 1)) | 0)) %
               VICTIM_PALETTE_HUES.length
           ];
+    } else if (v === 1) {
+      accentHue = RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0];
+    }
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
@@ -632,9 +768,14 @@ export class GameScene extends Phaser.Scene {
         h.state = 'warn';
         h.timer = 65;
         h.sprite.setTexture('hydrant-1');
+        this.sound.play('sfx-hydrant-clank', {
+          volume: 0.34 * SFX_VOLUME,
+          rate: Phaser.Math.FloatBetween(0.98, 1.02),
+        });
       } else if (h.state === 'warn' && h.timer <= 0) {
         h.state = 'burst';
         h.timer = 130;
+        this.startHydrantJet(h);
         // always tall enough to reach the default cruise line (forces a climb
         // to dodge) but never so tall the ceiling clamp can't out-climb it
         h.jetMaxH = 280 + Math.random() * 70;
@@ -642,6 +783,7 @@ export class GameScene extends Phaser.Scene {
         h.state = 'idle';
         h.splashed = true; // burst spent — never re-arm
         h.sprite.setTexture('hydrant-0');
+        this.stopHydrantJet(h);
       }
 
       // jet grows fast on burst, collapses when the cap reseats
@@ -673,6 +815,7 @@ export class GameScene extends Phaser.Scene {
 
     this.hydrants = this.hydrants.filter((h) => {
       if (h.sprite.x < -160) {
+        this.stopHydrantJet(h, false);
         h.sprite.destroy();
         h.jetCol.destroy();
         h.crown.destroy();
@@ -680,6 +823,39 @@ export class GameScene extends Phaser.Scene {
         return false;
       }
       return true;
+    });
+  }
+
+  private startHydrantJet(h: Hydrant): void {
+    this.stopHydrantJet(h, false);
+    const sound = this.sound.add('sfx-hydrant-jet-loop', {
+      loop: true,
+      volume: 0.18 * SFX_VOLUME,
+    }) as AdjustableSound;
+    sound.play();
+    // BaseSound resets its config when play begins; set the live gain after it starts.
+    sound.volume = 0.18 * SFX_VOLUME;
+    h.jetSound = sound;
+  }
+
+  private stopHydrantJet(h: Hydrant, fade = true): void {
+    const sound = h.jetSound;
+    if (!sound) return;
+    h.jetSound = undefined;
+    if (!fade || !sound.isPlaying) {
+      sound.stop();
+      sound.destroy();
+      return;
+    }
+    this.tweens.add({
+      targets: sound,
+      volume: 0,
+      duration: 120,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        sound.stop();
+        sound.destroy();
+      },
     });
   }
 
@@ -773,8 +949,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onSplat(v: Victim, p: Particle, _impact: number): void {
+    this.onVictimHit(v, p.rainbow, 'goo');
+  }
+
+  private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas'): void {
     if (v.hitCooldown > 0) return;
     v.hitCooldown = 30;
+
+    // This path is already cooldown-gated per victim, so a dense fluid blob
+    // reads as one impact instead of layering dozens of identical one-shots.
+    // Gas has its own collision reaction and deliberately does not splat.
+    if (source === 'goo') {
+      this.sound.play(v.kind === 'car' ? 'sfx-splat-car' : 'sfx-splat-ped', {
+        volume: (v.kind === 'car' ? 0.58 : 0.65) * SFX_VOLUME,
+        rate: Phaser.Math.FloatBetween(0.94, 1.06),
+      });
+    }
 
     this.comboTimer = 120;
     this.combo = Math.min(this.combo + 1, 8);
@@ -782,10 +972,15 @@ export class GameScene extends Phaser.Scene {
     const pts = base * this.combo;
     this.score += pts;
 
-    // rainbow goo flips the mood: victims get a delighted frame + positive line
-    const joyful = p.rainbow;
-
-    const label = v.kind === 'car' ? 'DING!' : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
+    // Rainbow goo flips the mood. Gas stays disgusting but gets its own hit verb.
+    const label =
+      source === 'gas'
+        ? v.kind === 'car'
+          ? 'PFFFFT!'
+          : 'GASSED!'
+        : v.kind === 'car'
+          ? 'DING!'
+          : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
     this.popup(v.sprite.x, v.sprite.y - 46, `${label} +${pts}`);
 
     // reaction frame (outraged or delighted), reverted by updateVictims after REACT_FRAMES
@@ -793,8 +988,9 @@ export class GameScene extends Phaser.Scene {
     v.reactTimer = REACT_FRAMES;
 
     if (v.kind === 'ped') {
-      // jogger shudders, the others shake fist/cane (y is owned by the bob update — don't tween it)
-      const wiggle = v.variant === 1 ? 5 : 9;
+      // The jogger and map-covered tourist shudder; broader poses shake harder.
+      // y is owned by the bob update, so do not tween it here.
+      const wiggle = v.variant === 1 || v.variant === 4 ? 5 : 9;
       this.tweens.add({
         targets: v.sprite,
         angle: { from: -wiggle, to: wiggle },
@@ -817,6 +1013,15 @@ export class GameScene extends Phaser.Scene {
       const line = joyful ? CAR_LINES_RAINBOW[v.variant] : CAR_LINES[v.variant];
       this.popup(v.sprite.x - 30, v.sprite.y - 40, line, joyful ? COLOR_JOY_GREEN : COLOR_AMBER, 15);
     }
+  }
+
+  private onAsphaltSplat(impact: number): void {
+    if (impact < 2.2 || this.time.now < this.nextAsphaltSplatAt) return;
+    this.nextAsphaltSplatAt = this.time.now + ASPHALT_SPLAT_COOLDOWN_MS;
+    this.sound.play('sfx-splat-asphalt', {
+      volume: Phaser.Math.Clamp(0.34 + impact * 0.025, 0.42, 0.62) * SFX_VOLUME,
+      rate: Phaser.Math.FloatBetween(0.95, 1.05),
+    });
   }
 
   private popup(x: number, y: number, msg: string, color = COLOR_CREAM, size = 19): void {
@@ -843,6 +1048,8 @@ export class GameScene extends Phaser.Scene {
   private updateGuano(f: number): void {
     this.rainbowTimer = Math.max(0, this.rainbowTimer - f);
     this.coffeeTimer = Math.max(0, this.coffeeTimer - f);
+    this.gasTimer = Math.max(0, this.gasTimer - f);
+    if (this.gasTimer <= 0) this.stopGasStream();
     if (Phaser.Input.Keyboard.JustDown(this.keys.damage)) this.scarePoop();
 
     const digestionRate =
@@ -864,6 +1071,7 @@ export class GameScene extends Phaser.Scene {
       (this.keys.poop.isDown || this.pointerPoop) &&
       this.meter > 0;
     if (wasPooping && !this.pooping) this.relievedTimer = 60;
+    if (!this.pooping && this.dumpKind === 'none') this.stopGasStream();
 
     if (this.dumpKind !== 'none') {
       this.meter = Math.max(0, this.meter - 2.4 * f);
@@ -887,6 +1095,18 @@ export class GameScene extends Phaser.Scene {
       ...this.hydrants.map((h) => h.collider),
     ]);
     this.gooLayer.render(this.sim.particles);
+    this.gasSim.step(
+      f,
+      this.victims.map((v) => ({
+        id: v.collider.id,
+        x: v.collider.x,
+        y: v.collider.y,
+        hw: v.collider.hw,
+        hh: v.collider.hh,
+        onHit: () => this.onVictimHit(v, false, 'gas'),
+      })),
+    );
+    this.gasLayer.render(this.gasSim.particles);
   }
 
   /** Emit `rate` drops this frame; `wild` sprays uncontrolled instead of streaming. */
@@ -899,6 +1119,16 @@ export class GameScene extends Phaser.Scene {
     // emit from under the tail, inheriting a bit of the pigeon's motion
     const tailX = this.pigeon.x - 42;
     const tailY = this.pigeonY + 24;
+    if (this.gasTimer > 0) {
+      // Gas replaces liquid output rather than decorating it. Fewer expanding
+      // parcels produce a coherent cloud at a fraction of the goo particle count.
+      this.startGasStream();
+      this.gasEmitCarry += n * 0.32;
+      const gasCount = Math.floor(this.gasEmitCarry);
+      this.gasEmitCarry -= gasCount;
+      if (gasCount > 0) this.gasSim.emit(tailX, tailY, wild, gasCount);
+      return;
+    }
     for (let i = 0; i < n; i++) {
       let tint = GUANO_TINT;
       if (rainbow) {
@@ -910,6 +1140,52 @@ export class GameScene extends Phaser.Scene {
       const vy = wild ? 2.5 + Math.random() * 3.5 : this.pigeonVy * 0.35 + 4.2;
       this.sim.emit(tailX, tailY, vx, vy, tint, 1, rainbow);
     }
+  }
+
+  /** Idempotent per frame: opens with one heave, then sustains the sputter bed. */
+  private startGasStream(): void {
+    if (!this.gasLoop) {
+      const loop = this.sound.add('sfx-gas-loop', { loop: true, volume: 0 }) as AdjustableSound;
+      loop.play();
+      this.gasLoop = loop;
+      this.tweens.add({
+        targets: loop,
+        volume: 0.22 * SFX_VOLUME,
+        duration: 130,
+        ease: 'Quad.easeIn',
+      });
+    }
+    if (!this.gasHeavePlayedThisPress) {
+      // One heave per press; a re-press while the last one still rings joins the
+      // loop bed silently instead of stacking another retch on top.
+      if (!this.gasHeave?.isPlaying) {
+        this.gasHeave?.destroy();
+        const volume = 0.38 * SFX_VOLUME;
+        this.gasHeave = this.sound.add('sfx-gas-whoosh') as AdjustableSound;
+        this.gasHeave.play({ volume, rate: Phaser.Math.FloatBetween(0.94, 1.05) });
+        // BaseSound resets its config when play begins; set the live gain after it starts.
+        this.gasHeave.volume = volume;
+      }
+      this.gasHeavePlayedThisPress = true;
+    }
+  }
+
+  private stopGasStream(): void {
+    this.gasHeavePlayedThisPress = false;
+    const loop = this.gasLoop;
+    if (!loop) return;
+    this.gasLoop = undefined;
+    this.tweens.killTweensOf(loop);
+    this.tweens.add({
+      targets: loop,
+      volume: 0,
+      duration: 200,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        loop.stop();
+        loop.destroy();
+      },
+    });
   }
 
   /**
@@ -992,6 +1268,7 @@ export class GameScene extends Phaser.Scene {
 
     this.scoreText.setText(String(this.score));
     this.comboText.setText(this.combo > 1 ? `x${this.combo} COMBO` : '');
+    this.music.setCombo(this.combo);
     this.effectMeters.clear();
     let effectY = 118;
     if (this.rainbowTimer > 0) {
@@ -1010,6 +1287,10 @@ export class GameScene extends Phaser.Scene {
         this.coffeeTimer / COFFEE_DURATION,
         [0x5a2f1f, 0x8b4b2b, 0xc98445, 0xe1aa61],
       );
+      effectY += 13;
+    }
+    if (this.gasTimer > 0) {
+      this.drawEffectMeter(this.effectMeters, effectY, this.gasTimer / GAS_DURATION, GAS_COLORS);
     }
 
     // pressure ring: fills clockwise from 12 o'clock, goes amber then pulsing

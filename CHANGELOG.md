@@ -125,11 +125,15 @@ was removed entirely; the silhouettes now float cleanly against the sky.
 
 Bread/fries/kebab immediately add +5/+8/+20 digestion pressure; kebab is the meaningful
 jump while the two snacks are small top-ups. Coffee now activates an eight-second rush
-that triples passive digestion. Chilli and pea already spawn, collect, and produce
-item-colored feedback bursts, but their fire-poo and gas-mode behaviors remain deliberately
-deferred. The frightened pod swaps `pickup-pea-0`/`pickup-pea-1` every 18 normalized frames
-so only its pupils dart left/right. `window.SP.spawnItemPickup(kind,x,y)` provides
-deterministic scene testing.
+that triples passive digestion. The pea pod activates an eight-second gas mode which
+replaces liquid emission with translucent green vapour. Dedicated gas parcels leave as a
+short downward/backward jet, expand, diffuse, become buoyant, curl in mild turbulence, and
+follow the world's slipstream; their expanding cloud volumes can hit victims without ever
+entering the goo simulation. A green timer bar tracks the remaining duration under the
+portrait. Chilli's fire-poo behavior remains deferred. The
+frightened pod swaps `pickup-pea-0`/`pickup-pea-1` every 18 normalized frames so only its
+pupils dart left/right. `window.SP.spawnItemPickup(kind,x,y)` provides deterministic scene
+testing.
 
 **Engagement tuning (2026-07-18):** passive digestion slowed from 0.12 to 0.035 meter per
 normalized frame (7.2 → 2.1 per second; empty-to-full now ≈48 s). Coffee raises that to
@@ -143,6 +147,11 @@ meter deltas 2.1/6.3, exact food gains 5/8/20, no pickup/effect text objects, re
 silhouettes at the new scale, both timer bars visible together, and an empty meter graphic
 after both effects expire.
 
+**Spawn palette and gas follow-up (2026-07-18):** an always-visible compact `DEBUG SPAWN`
+palette in the upper-right now produces pedestrians, cars, hydrants, and each pickup on
+demand. The POD button lands a pod in the pigeon's pickup range; GAS directly exercises the
+same eight-second gas state for quick visual testing.
+
 ## Ready portrait semantics (shipped 2026-07-18)
 
 The old runtime `public/assets/portraits/normal.png` was semantically misleading: its
@@ -152,3 +161,42 @@ asset and texture key to `ready.png` / `portrait-ready`. After the pigeon runs d
 short relief timer expires. Crossing the existing meter-8 firing threshold clears the lock
 and returns the portrait to `ready` after the normal anti-flicker hold. Historical
 `images/normal.png` generation references remain named as originally recorded.
+
+## Splat audio (shipped 2026-07-18)
+
+The shipped wet splat SFX now plays when goo scores an accepted hit on a pedestrian or
+car. Playback shares the existing per-victim hit cooldown, preventing dense blobs from
+stacking many copies at once, and gets a subtle randomized rate so repeated impacts do not
+sound mechanically identical. Gas hits remain intentionally silent. The initial v2 sound
+was subsequently replaced with a tighter 0.17-second cut of the fuller third impact in the
+user-supplied `splat-v3.mp3` master.
+
+**Surface variants (2026-07-18):** ElevenLabs-generated car and asphalt one-shots expand
+the set to three distinct impacts. Pedestrians retain the short wet v3 cut; cars get a
+0.45-second hollow metal-roof splat; street landings get a dry 0.22-second slap. GooSim now
+reports each particle's first street contact, and the scene applies an impact threshold plus
+a 420 ms global cooldown so a fluid blob sounds cohesive instead of triggering an aggressive
+row of samples. Pedestrian/car routing continues to share the existing per-victim cooldown.
+
+**Gas and hydrant cues (2026-07-18):** gas-mode emission opens each stream with one comical
+wet-heave/whoosh at natural rate (small random detune) and sustains a new seamless bubbly
+sputter loop underneath for as long as the stream runs — however long the press — with a
+130 ms fade-in and a 200 ms fade-out on release or gas expiry. The heave fires once per
+press and rings out naturally; a quick re-press while it still sounds rejoins the loop bed
+without stacking another retch. (This replaces the earlier rate-0.3 slowdown of the single
+one-shot, which pitched the heave into a groan and fell silent after ~3.4 s.) A fire
+hydrant now gives three gentle lid clinks as it enters `warn`, then starts the softer v0
+high-pressure water bed on `burst` for the full visible column and fades it out as the jet
+ends. The earlier harsh burst cue is no longer loaded. Both effects use the shared SFX bus.
+
+**Klezmer transition (2026-07-18):** leaving the frantic combo tier now fades the klezmer
+layer over 2.4 seconds while the sneaky layer returns on the original 0.9-second crossfade,
+giving the energetic track a smoother tail without delaying the base music.
+
+**Second pedestrian cast (2026-07-18):** added three new street victims: a tasteless
+fake-luxury influencer, a hopelessly lost tourist dad, and a skipped-leg-day gym bro. Each
+ships with walk, outraged splat, and delighted rainbow-reaction art plus character-specific
+reaction lines. Pedestrian spawning now samples all six characters. The shared victim
+palette control expanded from three to six source IDs, with isolated primary-garment masks
+for the influencer's velour tracksuit, tourist's vacation shirt, and gym bro's tank/shorts;
+existing pedestrians and the three car paint mappings remain in the same batched shader.

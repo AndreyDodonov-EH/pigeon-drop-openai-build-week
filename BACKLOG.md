@@ -64,8 +64,13 @@ this slot in alongside the normal flight frames.
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =
-  accelerated meter is shipped; chilli = explosive burning/fire poo and frightened pea
-  pod = gas mode remain. Rainbow behavior is already shipped.
+  accelerated meter and frightened pea pod = gas replacement mode are shipped; chilli =
+  explosive burning/fire poo remains. Rainbow behavior is already shipped.
+- **Reconsider pea-pod gas targeting:** the current buoyant cloud looks good but rises
+  before it can reliably reach pedestrians. Possible later redesign: emit a forceful
+  downward turbo jet of gas that remains concentrated until it hits the ground, then
+  disperses and rises using the current cloud physics. Decide whether that added ground
+  targeting and propulsion is preferable to keeping gas as an intentionally aerial effect.
 
 **World & level design**
 - Higher platforms / screen layers — e.g. flying at balcony level, vertical screen
