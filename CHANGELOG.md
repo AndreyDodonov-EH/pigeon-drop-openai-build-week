@@ -125,11 +125,15 @@ was removed entirely; the silhouettes now float cleanly against the sky.
 
 Bread/fries/kebab immediately add +5/+8/+20 digestion pressure; kebab is the meaningful
 jump while the two snacks are small top-ups. Coffee now activates an eight-second rush
-that triples passive digestion. Chilli and pea already spawn, collect, and produce
-item-colored feedback bursts, but their fire-poo and gas-mode behaviors remain deliberately
-deferred. The frightened pod swaps `pickup-pea-0`/`pickup-pea-1` every 18 normalized frames
-so only its pupils dart left/right. `window.SP.spawnItemPickup(kind,x,y)` provides
-deterministic scene testing.
+that triples passive digestion. The pea pod activates an eight-second gas mode which
+replaces liquid emission with translucent green vapour. Dedicated gas parcels leave as a
+short downward/backward jet, expand, diffuse, become buoyant, curl in mild turbulence, and
+follow the world's slipstream; their expanding cloud volumes can hit victims without ever
+entering the goo simulation. A green timer bar tracks the remaining duration under the
+portrait. Chilli's fire-poo behavior remains deferred. The
+frightened pod swaps `pickup-pea-0`/`pickup-pea-1` every 18 normalized frames so only its
+pupils dart left/right. `window.SP.spawnItemPickup(kind,x,y)` provides deterministic scene
+testing.
 
 **Engagement tuning (2026-07-18):** passive digestion slowed from 0.12 to 0.035 meter per
 normalized frame (7.2 → 2.1 per second; empty-to-full now ≈48 s). Coffee raises that to
@@ -142,6 +146,11 @@ coffee strip), packed upward and hidden at zero. Verified in live Phaser: exact 
 meter deltas 2.1/6.3, exact food gains 5/8/20, no pickup/effect text objects, readable pickup
 silhouettes at the new scale, both timer bars visible together, and an empty meter graphic
 after both effects expire.
+
+**Spawn palette and gas follow-up (2026-07-18):** an always-visible compact `DEBUG SPAWN`
+palette in the upper-right now produces pedestrians, cars, hydrants, and each pickup on
+demand. The POD button lands a pod in the pigeon's pickup range; GAS directly exercises the
+same eight-second gas state for quick visual testing.
 
 ## Ready portrait semantics (shipped 2026-07-18)
 

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GooSim, type Collider, type Particle } from '../goo/GooSim';
 import { GooLayer } from '../goo/GooLayer';
+import { GasSim } from '../gas/GasSim';
+import { GasLayer } from '../gas/GasLayer';
 import { getAlphaMask } from '../goo/alphaMask';
 import {
   ensureVictimPalettePipeline,
@@ -47,6 +49,8 @@ const PEA_LOOK_FRAME_FRAMES = 18;
 const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
+const GAS_DURATION = 60 * 8;
+const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
 /** collection hitbox half-extents around the pigeon */
 const PICKUP_GRAB_X = 33;
 const PICKUP_GRAB_Y = 30;
@@ -132,6 +136,8 @@ type PortraitKey = 'ready' | 'pleased' | 'strain' | 'panic' | 'damage';
 export class GameScene extends Phaser.Scene {
   private sim!: GooSim;
   private gooLayer!: GooLayer;
+  private gasSim!: GasSim;
+  private gasLayer!: GasLayer;
 
   private pigeon!: Phaser.GameObjects.Container;
   private pigeonImg!: Phaser.GameObjects.Image;
@@ -169,6 +175,8 @@ export class GameScene extends Phaser.Scene {
   private batteredTimer = 0;
   private relievedTimer = 0;
   private coffeeTimer = 0;
+  private gasTimer = 0;
+  private gasEmitCarry = 0;
   private pooping = false;
   /** involuntary dump in progress (runs until the meter empties) */
   private dumpKind: 'none' | 'blowout' | 'scare' = 'none';
@@ -245,6 +253,10 @@ export class GameScene extends Phaser.Scene {
     this.sim.boundsW = W;
     this.sim.worldVx = SCROLL;
     this.gooLayer = new GooLayer(this, W, H, 6);
+    this.gasSim = new GasSim();
+    this.gasSim.boundsW = W;
+    this.gasSim.worldVx = SCROLL;
+    this.gasLayer = new GasLayer(this, W, H, 6.6);
 
     this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
     this.pigeon = this.add.container(240, this.pigeonY, [this.pigeonImg]).setDepth(7);
@@ -259,6 +271,7 @@ export class GameScene extends Phaser.Scene {
       setPoop: (v: boolean) => (this.pointerPoop = v),
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
       particleCount: () => this.sim.particles.length,
+      gasParticleCount: () => this.gasSim.particles.length,
       spawnHydrant: () => this.spawnHydrant(),
       spawnRainbowPickup: (x = W + 60, y = this.pigeonY) => this.spawnPickup('rainbow', x, y),
       spawnItemPickup: (
@@ -268,6 +281,7 @@ export class GameScene extends Phaser.Scene {
       ) => this.spawnPickup(kind, x, y),
       rainbowRemaining: () => this.rainbowTimer,
       coffeeRemaining: () => this.coffeeTimer,
+      gasRemaining: () => this.gasTimer,
       pigeonY: () => this.pigeonY,
     };
   }
@@ -466,7 +480,12 @@ export class GameScene extends Phaser.Scene {
       this.meter = Math.min(100, this.meter + effect.pressureGain);
     }
     if (kind === 'coffee') this.coffeeTimer = COFFEE_DURATION;
+    if (kind === 'pea') this.activateGas();
     this.pickupBurst(x, y, effect.burstColors);
+  }
+
+  private activateGas(): void {
+    this.gasTimer = GAS_DURATION;
   }
 
   private pickupBurst(x: number, y: number, colors: number[]): void {
@@ -773,6 +792,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onSplat(v: Victim, p: Particle, _impact: number): void {
+    this.onVictimHit(v, p.rainbow, 'goo');
+  }
+
+  private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas'): void {
     if (v.hitCooldown > 0) return;
     v.hitCooldown = 30;
 
@@ -782,10 +805,15 @@ export class GameScene extends Phaser.Scene {
     const pts = base * this.combo;
     this.score += pts;
 
-    // rainbow goo flips the mood: victims get a delighted frame + positive line
-    const joyful = p.rainbow;
-
-    const label = v.kind === 'car' ? 'DING!' : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
+    // Rainbow goo flips the mood. Gas stays disgusting but gets its own hit verb.
+    const label =
+      source === 'gas'
+        ? v.kind === 'car'
+          ? 'PFFFFT!'
+          : 'GASSED!'
+        : v.kind === 'car'
+          ? 'DING!'
+          : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
     this.popup(v.sprite.x, v.sprite.y - 46, `${label} +${pts}`);
 
     // reaction frame (outraged or delighted), reverted by updateVictims after REACT_FRAMES
@@ -843,6 +871,7 @@ export class GameScene extends Phaser.Scene {
   private updateGuano(f: number): void {
     this.rainbowTimer = Math.max(0, this.rainbowTimer - f);
     this.coffeeTimer = Math.max(0, this.coffeeTimer - f);
+    this.gasTimer = Math.max(0, this.gasTimer - f);
     if (Phaser.Input.Keyboard.JustDown(this.keys.damage)) this.scarePoop();
 
     const digestionRate =
@@ -887,6 +916,18 @@ export class GameScene extends Phaser.Scene {
       ...this.hydrants.map((h) => h.collider),
     ]);
     this.gooLayer.render(this.sim.particles);
+    this.gasSim.step(
+      f,
+      this.victims.map((v) => ({
+        id: v.collider.id,
+        x: v.collider.x,
+        y: v.collider.y,
+        hw: v.collider.hw,
+        hh: v.collider.hh,
+        onHit: () => this.onVictimHit(v, false, 'gas'),
+      })),
+    );
+    this.gasLayer.render(this.gasSim.particles);
   }
 
   /** Emit `rate` drops this frame; `wild` sprays uncontrolled instead of streaming. */
@@ -899,6 +940,15 @@ export class GameScene extends Phaser.Scene {
     // emit from under the tail, inheriting a bit of the pigeon's motion
     const tailX = this.pigeon.x - 42;
     const tailY = this.pigeonY + 24;
+    if (this.gasTimer > 0) {
+      // Gas replaces liquid output rather than decorating it. Fewer expanding
+      // parcels produce a coherent cloud at a fraction of the goo particle count.
+      this.gasEmitCarry += n * 0.32;
+      const gasCount = Math.floor(this.gasEmitCarry);
+      this.gasEmitCarry -= gasCount;
+      if (gasCount > 0) this.gasSim.emit(tailX, tailY, wild, gasCount);
+      return;
+    }
     for (let i = 0; i < n; i++) {
       let tint = GUANO_TINT;
       if (rainbow) {
@@ -1010,6 +1060,10 @@ export class GameScene extends Phaser.Scene {
         this.coffeeTimer / COFFEE_DURATION,
         [0x5a2f1f, 0x8b4b2b, 0xc98445, 0xe1aa61],
       );
+      effectY += 13;
+    }
+    if (this.gasTimer > 0) {
+      this.drawEffectMeter(this.effectMeters, effectY, this.gasTimer / GAS_DURATION, GAS_COLORS);
     }
 
     // pressure ring: fills clockwise from 12 o'clock, goes amber then pulsing
