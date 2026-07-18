@@ -32,6 +32,8 @@ const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.34;
 const PED_VARIANT_COUNT = 6;
+const PEDESTRIAN_DEPTH = 5;
+const CAR_DEPTH = 5.1; // the road lane is closer to camera than the pavement
 
 // Curated clothing/paint/tie hues: blue, burgundy, green, violet, orange,
 // teal, ochre, and plum. The shared shader receives hue, accent hue, source
@@ -295,7 +297,7 @@ export class GameScene extends Phaser.Scene {
 
     this.pigeonShadow = this.add.image(240, GROUND_Y - 6, 'shadow').setDepth(4);
 
-    // victims live at depth 5, goo at 6, pigeon 7, HUD 10+
+    // pedestrians/road traffic live at depth 5/5.1, goo at 6, pigeon 7, HUD 10+
     this.sim = new GooSim();
     this.sim.groundY = GROUND_Y;
     this.sim.boundsW = W;
@@ -639,7 +641,7 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.add
       .sprite(W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
-      .setDepth(5)
+      .setDepth(PEDESTRIAN_DEPTH)
       .setFlipX(dir > 0)
       .setTint(victimPaletteTint(hue, v, 'ped', accentHue))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
@@ -676,7 +678,7 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.add
       .sprite(W + 80, 0, `car-${v}`)
       .setScale(VICTIM_SCALE)
-      .setDepth(5)
+      .setDepth(CAR_DEPTH)
       .setTint(victimPaletteTint(hue, v, 'car'))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
     sprite.setY(GROUND_Y + 32 - sprite.displayHeight / 2);
