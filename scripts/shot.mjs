@@ -18,7 +18,7 @@ page.on('console', (msg) => {
 });
 page.on('pageerror', (err) => errors.push(String(err)));
 
-await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
+await page.goto(process.env.GAME_URL || 'http://localhost:5199/', { waitUntil: 'networkidle' });
 await page.waitForFunction(() => typeof window.SP !== 'undefined', { timeout: 10000 });
 await page.waitForTimeout(600);
 

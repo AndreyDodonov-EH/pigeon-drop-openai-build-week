@@ -5,7 +5,7 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 980, height: 560 } });
 page.on('console', (m) => m.type() === 'error' && console.log('console error:', m.text()));
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
+await page.goto(process.env.GAME_URL || 'http://localhost:5199/', { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.SP);
 // let victims spawn and spread out
 await page.waitForTimeout(6000);

@@ -9,7 +9,7 @@ const errors = [];
 page.on('console', (msg) => msg.type() === 'error' && errors.push(msg.text()));
 page.on('pageerror', (err) => errors.push(String(err)));
 
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
+await page.goto(process.env.GAME_URL || 'http://localhost:5199/', { waitUntil: 'networkidle' });
 await page.waitForFunction(() => window.SP);
 
 const results = await page.evaluate(() => {
