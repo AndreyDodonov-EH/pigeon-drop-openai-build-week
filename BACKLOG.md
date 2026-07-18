@@ -61,6 +61,10 @@ this slot in alongside the normal flight frames.
   behind the scenes.
 - Chain reactions to create chaos? (one splat triggers the next — startled ped stumbles
   into a car, honk scares more peds…)
+- **Character interactions:** matching or compatible pedestrians occasionally pause when
+  they meet and play a short paired gag before continuing. Examples: two gym bros stop to
+  out-flex each other; two granddads lean on their canes and gossip. Use proximity plus a
+  per-character cooldown so interactions stay surprising and do not jam pedestrian flow.
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =
