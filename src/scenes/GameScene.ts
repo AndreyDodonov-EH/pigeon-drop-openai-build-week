@@ -9,7 +9,7 @@ import {
   victimPaletteTint,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
-import { buildTextures, W, H, GROUND_Y } from '../world/textures';
+import { buildTextures, W, H, GROUND_Y, SIDEWALK_H } from '../world/textures';
 import {
   NearBuildingsLayer,
   BUILDING_SPRITES,
@@ -39,7 +39,13 @@ const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.34;
 const PED_VARIANT_COUNT = 6;
 const PEDESTRIAN_DEPTH = 5;
+// street furniture (lamps/trees/mailboxes/hydrants) stands at the curb edge,
+// closer to camera than the pedestrians walking against the buildings
+const STREET_PROP_DEPTH = 5.05;
 const CAR_DEPTH = 5.1; // the road lane is closer to camera than the pavement
+// Pedestrians walk on the sidewalk band against the buildings, not on the
+// curb: their ground line sits above GROUND_Y (the curb/road line).
+const PED_GROUND_Y = GROUND_Y - 9;
 
 // Curated clothing/paint/tie hues: blue, burgundy, green, violet, orange,
 // teal, ochre, and plum. The shared shader receives hue, accent hue, source
@@ -184,6 +190,7 @@ export class GameScene extends Phaser.Scene {
 
   private bgFar!: Phaser.GameObjects.TileSprite;
   private bgNear!: NearBuildingsLayer;
+  private sidewalkTs!: Phaser.GameObjects.TileSprite;
   private streetTs!: Phaser.GameObjects.TileSprite;
   private clouds: Phaser.GameObjects.Image[] = [];
   /** decorative sidewalk furniture (lamps/trees/mailboxes), ground-scrolled */
@@ -333,9 +340,14 @@ export class GameScene extends Phaser.Scene {
       this.clouds.push(cloud);
     }
     this.bgFar = this.add.tileSprite(0, 0, W, H, 'bg-far').setOrigin(0, 0).setDepth(1);
+    // pavement behind the facades, scrolling with them so stoops stay planted
+    this.sidewalkTs = this.add
+      .tileSprite(0, GROUND_Y - 6 - SIDEWALK_H, W, SIDEWALK_H, 'sidewalk')
+      .setOrigin(0, 0)
+      .setDepth(1.5);
     this.bgNear = new NearBuildingsLayer(this, 2);
     this.streetTs = this.add
-      .tileSprite(0, GROUND_Y - 20, W, H - GROUND_Y + 30, 'street')
+      .tileSprite(0, GROUND_Y - 6, W, H - GROUND_Y + 6, 'street')
       .setOrigin(0, 0)
       .setDepth(3);
 
@@ -566,6 +578,7 @@ export class GameScene extends Phaser.Scene {
   private scrollWorld(f: number): void {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
     this.bgNear.update(SCROLL * 0.55 * f);
+    this.sidewalkTs.tilePositionX += SCROLL * 0.55 * f;
     this.streetTs.tilePositionX += SCROLL * f;
     for (const cloud of this.clouds) {
       cloud.x -= (SCROLL * 0.06 + cloud.getData('drift')) * f;
@@ -577,7 +590,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** sidewalk furniture scrolls with the ground, behind the pedestrians */
+  /** sidewalk furniture scrolls with the ground, in front of the pedestrians */
   private updateProps(f: number, deltaMs: number): void {
     this.propTimer -= deltaMs;
     if (this.propTimer <= 0) {
@@ -585,7 +598,7 @@ export class GameScene extends Phaser.Scene {
       const key = kinds[(Math.random() * kinds.length) | 0];
       const prop = this.add
         .image(W + 90, 0, key)
-        .setDepth(4.5)
+        .setDepth(STREET_PROP_DEPTH)
         .setScale(0.21 + Math.random() * 0.03);
       if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
       prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
@@ -767,7 +780,7 @@ export class GameScene extends Phaser.Scene {
       .setFlipX(dir > 0)
       .setTint(victimPaletteTint(hue, v, 'ped', accentHue))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
-    sprite.setY(GROUND_Y - sprite.displayHeight / 2);
+    sprite.setY(PED_GROUND_Y - sprite.displayHeight / 2);
     this.victims.push({
       sprite,
       kind: 'ped',
@@ -829,25 +842,28 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnHydrant(): void {
-    const sprite = this.add.sprite(W + 40, 0, 'hydrant-0').setScale(HYDRANT_SCALE).setDepth(5);
+    const sprite = this.add
+      .sprite(W + 40, 0, 'hydrant-0')
+      .setScale(HYDRANT_SCALE)
+      .setDepth(STREET_PROP_DEPTH);
     sprite.setY(GROUND_Y - sprite.displayHeight / 2);
     const jetCol = this.add
       .tileSprite(sprite.x, sprite.y, 14, 0, 'water-col')
       .setOrigin(0.5, 1)
-      .setDepth(5)
+      .setDepth(STREET_PROP_DEPTH)
       .setAlpha(0.88)
       .setVisible(false);
     const crown = this.add
       .image(sprite.x, sprite.y, 'water-crown')
       .setOrigin(0.5, 0.72)
-      .setDepth(5)
+      .setDepth(STREET_PROP_DEPTH)
       .setScale(0.4)
       .setVisible(false);
     this.hydrants.push({
       sprite,
       jetCol,
       crown,
-      warnFx: this.add.graphics().setDepth(5),
+      warnFx: this.add.graphics().setDepth(STREET_PROP_DEPTH),
       state: 'idle',
       timer: 90 + Math.random() * 140,
       jetH: 0,
@@ -1059,7 +1075,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (v.kind === 'ped') {
         v.bobT += 0.25 * f;
-        v.sprite.y = GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * -3;
+        v.sprite.y = PED_GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * -3;
       } else {
         v.sprite.y = GROUND_Y + 32 - v.sprite.displayHeight / 2;
       }

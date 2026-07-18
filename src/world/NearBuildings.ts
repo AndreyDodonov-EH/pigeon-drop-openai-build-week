@@ -39,10 +39,11 @@ const FACADES: FacadeDef[] = [
 export const BUILDING_SPRITES = FACADES.map((f) => f.key);
 export const CONNECTOR_SPRITES = ['bg-fence-0', 'bg-fence-1', 'bg-fence-2'];
 
-// The street strip (depth 3) starts at GROUND_Y - 20 with a 14px sidewalk
-// band. Buildings stand on the sidewalk's back edge with only a few px tucked
-// behind it — sinking them lower hides their stoops/doors and makes the
-// pavement read as elevated.
+// The sidewalk band (depth 1.5) is rendered behind the facades and scrolls at
+// the same parallax rate, so buildings stand on it: their bases overlap the
+// band and even a facade whose wall base sits above the stoop's bottom step
+// (bg-building-0) meets pavement, not sky. The curb/roadway strip (depth 3)
+// only starts below the band and stays clear of the building bottoms.
 const BASELINE = GROUND_Y - 16;
 const SPAWN_AHEAD = 260; // keep the row planned this far past the right edge
 

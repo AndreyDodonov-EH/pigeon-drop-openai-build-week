@@ -14,9 +14,13 @@ export const GROUND_Y = 484;
 export function buildTextures(scene: Phaser.Scene): void {
   sky(scene);
   farSkyline(scene);
+  sidewalk(scene);
   street(scene);
   shadow(scene);
 }
+
+/** height of the sidewalk band the near buildings stand on */
+export const SIDEWALK_H = 24;
 
 // ---------------------------------------------------------------- sky
 
@@ -156,42 +160,56 @@ function shade(hex: string, amt: number): string {
 
 // -------------------------------------------------------------- street
 
-function street(scene: Phaser.Scene): void {
-  const h = H - GROUND_Y + 30;
-  const c = scene.textures.createCanvas('street', W, h)!;
+// The pavement the buildings stand on: rendered behind the facades and
+// scrolled at the near-building parallax rate so slab joints don't slide
+// under the stoops. Deep enough that facades whose wall base sits above the
+// stoop's bottom step (bg-building-0) still meet pavement, not sky.
+function sidewalk(scene: Phaser.Scene): void {
+  const c = scene.textures.createCanvas('sidewalk', W, SIDEWALK_H)!;
   const ctx = c.getContext();
 
-  // sidewalk slabs with joints and per-slab tone shifts (60 divides W: seamless)
+  // slabs with joints and per-slab tone shifts (60 divides W: seamless)
   ctx.fillStyle = '#a9a294';
-  ctx.fillRect(0, 0, W, 14);
+  ctx.fillRect(0, 0, W, SIDEWALK_H);
   for (let sx = 0; sx < W; sx += 60) {
     if ((sx / 60) % 2 === 0) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-      ctx.fillRect(sx, 0, 60, 14);
+      ctx.fillRect(sx, 0, 60, SIDEWALK_H);
     }
     ctx.fillStyle = '#8f887a';
-    ctx.fillRect(sx, 0, 1, 14);
+    ctx.fillRect(sx, 0, 1, SIDEWALK_H);
   }
   ctx.fillStyle = 'rgba(143, 136, 122, 0.5)';
-  ctx.fillRect(0, 7, W, 1);
+  ctx.fillRect(0, 8, W, 1);
+  ctx.fillRect(0, 16, W, 1);
+
+  c.refresh();
+}
+
+// Curb and roadway: the full-scroll-speed gameplay ground, in front of the
+// buildings; starts right where the sidewalk band ends.
+function street(scene: Phaser.Scene): void {
+  const h = H - GROUND_Y + 6;
+  const c = scene.textures.createCanvas('street', W, h)!;
+  const ctx = c.getContext();
 
   // curb: sunlit lip over a shaded face, then the gutter shadow line
   ctx.fillStyle = '#bcb5a5';
-  ctx.fillRect(0, 14, W, 2);
+  ctx.fillRect(0, 0, W, 2);
   ctx.fillStyle = '#7c7568';
-  ctx.fillRect(0, 16, W, 5);
+  ctx.fillRect(0, 2, W, 5);
   ctx.fillStyle = '#3e3c44';
-  ctx.fillRect(0, 21, W, 4);
+  ctx.fillRect(0, 7, W, 4);
 
   // asphalt with tonal patches, speckle grain and tar cracks
   ctx.fillStyle = '#4c4a52';
-  ctx.fillRect(0, 25, W, h - 25);
+  ctx.fillRect(0, 11, W, h - 11);
   for (let i = 0; i < 6; i++) {
     ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.07)';
     ctx.beginPath();
     ctx.ellipse(
       80 + ((i * 173.7) % (W - 160)),
-      32 + ((i * 31) % (h - 44)),
+      18 + ((i * 31) % (h - 30)),
       55 + (i % 3) * 30,
       9 + (i % 2) * 5,
       0,
@@ -203,7 +221,7 @@ function street(scene: Phaser.Scene): void {
   for (let i = 0; i < 260; i++) {
     // deterministic scatter keeps the speckle off the tile seam
     const sx = 4 + ((i * 37.37) % (W - 8));
-    const sy = 27 + ((i * 17.93) % (h - 30));
+    const sy = 13 + ((i * 17.93) % (h - 16));
     ctx.fillStyle = i % 3 === 0 ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.14)';
     ctx.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, 1);
   }
@@ -211,13 +229,13 @@ function street(scene: Phaser.Scene): void {
   ctx.lineWidth = 1;
   for (let i = 0; i < 3; i++) {
     let cx = 120 + i * 300 + Math.random() * 60;
-    let cy = 30 + Math.random() * (h - 50);
+    let cy = 16 + Math.random() * (h - 36);
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     for (let s = 0; s < 6; s++) {
       cx += 8 + Math.random() * 14;
       cy += (Math.random() - 0.5) * 12;
-      ctx.lineTo(Math.min(cx, W - 10), Math.max(28, Math.min(h - 4, cy)));
+      ctx.lineTo(Math.min(cx, W - 10), Math.max(14, Math.min(h - 4, cy)));
     }
     ctx.stroke();
   }
