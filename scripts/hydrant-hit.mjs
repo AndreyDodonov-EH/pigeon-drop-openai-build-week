@@ -9,7 +9,7 @@ const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
 
-await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
+await page.goto(process.env.GAME_URL || 'http://localhost:5199/', { waitUntil: 'networkidle' });
 await page.waitForFunction(() => typeof window.SP !== 'undefined', { timeout: 10000 });
 await page.waitForTimeout(500);
 
