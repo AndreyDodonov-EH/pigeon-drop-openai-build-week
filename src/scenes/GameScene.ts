@@ -264,6 +264,14 @@ export class GameScene extends Phaser.Scene {
       'assets/audio/hydrant-jet-loop.ogg',
       'assets/audio/hydrant-jet-loop.mp3',
     ]);
+    this.load.audio('sfx-splash-hydrant', [
+      'assets/audio/splash-hydrant.ogg',
+      'assets/audio/splash-hydrant.mp3',
+    ]);
+    this.load.audio('sfx-koo-irritated', [
+      'assets/audio/koo-irritated.ogg',
+      'assets/audio/koo-irritated.mp3',
+    ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
@@ -920,6 +928,17 @@ export class GameScene extends Phaser.Scene {
           this.scarePoop();
           this.pigeonVy = -5.5; // geyser kick
           this.popup(this.pigeon.x, this.pigeonY - 52, 'SPLOOSH!!', COLOR_WATER, 22);
+          this.sound.play('sfx-splash-hydrant', {
+            volume: 0.5 * SFX_VOLUME,
+            rate: Phaser.Math.FloatBetween(0.96, 1.04),
+          });
+          // the indignant coo lands as a reaction, just after the water hits
+          this.time.delayedCall(220, () => {
+            this.sound.play('sfx-koo-irritated', {
+              volume: 0.55 * SFX_VOLUME,
+              rate: Phaser.Math.FloatBetween(0.97, 1.05),
+            });
+          });
         }
       }
 
