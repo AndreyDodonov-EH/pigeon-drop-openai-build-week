@@ -2,6 +2,39 @@
 
 Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md`.
 
+## Next up — first engagement slice (prioritized 2026-07-18, not started)
+
+The engagement gap is **pull + juice, not more threats**: nothing lures the player off
+the safe cruise line (optimal play is "hold the line and hold S"), and score chains have
+no spectacle. The hydrant already covers the dodge verb; a second hazard adds threat
+variety but no new decisions. Turbo is the biggest idea but lands best once food pickups
+complete the meter economy (one resource: ammo + boost + comedy). Ordered by
+payoff-per-effort:
+
+1. **Combo ranks** (zero assets, pure code): uncap the x8 combo counter in `onSplat()`;
+   keep the score multiplier plateauing at x8 behind the scenes. Rank thresholds on
+   combo count (e.g. 3/6/10/15) show Splat! → Dirty! → Craptacular! → SHITSTORM in the
+   HUD with escalating style (size/color, scale-punch on rank-up, small shake at
+   SHITSTORM). Scare-poop already zeroes the combo — wiping a high rank makes the
+   hydrant retroactively matter.
+2. **Food pickups** (bread crust / fries / kebab): extend `PickupKind`; separate,
+   more-frequent food spawn timer (~5–9s vs rainbow's 12–20s); place at awkward
+   altitudes — near the ground clamp, near the ceiling, occasionally in the hydrant
+   approach lane. Meter jumps roughly +15/+25/+40 — the kebab can shove you toward
+   blowout (reward with teeth). Add a `spawnFoodPickup` debug hook to `window.SP`.
+3. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
+   vx ~2.5–3.5 (vs 0.3–0.8 walkers), either direction, base score 40; extend
+   `PED_LINES` / `PED_LINES_RAINBOW`; verify `VictimPalettePipeline` variant packing
+   handles a 4th ped.
+- Freebie alongside: randomize the hydrant burst trigger distance
+  (`pigeon.x + 230` → `+ 200 + rand()*80`, rolled at spawn).
+
+**Assets needed, in order:** none for ranks; then a food-pickup sheet
+(`pickup-bread/fries/kebab`, sized like `pickup-rainbow` at `PICKUP_SCALE`) and a skater
+sheet (`ped-3` / `ped-3-r` / `ped-3-rainbow`, matching the pedestrian sheet layout) —
+both via the codex-image → `ART_LOG.md` pipeline. Deferred to later slices: turbo pigeon
+set, open-beak blowout frame, terrified portrait, audio.
+
 ## Meter economy — remaining work (agreed 2026-07-14; core shipped, see CHANGELOG)
 
 - **Food pickups** for big meter jumps (bread crusts, fries, kebab; place at varying
