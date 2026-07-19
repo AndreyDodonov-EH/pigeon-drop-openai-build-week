@@ -38,7 +38,12 @@ const PIGEON_SCALE = 0.38;
 const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.34;
-const PED_VARIANT_COUNT = 6;
+const PED_VARIANT_COUNT = 7;
+// The inline skater outruns the world scroll: high-value, high-lead target.
+const SKATER_VARIANT = 6;
+const SKATER_BASE_SCORE = 40;
+/** frames per stride pose before swapping ped-6 <-> ped-6-b (~1/3 s per leg) */
+const SKATER_STRIDE_FRAMES = 20;
 const PEDESTRIAN_DEPTH = 5;
 // street furniture (lamps/trees/mailboxes/hydrants) stands at the curb edge,
 // closer to camera than the pedestrians walking against the buildings
@@ -133,6 +138,7 @@ const PED_LINES = [
   'NOT THE BAG!',
   'MY MAP!',
   'BRO! SERIOUSLY?!',
+  'DUDE, MY HOODIE!',
 ];
 // rainbow goo delights instead of disgusts — same characters, opposite mood
 const PED_LINES_RAINBOW = [
@@ -142,6 +148,7 @@ const PED_LINES_RAINBOW = [
   'CONTENT GOLD!',
   'BEST TRIP EVER!',
   'SICK COLORS!',
+  'RADICAL!!',
 ];
 const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
@@ -336,6 +343,8 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
       this.load.image(`ped-${i}-rainbow`, `assets/sprites/ped-${i}-rainbow.png`);
     }
+    // second stride pose; the skater alternates legs instead of bobbing
+    this.load.image(`ped-${SKATER_VARIANT}-b`, `assets/sprites/ped-${SKATER_VARIANT}-b.png`);
     for (let i = 0; i < 3; i++) {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
@@ -610,10 +619,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Compact always-on development palette for testing scene objects on demand. */
+  /** Development palette for testing scene objects on demand via ?debug. */
   private createDebugMenu(): void {
-    // phones: it sits inside the right poop zone — hidden unless ?debug is set
-    if (isTouchDevice() && !new URLSearchParams(location.search).has('debug')) return;
+    const params = new URLSearchParams(location.search);
+    if (!params.has('debug')) return;
     const x = W - 174;
     const y = 106;
     const buttonW = 48;
@@ -878,8 +887,13 @@ export class GameScene extends Phaser.Scene {
     } else if (v === 1) {
       accentHue = RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0];
     }
+    // Walkers always drift left on screen (own vx never beats SCROLL), so they
+    // enter from the right. A rightward skater outruns the scroll and must
+    // enter from the left instead.
+    const vx =
+      v === SKATER_VARIANT ? dir * (2.5 + Math.random() * 1.0) : dir * (0.3 + Math.random() * 0.5);
     const sprite = this.add
-      .sprite(W + 40, 0, `ped-${v}`)
+      .sprite(vx > SCROLL ? -40 : W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
       .setDepth(PEDESTRIAN_DEPTH)
       .setFlipX(dir > 0)
@@ -890,7 +904,7 @@ export class GameScene extends Phaser.Scene {
       sprite,
       kind: 'ped',
       variant: v,
-      vx: dir * (0.3 + Math.random() * 0.5),
+      vx,
       hitCooldown: 0,
       bobT: Math.random() * 10,
       reactTimer: 0,
@@ -1180,7 +1194,15 @@ export class GameScene extends Phaser.Scene {
       }
       if (v.kind === 'ped') {
         v.bobT += 0.25 * f;
-        v.sprite.y = PED_GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * -3;
+        if (v.variant === SKATER_VARIANT && v.reactTimer <= 0) {
+          // alternate stride poses for the leg-pumping speed read
+          const stride = ((v.bobT / (0.25 * SKATER_STRIDE_FRAMES)) | 0) % 2;
+          const key = stride === 0 ? `ped-${SKATER_VARIANT}` : `ped-${SKATER_VARIANT}-b`;
+          if (v.sprite.texture.key !== key) v.sprite.setTexture(key);
+        }
+        // skates glide; walkers bob a full 3px
+        const bob = v.variant === SKATER_VARIANT ? -1.5 : -3;
+        v.sprite.y = PED_GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * bob;
       } else {
         v.sprite.y = GROUND_Y + 32 - v.sprite.displayHeight / 2;
       }
@@ -1196,7 +1218,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.victims = this.victims.filter((v) => {
-      if (v.sprite.x < -160) {
+      // rightward skaters outrun the scroll and exit stage right
+      if (v.sprite.x < -160 || v.sprite.x > W + 160) {
         v.sprite.destroy();
         return false;
       }
@@ -1227,7 +1250,9 @@ export class GameScene extends Phaser.Scene {
     this.comboTimer = 120;
     // the visible counter is uncapped (rank spectacle); scoring plateaus at x8
     this.combo += 1;
-    const base = v.kind === 'car' ? 25 : 10;
+    // The skater pays 4x a walker: he's fast, and the lead is the skill test.
+    const base =
+      v.kind === 'car' ? 25 : v.variant === SKATER_VARIANT ? SKATER_BASE_SCORE : 10;
     const pts = base * Math.min(this.combo, 8);
     this.score += pts;
 

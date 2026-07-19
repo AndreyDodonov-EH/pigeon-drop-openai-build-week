@@ -2,37 +2,6 @@
 
 Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md`.
 
-## Next up — engagement follow-ups (reprioritized 2026-07-18)
-
-Food pickups now supply the missing **pull** and complete the basic meter economy (see
-CHANGELOG). The remaining engagement gap is score-chain spectacle and higher-skill target
-variety. The hydrant already covers the dodge verb; a second hazard adds threat variety but
-no new decisions. Ordered by payoff-per-effort:
-
-1. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
-   vx ~2.5–3.5 (vs 0.3–0.8 walkers), either direction, base score 40; extend
-   `PED_LINES` / `PED_LINES_RAINBOW`; verify `VictimPalettePipeline` variant packing
-   handles a 4th ped. Will require two sprites to show that it's moving legs, left in front, then right in front, will give speed feeling.
-
-**Next asset set:** skater sheet (`ped-3` / `ped-3-r` / `ped-3-rainbow`, matching the
-pedestrian sheet layout) via the codex-image → `ART_LOG.md` pipeline. Deferred to later
-slices: turbo pigeon set, open-beak blowout frame, terrified portrait, audio.
-
-## Meter economy — remaining work (agreed 2026-07-14; core shipped, see CHANGELOG)
-
-- **Open-beak flight sprite** for the blowout telegraph (portrait + wobble only for now)
-  + sound.
-- Ties into turbo (below): turbo spends meter as rocket fuel — one resource governs
-  ammo, boost, and comedy.
-
-## Turbo / rocket guano (noted 2026-07-13, user idea)
-
-Guano as explicit accelerator: holding the poop stream propels the pigeon like a rocket
-(thrust opposite the stream), with turbo particle effects (exhaust flames/steam mixed
-into the goo emission) and a **dedicated turbo pigeon sprite variant** (strained body,
-swept-back wings, motion-blur feathers). Design the sprite set so pose variants like
-this slot in alongside the normal flight frames.
-
 ## Fire hydrant follow-ups
 
 - Peds reacting to the water; hydrant splash puddle; sound; terrified portrait cue
@@ -42,9 +11,8 @@ this slot in alongside the normal flight frames.
 
 **Targets & scoring**
 - Go to pleased portrait only after a longer dump - also dont go to pleased if we went to hungry
-- Objects to dump on, e.g. statues (static targets — presumably score less than moving
+- Stationary Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
-- Higher-value fast targets: quick rollerblader/skater — harder lead, bigger reward.
 - Higher-altitude targets: rooftop party.
 - Chain reactions to create chaos? (one splat triggers the next — startled ped stumbles
   into a car, honk scares more peds…)
@@ -58,22 +26,11 @@ this slot in alongside the normal flight frames.
 
 **Sounds**
 - Sound for character interation (once done)
-- ~~Sound for some of pedestrain and car reactions - should replace text pop-ups~~
-  (shipped 2026-07-19 — grumble/delight for peds, angry/happy honks for cars, gated by
-  variant + chance + shared cooldown; see CHANGELOG)
-- Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
-  (partial 2026-07-19: runoff dripping off victims/hydrant now lands silently — see
-  CHANGELOG. Still open: the *direct* asphalt splat's clicky timbre itself.)
-- Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump. (The empty-tank telegraph got a generated belly-rumble SFX instead of a hungry koo — see CHANGELOG 2026-07-19.)
+
+
 - Slighly crackling sound when we poo in chilli mode
 
 **Pickups**
-- **Pea-pod gas targeting — keep as is (resolved 2026-07-19):** the buoyant cloud that
-  rises before reaching pedestrians turned out to be the mechanic, not a flaw: gas
-  scores fine if you fly low, so it trades the safe high bombing line for risky
-  head-height crop-dusting (closer to cars and hydrant jets). The earlier downward-jet
-  redesign idea is dropped. Note: gas hits build combo/rank normally but a missed cloud
-  never breaks the chain (no salvo judgment) — low gas runs are strictly combo-friendly.
 - Add sound to pick-ups (some are already present in the repository, just not wired)
 - Kebab/bread can effect how liquid goo is - kebab should make it more liquid, bread - a little denser. May be with timer, but no explicit one. It just should feel naturally as part of the game, more    diegetic.
 

@@ -322,3 +322,21 @@ the hit that put the goo there already made its noise, runoff lands silently. Di
 pigeon→street misses still click, unchanged (threshold + 420 ms cooldown). Verified
 headless: a burst dumped on a ped produced runoff landings with zero asphalt plays,
 while a straight street drop still played.
+
+## The skater — fast high-value target (shipped 2026-07-19)
+
+Backlog's top engagement item: ped variant 6, a smug inline-skater in a grape-purple
+hoodie (art: 4-panel sheet via codex-image, see ART_LOG — stride A/B, outrage react,
+rainbow delight; stride B needed one re-render because its legs initially duplicated
+stride A's). He skates at own vx ±(2.5–3.5) vs walkers' 0.3–0.8, either direction —
+rightward he outruns the 2.1 px/frame world scroll, so he enters from the LEFT edge
+(new right-edge despawn added), making him the first target that crosses against the
+traffic of the screen. Base score 40 vs a walker's 10: the lead is the skill test.
+Two-frame stride animation (`ped-6` ↔ `ped-6-b`, ~⅓ s per leg via `SKATER_STRIDE_FRAMES`,
+suspended during reactions) gives the leg-pumping speed read; he glides with half the
+walker bob. Hit lines "DUDE, MY HOODIE!" / "RADICAL!!"; text-only for now (no voice pair
+yet). `VictimPalettePipeline` SOURCE_CONTROLS re-spaced 6 → 7 values (all ped/car/accent
+band thresholds updated); his hoodie recolor band uses the median purple sampled from the
+shipped sprite (RGB 107/62/131, luminance ceiling 0.50 protects his skin). Verified
+headless: all four frames on-street at correct scale, four distinct hoodie hues in one
+batch, stride textures alternating at runtime.
