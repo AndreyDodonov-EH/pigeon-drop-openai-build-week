@@ -61,8 +61,5 @@ and some pick-up are effected (e.g. no rainbow at night). Also shaders of course
 
 ## Other candidates
 
-- Absurd hazards: e.g. kid throws a car at the pigeon → triggers scare-poop (no health;
-  everything routes through the pressure meter).
 - Pigeon skins (portrait + flight set per skin).
 - Terrified portrait state for incoming hazards.
-- Audio: coo, splat, honk.

@@ -3,27 +3,17 @@ import { W, H } from '../world/textures';
 import { isTouchDevice } from '../input/TouchControls';
 import { t } from '../i18n';
 
-const SEEN_KEY = 'sp-wizard-seen';
 const CREAM = '#f3ead8';
 const DEPTH = 30; // above HUD (10-12) and debug menu (20-21)
 
-/** First-run only, unless forced with ?wizard (or suppressed with ?nowizard —
- * headless test drivers get fresh localStorage every launch and would otherwise
- * always see it). If localStorage is blocked we just show it every visit —
- * it's one tap to dismiss. */
+/** Shown every launch — it's one tap to dismiss. ?nowizard suppresses it
+ * (headless test drivers need a clean scene). */
 export function shouldShowWizard(): boolean {
-  const params = new URLSearchParams(location.search);
-  if (params.has('nowizard')) return false;
-  if (params.has('wizard')) return true;
-  try {
-    return localStorage.getItem(SEEN_KEY) === null;
-  } catch {
-    return true;
-  }
+  return !new URLSearchParams(location.search).has('nowizard');
 }
 
 /**
- * One-time "how to play" overlay: dims the scene and shows the controls —
+ * "How to play" overlay: dims the scene and shows the controls —
  * split touch zones on phones, key bindings on desktop. The first tap or
  * keypress dismisses it (and on touch that same tap already starts flying).
  */
@@ -78,11 +68,6 @@ export class FirstRunWizard {
   private dismiss(): void {
     if (this.dismissed) return;
     this.dismissed = true;
-    try {
-      localStorage.setItem(SEEN_KEY, '1');
-    } catch {
-      /* private mode — it'll just show again next visit */
-    }
     this.scene.input.off('pointerdown', this.dismiss, this);
     this.scene.input.off('pointerdownoutside', this.dismiss, this);
     this.scene.input.keyboard?.off('keydown', this.dismiss, this);

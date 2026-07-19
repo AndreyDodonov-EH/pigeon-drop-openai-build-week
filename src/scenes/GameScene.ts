@@ -42,8 +42,10 @@ const PED_VARIANT_COUNT = 7;
 // The inline skater outruns the world scroll: high-value, high-lead target.
 const SKATER_VARIANT = 6;
 const SKATER_BASE_SCORE = 40;
-/** frames per stride pose before swapping ped-6 <-> ped-6-b (~1/3 s per leg) */
-const SKATER_STRIDE_FRAMES = 20;
+/** frames per stride pose (~150 ms each across the 4-pose cycle) */
+const SKATER_STRIDE_FRAMES = 9;
+/** texture-key suffixes in cycle order: push -> lift -> glide -> lean-in */
+const SKATER_STRIDE_POSES = ['', '-c', '-b', '-d'];
 const PEDESTRIAN_DEPTH = 5;
 // street furniture (lamps/trees/mailboxes/hydrants) stands at the curb edge,
 // closer to camera than the pedestrians walking against the buildings
@@ -350,8 +352,13 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
       this.load.image(`ped-${i}-rainbow`, `assets/sprites/ped-${i}-rainbow.png`);
     }
-    // second stride pose; the skater alternates legs instead of bobbing
-    this.load.image(`ped-${SKATER_VARIANT}-b`, `assets/sprites/ped-${SKATER_VARIANT}-b.png`);
+    // extra stride poses; the skater runs a 4-frame leg cycle instead of bobbing
+    for (const suffix of SKATER_STRIDE_POSES.slice(1)) {
+      this.load.image(
+        `ped-${SKATER_VARIANT}${suffix}`,
+        `assets/sprites/ped-${SKATER_VARIANT}${suffix}.png`,
+      );
+    }
     for (let i = 0; i < 3; i++) {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
@@ -1201,11 +1208,22 @@ export class GameScene extends Phaser.Scene {
       }
       if (v.kind === 'ped') {
         v.bobT += 0.25 * f;
-        if (v.variant === SKATER_VARIANT && v.reactTimer <= 0) {
-          // alternate stride poses for the leg-pumping speed read
-          const stride = ((v.bobT / (0.25 * SKATER_STRIDE_FRAMES)) | 0) % 2;
-          const key = stride === 0 ? `ped-${SKATER_VARIANT}` : `ped-${SKATER_VARIANT}-b`;
-          if (v.sprite.texture.key !== key) v.sprite.setTexture(key);
+        if (v.variant === SKATER_VARIANT) {
+          if (v.reactTimer > 0) {
+            v.sprite.setAngle(0);
+          } else {
+            // 4-pose stride cycle for the leg-pumping speed read
+            const stridePhase = v.bobT / (0.25 * SKATER_STRIDE_FRAMES);
+            const pose = SKATER_STRIDE_POSES[(stridePhase | 0) % SKATER_STRIDE_POSES.length];
+            const key = `ped-${SKATER_VARIANT}${pose}`;
+            if (v.sprite.texture.key !== key) v.sprite.setTexture(key);
+            // continuous lean synced to the pump: the eye reads the smooth
+            // rock as in-between motion the poses don't quite have
+            const fwd = v.sprite.flipX ? 1 : -1;
+            v.sprite.setAngle(
+              fwd * (2 + Math.sin((stridePhase * Math.PI) / 2) * 2.5),
+            );
+          }
         }
         // skates glide; walkers bob a full 3px
         const bob = v.variant === SKATER_VARIANT ? -1.5 : -3;
