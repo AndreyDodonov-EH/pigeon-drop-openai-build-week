@@ -24,7 +24,8 @@ const results = await page.evaluate(() => {
     victim.collider.x = 420;
     victim.collider.vx = kind === 'car' ? -4.5 : -2.1;
 
-    scene.sim.particles.length = 0;
+    const sim = scene.guanoFx.gooSim;
+    sim.particles.length = 0;
     let hits = 0;
     victim.collider.onHit = () => hits++;
 
@@ -32,9 +33,9 @@ const results = await page.evaluate(() => {
     // Cross the complete target in one simulation step: endpoint collision
     // misses this, while the swept alpha-mask test must catch it.
     const vy = victim.collider.hh * 2 + 70;
-    scene.sim.emit(victim.collider.x, startY, victim.collider.vx, vy, 0xf2ecd4);
-    scene.sim.step([victim.collider]);
-    const particle = scene.sim.particles[0];
+    sim.emit(victim.collider.x, startY, victim.collider.vx, vy, 0xf2ecd4);
+    sim.step([victim.collider]);
+    const particle = sim.particles[0];
     return {
       kind,
       hits,

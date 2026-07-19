@@ -3,7 +3,7 @@
 // Edit `setup` for the state you want to verify. Field names are internal to
 // GameScene.ts (state/jetH/jetMaxH/splashed, sim.particles, …) — confirm them
 // against source; they drift.
-import { chromium } from '/home/aadod/_PROJECTS/shitting_pigeon/node_modules/playwright/index.mjs';
+import { chromium } from '/home/aadod/_PROJECTS/pigeon_drop/node_modules/playwright/index.mjs';
 
 const OUT = process.argv[2] || 'shot.png';
 const URL = process.env.GAME_URL || 'http://localhost:5199/';
