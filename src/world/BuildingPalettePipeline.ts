@@ -12,6 +12,7 @@ precision mediump float;
 #endif
 
 uniform sampler2D uMainSampler[%count%];
+uniform vec3 uAmbient;
 
 varying vec2 outTexCoord;
 varying float outTexId;
@@ -73,6 +74,9 @@ void main() {
   color = mix(color, vec3(gradeLum), 0.16);
   color = mix(color, vec3(0.91, 0.89, 0.86) * texture.a, 0.08);
 
+  // Time-of-day ambient light (day = white, dusk warm, night cool-dark).
+  color *= uAmbient;
+
   // Phaser's sprite renderer uses premultiplied alpha.
   gl_FragColor = vec4(color * outTint.a, texture.a * outTint.a);
 }
@@ -84,8 +88,23 @@ void main() {
  * so a handful of facade sprites reads as a whole street of different houses.
  */
 export class BuildingPalettePipeline extends Phaser.Renderer.WebGL.Pipelines.MultiPipeline {
+  private ambientR = 1;
+  private ambientG = 1;
+  private ambientB = 1;
+
   constructor(game: Phaser.Game) {
     super({ game, fragShader: FRAG });
+  }
+
+  /** DayNight pushes the current ambient light color here once per frame. */
+  setAmbient(r: number, g: number, b: number): void {
+    this.ambientR = r;
+    this.ambientG = g;
+    this.ambientB = b;
+  }
+
+  onPreRender(): void {
+    this.set3f('uAmbient', this.ambientR, this.ambientG, this.ambientB);
   }
 }
 

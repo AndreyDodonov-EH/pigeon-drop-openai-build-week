@@ -2,37 +2,6 @@
 
 Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md`.
 
-## Next up — engagement follow-ups (reprioritized 2026-07-18)
-
-Food pickups now supply the missing **pull** and complete the basic meter economy (see
-CHANGELOG). The remaining engagement gap is score-chain spectacle and higher-skill target
-variety. The hydrant already covers the dodge verb; a second hazard adds threat variety but
-no new decisions. Ordered by payoff-per-effort:
-
-1. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
-   vx ~2.5–3.5 (vs 0.3–0.8 walkers), either direction, base score 40; extend
-   `PED_LINES` / `PED_LINES_RAINBOW`; verify `VictimPalettePipeline` variant packing
-   handles a 4th ped. Will require two sprites to show that it's moving legs, left in front, then right in front, will give speed feeling.
-
-**Next asset set:** skater sheet (`ped-3` / `ped-3-r` / `ped-3-rainbow`, matching the
-pedestrian sheet layout) via the codex-image → `ART_LOG.md` pipeline. Deferred to later
-slices: turbo pigeon set, open-beak blowout frame, terrified portrait, audio.
-
-## Meter economy — remaining work (agreed 2026-07-14; core shipped, see CHANGELOG)
-
-- **Open-beak flight sprite** for the blowout telegraph (portrait + wobble only for now)
-  + sound.
-- Ties into turbo (below): turbo spends meter as rocket fuel — one resource governs
-  ammo, boost, and comedy.
-
-## Turbo / rocket guano (noted 2026-07-13, user idea)
-
-Guano as explicit accelerator: holding the poop stream propels the pigeon like a rocket
-(thrust opposite the stream), with turbo particle effects (exhaust flames/steam mixed
-into the goo emission) and a **dedicated turbo pigeon sprite variant** (strained body,
-swept-back wings, motion-blur feathers). Design the sprite set so pose variants like
-this slot in alongside the normal flight frames.
-
 ## Fire hydrant follow-ups
 
 - Peds reacting to the water; hydrant splash puddle; sound; terrified portrait cue
@@ -41,10 +10,8 @@ this slot in alongside the normal flight frames.
 ## Idea dump (user, 2026-07-17)
 
 **Targets & scoring**
-- Go to pleased portrait only after a longer dump - also dont go to pleased if we went to hungry
-- Objects to dump on, e.g. statues (static targets — presumably score less than moving
+- Stationary Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
-- Higher-value fast targets: quick rollerblader/skater — harder lead, bigger reward.
 - Higher-altitude targets: rooftop party.
 - Chain reactions to create chaos? (one splat triggers the next — startled ped stumbles
   into a car, honk scares more peds…)
@@ -58,22 +25,11 @@ this slot in alongside the normal flight frames.
 
 **Sounds**
 - Sound for character interation (once done)
-- ~~Sound for some of pedestrain and car reactions - should replace text pop-ups~~
-  (shipped 2026-07-19 — grumble/delight for peds, angry/happy honks for cars, gated by
-  variant + chance + shared cooldown; see CHANGELOG)
-- Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
-  (partial 2026-07-19: runoff dripping off victims/hydrant now lands silently — see
-  CHANGELOG. Still open: the *direct* asphalt splat's clicky timbre itself.)
-- Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump. (The empty-tank telegraph got a generated belly-rumble SFX instead of a hungry koo — see CHANGELOG 2026-07-19.)
+
+
 - Slighly crackling sound when we poo in chilli mode
 
 **Pickups**
-- **Pea-pod gas targeting — keep as is (resolved 2026-07-19):** the buoyant cloud that
-  rises before reaching pedestrians turned out to be the mechanic, not a flaw: gas
-  scores fine if you fly low, so it trades the safe high bombing line for risky
-  head-height crop-dusting (closer to cars and hydrant jets). The earlier downward-jet
-  redesign idea is dropped. Note: gas hits build combo/rank normally but a missed cloud
-  never breaks the chain (no salvo judgment) — low gas runs are strictly combo-friendly.
 - Add sound to pick-ups (some are already present in the repository, just not wired)
 - Kebab/bread can effect how liquid goo is - kebab should make it more liquid, bread - a little denser. May be with timer, but no explicit one. It just should feel naturally as part of the game, more    diegetic.
 
@@ -86,7 +42,6 @@ this slot in alongside the normal flight frames.
   nervous/twitchy, cars start maneuvering/swerving, and at the top end even the sun/moon
   looks at you in awe/fear. Needs more sprites/animation states; rank tier is already
   available via `rankForCombo` in `src/ui/ranks.ts`.
-- slight particles or sprite-specific-shaders: for lantern definitely, may be for caffee (especially if added day/night phases)
 - Natural habitat points - e.g. extra building "gym" plus then a lot of bodybuilders near it
 - stationary victims, e.g. people sitting in from of the caffe (caffe building exists already)
 - Higher platforms / screen layers — e.g. flying at balcony level, vertical screen
@@ -94,8 +49,10 @@ this slot in alongside the normal flight frames.
 - Occasional events, e.g. a Politiker motorcade (or different levels/themes entirely).
 - Window washer (mid-air platform/victim on a suspended cradle).
 - Drones (airborne hazard or target at flight altitude).
-- Sunrise/day/sunset/night change - also effects characters (e.g. adding stationary hooker near a lamp at midnight, robberer etc.),
-and some pick-up are effected (e.g. no rainbow at night). Also shaders of course should be affected, as well as background naturally.
+- Night-specific characters for the day/night cycle (the cycle itself shipped 2026-07-19,
+  see CHANGELOG): e.g. stationary hooker near a lamp at midnight, robber, etc. New spawns
+  can key off `DayNight` (`src/world/DayNight.ts` — `isNight` / `nightness`), same as the
+  no-rainbow-at-night pickup rule already does. Car headlights at night would also sell it.
 
 **Webpage**
 - Add icon (favicon)
@@ -105,8 +62,5 @@ and some pick-up are effected (e.g. no rainbow at night). Also shaders of course
 
 ## Other candidates
 
-- Absurd hazards: e.g. kid throws a car at the pigeon → triggers scare-poop (no health;
-  everything routes through the pressure meter).
 - Pigeon skins (portrait + flight set per skin).
 - Terrified portrait state for incoming hazards.
-- Audio: coo, splat, honk.

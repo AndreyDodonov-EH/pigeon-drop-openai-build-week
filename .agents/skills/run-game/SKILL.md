@@ -64,11 +64,10 @@ waits for `window.SP`, applies a state-setup callback, waits a few frames, and
 screenshots. Edit the `setup` block in the copy (or inline the eval) for the
 state you need — the shipped example parks a hydrant on-screen in full burst.
 
-The driver loads `/?nowizard`, which suppresses the first-run "how to play"
-overlay (headless pages get fresh localStorage, so without it every run would
-sit behind the dimmed overlay — see `shouldShowWizard` in
-`src/ui/FirstRunWizard.ts`). Keep the param in any custom URL; drop it (or use
-`?wizard`) only when the overlay itself is what you're screenshotting.
+The driver loads `/?nowizard`, which suppresses the "how to play" overlay
+shown on every launch (see `shouldShowWizard` in `src/ui/FirstRunWizard.ts`).
+Keep the param in any custom URL; drop it only when the overlay itself is what
+you're screenshotting.
 
 **Then Read the screenshot and actually look at it.** A blank frame is a launch
 failure, not a pass.

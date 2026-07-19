@@ -3,48 +3,38 @@ import { W, H } from '../world/textures';
 import { isTouchDevice } from '../input/TouchControls';
 import { t } from '../i18n';
 
-const SEEN_KEY = 'sp-wizard-seen';
 const CREAM = '#f3ead8';
 const DEPTH = 30; // above HUD (10-12) and debug menu (20-21)
 
-/** First-run only, unless forced with ?wizard (or suppressed with ?nowizard —
- * headless test drivers get fresh localStorage every launch and would otherwise
- * always see it). If localStorage is blocked we just show it every visit —
- * it's one tap to dismiss. */
+/** Shown every launch — it's one tap to dismiss. ?nowizard suppresses it
+ * (headless test drivers need a clean scene). */
 export function shouldShowWizard(): boolean {
-  const params = new URLSearchParams(location.search);
-  if (params.has('nowizard')) return false;
-  if (params.has('wizard')) return true;
-  try {
-    return localStorage.getItem(SEEN_KEY) === null;
-  } catch {
-    return true;
-  }
+  return !new URLSearchParams(location.search).has('nowizard');
 }
 
 /**
- * One-time "how to play" overlay: dims the scene and shows the controls —
+ * "How to play" overlay: dims the scene and shows the controls —
  * split touch zones on phones, key bindings on desktop. The first tap or
  * keypress dismisses it (and on touch that same tap already starts flying).
  */
 export class FirstRunWizard {
   private objs: Phaser.GameObjects.GameObject[] = [];
+  private dim: Phaser.GameObjects.Rectangle;
   private prompt!: Phaser.GameObjects.Text;
   private dismissed = false;
 
   constructor(private scene: Phaser.Scene) {
-    this.objs.push(scene.add.rectangle(W / 2, H / 2, W, H, 0x0a0b10, 0.72).setDepth(DEPTH));
+    this.dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x0a0b10, 0.72).setDepth(DEPTH);
+    this.objs.push(this.dim);
     this.text(W / 2, H * 0.14, t.howToPlay, 14, 0.7);
 
     if (isTouchDevice()) {
+      // no per-zone text: the tap-hand markers (TouchControls, depth 31,
+      // above our dim) say it all, and they outlast this overlay until
+      // each action is actually performed
       this.objs.push(
         scene.add.rectangle(W / 2, H * 0.42, 2, H * 0.5, 0xf3ead8, 0.25).setDepth(DEPTH),
       );
-      this.text(W * 0.25, H * 0.3, '▲', 44);
-      this.text(W * 0.25, H * 0.44, t.holdClimb, 20);
-      this.text(W * 0.25, H * 0.53, `${t.dragDive} ▼`, 15, 0.8);
-      this.text(W * 0.75, H * 0.3, '💩', 44);
-      this.text(W * 0.75, H * 0.44, t.holdRip, 20);
       this.prompt = this.text(W / 2, H * 0.78, t.tapStart, 16);
     } else {
       this.text(W / 2, H * 0.34, t.kbClimb, 20);
@@ -78,19 +68,23 @@ export class FirstRunWizard {
   private dismiss(): void {
     if (this.dismissed) return;
     this.dismissed = true;
-    try {
-      localStorage.setItem(SEEN_KEY, '1');
-    } catch {
-      /* private mode — it'll just show again next visit */
-    }
     this.scene.input.off('pointerdown', this.dismiss, this);
     this.scene.input.off('pointerdownoutside', this.dismiss, this);
     this.scene.input.keyboard?.off('keydown', this.dismiss, this);
     this.scene.tweens.killTweensOf(this.prompt);
+    // the dim and the now-stale "tap to start" prompt get out of the way
+    // fast, but the control instructions linger through the fullscreen +
+    // rotation shuffle this same tap just triggered, then fade gently
     this.scene.tweens.add({
-      targets: this.objs,
+      targets: [this.dim, this.prompt],
       alpha: 0,
-      duration: 350,
+      duration: 250,
+    });
+    this.scene.tweens.add({
+      targets: this.objs.filter((o) => o !== this.dim && o !== this.prompt),
+      alpha: 0,
+      delay: 1500,
+      duration: 800,
       onComplete: () => this.objs.forEach((o) => o.destroy()),
     });
   }

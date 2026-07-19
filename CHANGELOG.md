@@ -322,3 +322,89 @@ the hit that put the goo there already made its noise, runoff lands silently. Di
 pigeon→street misses still click, unchanged (threshold + 420 ms cooldown). Verified
 headless: a burst dumped on a ped produced runoff landings with zero asphalt plays,
 while a straight street drop still played.
+
+## The skater — fast high-value target (shipped 2026-07-19)
+
+Backlog's top engagement item: ped variant 6, a smug inline-skater in a grape-purple
+hoodie (art: 4-panel sheet via codex-image, see ART_LOG — stride A/B, outrage react,
+rainbow delight; stride B needed one re-render because its legs initially duplicated
+stride A's). He skates at own vx ±(2.5–3.5) vs walkers' 0.3–0.8, either direction —
+rightward he outruns the 2.1 px/frame world scroll, so he enters from the LEFT edge
+(new right-edge despawn added), making him the first target that crosses against the
+traffic of the screen. Base score 40 vs a walker's 10: the lead is the skill test.
+Two-frame stride animation (`ped-6` ↔ `ped-6-b`, ~⅓ s per leg via `SKATER_STRIDE_FRAMES`,
+suspended during reactions) gives the leg-pumping speed read; he glides with half the
+walker bob. Hit lines "DUDE, MY HOODIE!" / "RADICAL!!"; text-only for now (no voice pair
+yet). `VictimPalettePipeline` SOURCE_CONTROLS re-spaced 6 → 7 values (all ped/car/accent
+band thresholds updated); his hoodie recolor band uses the median purple sampled from the
+shipped sprite (RGB 107/62/131, luminance ceiling 0.50 protects his skin). Verified
+headless: all four frames on-street at correct scale, four distinct hoodie hues in one
+batch, stride textures alternating at runtime.
+
+## Day/night cycle + lantern & café night light (shipped 2026-07-19)
+
+Two overlapping backlog items: time-of-day change, and "slight particles or
+sprite-specific shaders — for lantern definitely, may be for café".
+
+**The cycle** (`src/world/DayNight.ts`): day → dusk → night → dawn on a ~3 min loop
+(day 58 s and night 52 s holds, 12–14 s smoothstepped crossfades). Four full procedural
+sky paintings (`textures.ts`: existing day sky plus `sky-dusk` low fat sun + banded
+clouds, `sky-night` starfield/full moon with craters, `sky-dawn` pink-lavender with the
+sun rising in the day sky's spot so the crossfade reads as a climb) crossfaded by two
+stacked images DayNight owns. Deliberately no full-screen tint overlay — the cut mood
+vignette taught us that reads as a filter; the light lives in the objects instead:
+per-look ambient color multiplies into everything via `setTint` (street, sidewalk, far
+skyline, clouds, props, hydrant + jet, pickups, pigeon) and via a new `uAmbient` uniform
+in both palette pipelines (buildings get the full scenery ambient, victims a gentler
+actor ambient so gameplay stays readable at night — set once per frame through
+`onPreRender`). The far skyline gets a `bg-far-lit` overlay canvas drawn in the same
+generation pass (so windows sit on their buildings): ~half the homes light up warm,
+sparse pinpricks on the distant row, red aircraft beacons on antenna masts — faded in
+by `farWindowAlpha`. Backlog rule "no rainbow at night" implemented: the rainbow pickup
+timer just re-arms until sunrise. Debug hooks `SP.setTimeOfDay(look)` / `SP.timeOfDay()`
+/ `SP.spawnProp(key, x?)`.
+
+**Lantern** (`src/world/LampFx.ts`): street lamps carry an additive warm halo + bright
+core (`lamp-glow` radial texture) on the lantern head with a two-sine gas-lamp shimmer,
+plus three moths spiralling in the light once the lamp is properly lit — all alpha-tied
+to the DayNight glow value, invisible in daylight.
+
+**Café** (`bg-building-2-lit.png`, procedural Pillow overlay built by Codex — pixel-
+perfect window alignment by construction, see ART_LOG): emissive lit-windows sprite
+ADD-blended over the facade by `NearBuildingsLayer` (no repaint pipeline on it — warm
+light is warm on any paint job), alpha driven by `setGlow`. Storefront glows cozy amber
+under the awning, upper windows dimmer per-window.
+
+Verified headless at all four looks plus a mid dusk→night blend: day is pixel-identical
+in spirit to before (lamps dark, no glows), dusk warms with lamps already on, night
+cools the street while lamps/café/skyline windows carry the scene, dawn holds a faint
+lamp afterglow. Both a forced café and a naturally spawned one glowed at night.
+
+## Day/night follow-ups (shipped 2026-07-19, same day)
+
+User feedback round: a dawn start was tried and rolled back same day — the session
+starts in full daylight again (day → dusk → night → dawn), day one opens mid-morning.
+New debug affordances to hop phases: a `TIME`
+button in the `?debug` spawn palette and `SP.nextTimeOfDay()`, both jumping to the middle
+of the next look's hold (`DayNight.jumpNext`). The night café overlay was revised after
+in-game review: v1's storefront blew out to a near-white slab (additive core too bright
+and too white — it erased the interior art) while the upper windows barely registered;
+the rev drops the storefront core ~43%, shifts it to saturated amber #ffc878 with a 1px
+frame inset so mullions stay visible, and raises the upper panes to ~75-80% of the new
+storefront level. (Further rev: upper-pane chroma keying replaced with full-pane ROI
+fills after fragments read unlit in-game; third hanging-lamp blob re-anchored onto its
+actual lamp instead of the window frame.)
+Final artifact round (user-spotted): the storefront's threshold keying had punched
+hard-edged black holes in the glow wherever dark interior details sat (pastry trays,
+shelves) — ground-floor panes rebuilt as full ROI fills like the upper windows, with
+the interior detail mask instead dimming the glow to ~60% under a 2px blur, so shelves
+and plants read as soft silhouettes in warm light rather than holes.
+Debug spawn palette gained a `CAFE` button (`NearBuildingsLayer.queueNext`, also
+`SP.spawnBuilding(key)`): forces a chosen facade as the next planned building, entering
+from the right edge like any block (~4-6 s at parallax speed) instead of popping in.
+Upper-window registration round (user-spotted): the box-shaped upper fills could never
+fit the 3/4-view side face (panes there are skewed parallelograms) — left thirds stayed
+cold while glow spilled onto stone. Fixed in a fresh Codex session with hand-traced
+per-pane polygons (arch tops included), self-validated against a magenta outline trace
+over the base art (`bg-building-2-lit-upper-trace-qa.png`) before shipping; storefront
+output pixel-identical to the previous rev.

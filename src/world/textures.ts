@@ -15,23 +15,28 @@ export const GROUND_Y = 484;
  * this tile, so they stay seamless whatever W ends up being. */
 const TILE_W = 960;
 
-/** Design height is fixed at 540 — all vertical gameplay is tuned to it. On
- * phones (coarse pointer) the width stretches to the device's aspect ratio so
- * the playfield fills the screen edge-to-edge instead of pillarboxing;
- * desktop keeps the calibrated 960×540. Capped at ~21:9. */
+/** Design height is fixed at 540 — all vertical gameplay is tuned to it. The
+ * width stretches to the viewport's aspect ratio so the playfield fills the
+ * screen edge-to-edge instead of pillarboxing: phones (coarse pointer) use the
+ * device screen (landscape long/short, since play is landscape), desktop uses
+ * the browser window at load. Clamped between 16:9 (960) and ~21:9. */
 export const W = (() => {
-  if (!window.matchMedia('(pointer: coarse)').matches) return 960;
-  const long = Math.max(screen.width, screen.height);
-  const short = Math.min(screen.width, screen.height);
+  const mobile = window.matchMedia('(pointer: coarse)').matches;
+  const long = mobile ? Math.max(screen.width, screen.height) : window.innerWidth;
+  const short = mobile ? Math.min(screen.width, screen.height) : window.innerHeight;
   return Math.round(H * Math.min(Math.max(long / short, 960 / 540), 1280 / 540));
 })();
 
 export function buildTextures(scene: Phaser.Scene): void {
   sky(scene);
+  skyDusk(scene);
+  skyNight(scene);
+  skyDawn(scene);
   farSkyline(scene);
   sidewalk(scene);
   street(scene);
   shadow(scene);
+  lampGlow(scene);
 }
 
 /** height of the sidewalk band the near buildings stand on */
@@ -77,6 +82,157 @@ function sky(scene: Phaser.Scene): void {
   c.refresh();
 }
 
+// The other three time-of-day skies. DayNight crossfades full-screen images
+// of these, so each is a complete standalone sky, not an overlay.
+
+function skyDusk(scene: Phaser.Scene): void {
+  const c = scene.textures.createCanvas('sky-dusk', W, H)!;
+  const ctx = c.getContext();
+
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#46508a');
+  g.addColorStop(0.34, '#8a6f9e');
+  g.addColorStop(0.58, '#d98d6a');
+  g.addColorStop(0.8, '#f0a95e');
+  g.addColorStop(1, '#d7834f');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // the same sun as the day sky, now fat, orange and sinking toward the roofs
+  const sunX = 320;
+  const sunY = 248;
+  const glow = ctx.createRadialGradient(sunX, sunY, 8, sunX, sunY, 160);
+  glow.addColorStop(0, 'rgba(255, 205, 130, 0.95)');
+  glow.addColorStop(0.4, 'rgba(255, 165, 95, 0.4)');
+  glow.addColorStop(1, 'rgba(255, 150, 90, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(sunX - 160, sunY - 160, 320, 320);
+  ctx.fillStyle = '#ffd9a0';
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 34, 0, Math.PI * 2);
+  ctx.fill();
+
+  // thin banded clouds catching the last light
+  ctx.fillStyle = 'rgba(255, 190, 140, 0.28)';
+  for (let i = 0; i < 4; i++) {
+    const by = 120 + i * 46 + (i % 2) * 14;
+    ctx.fillRect(((i * 331) % W) - 120, by, 260 + (i % 3) * 90, 5 + (i % 2) * 3);
+  }
+
+  const haze = ctx.createLinearGradient(0, H * 0.6, 0, H);
+  haze.addColorStop(0, 'rgba(214, 122, 80, 0)');
+  haze.addColorStop(1, 'rgba(214, 122, 80, 0.45)');
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, H * 0.6, W, H * 0.4);
+
+  c.refresh();
+}
+
+function skyNight(scene: Phaser.Scene): void {
+  const c = scene.textures.createCanvas('sky-night', W, H)!;
+  const ctx = c.getContext();
+
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#111527');
+  g.addColorStop(0.45, '#1a2140');
+  g.addColorStop(0.75, '#283052');
+  g.addColorStop(1, '#39395c');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // deterministic star field, thinning toward the horizon haze
+  for (let i = 0; i < 110; i++) {
+    const sx = (i * 97.31 + 13) % W;
+    const sy = ((i * 53.77 + 7) % (H * 0.66)) * (0.94 + ((i * 7) % 5) * 0.012);
+    const twinkle = 0.25 + ((i * 37) % 60) / 90;
+    ctx.fillStyle =
+      i % 9 === 0 ? `rgba(255, 231, 186, ${twinkle})` : `rgba(226, 234, 255, ${twinkle})`;
+    const s = i % 11 === 0 ? 2 : 1;
+    ctx.fillRect(sx, sy, s, s);
+  }
+
+  // full moon, clear of the right-side HUD numbers
+  const mx = W * 0.76;
+  const my = 118;
+  const glow = ctx.createRadialGradient(mx, my, 4, mx, my, 95);
+  glow.addColorStop(0, 'rgba(226, 232, 255, 0.55)');
+  glow.addColorStop(0.4, 'rgba(210, 220, 255, 0.18)');
+  glow.addColorStop(1, 'rgba(210, 220, 255, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(mx - 95, my - 95, 190, 190);
+  ctx.fillStyle = '#eceadb';
+  ctx.beginPath();
+  ctx.arc(mx, my, 26, 0, Math.PI * 2);
+  ctx.fill();
+  // craters and a cool shaded limb keep it painterly instead of a flat disc
+  ctx.fillStyle = 'rgba(120, 128, 150, 0.22)';
+  for (const [ox, oy, r] of [
+    [-8, -4, 5],
+    [6, 8, 7],
+    [10, -9, 3.5],
+    [-3, 12, 3],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(mx + ox, my + oy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(40, 52, 90, 0.16)';
+  ctx.beginPath();
+  ctx.arc(mx - 7, my, 26, Math.PI * 0.45, Math.PI * 1.55);
+  ctx.fill();
+
+  const haze = ctx.createLinearGradient(0, H * 0.6, 0, H);
+  haze.addColorStop(0, 'rgba(44, 52, 88, 0)');
+  haze.addColorStop(1, 'rgba(44, 52, 88, 0.55)');
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, H * 0.6, W, H * 0.4);
+
+  c.refresh();
+}
+
+function skyDawn(scene: Phaser.Scene): void {
+  const c = scene.textures.createCanvas('sky-dawn', W, H)!;
+  const ctx = c.getContext();
+
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#5c6a9e');
+  g.addColorStop(0.4, '#9b8bb0');
+  g.addColorStop(0.65, '#e3a98f');
+  g.addColorStop(0.85, '#f6c992');
+  g.addColorStop(1, '#f2b97e');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // sun barely up, same spot the day sky's sun will occupy — the crossfade
+  // into day reads as it climbing
+  const sunX = 320;
+  const sunY = 268;
+  const glow = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, 130);
+  glow.addColorStop(0, 'rgba(255, 236, 190, 0.85)');
+  glow.addColorStop(0.45, 'rgba(255, 210, 150, 0.3)');
+  glow.addColorStop(1, 'rgba(255, 210, 150, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(sunX - 130, sunY - 130, 260, 260);
+  ctx.fillStyle = '#ffe9bd';
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 19, 0, Math.PI * 2);
+  ctx.fill();
+
+  // a last faint star or two clinging on up top
+  ctx.fillStyle = 'rgba(230, 236, 255, 0.35)';
+  ctx.fillRect(W * 0.62, 46, 1, 1);
+  ctx.fillRect(W * 0.81, 74, 1, 1);
+  ctx.fillRect(W * 0.35, 30, 1, 1);
+
+  const haze = ctx.createLinearGradient(0, H * 0.6, 0, H);
+  haze.addColorStop(0, 'rgba(242, 190, 150, 0)');
+  haze.addColorStop(1, 'rgba(242, 190, 150, 0.45)');
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, H * 0.6, W, H * 0.4);
+
+  c.refresh();
+}
+
 // ---------------------------------------------------------- far skyline
 
 /**
@@ -86,9 +242,13 @@ function sky(scene: Phaser.Scene): void {
 function farSkyline(scene: Phaser.Scene): void {
   const c = scene.textures.createCanvas('bg-far', W, H)!;
   const ctx = c.getContext();
+  // Lit-windows-only overlay, drawn in the same pass so every window sits on
+  // its building; a tileSprite of it fades in over bg-far after dark.
+  const lit = scene.textures.createCanvas('bg-far-lit', W, H)!;
+  const litCtx = lit.getContext();
 
-  skylineRow(ctx, ['#a7aec5', '#9ba3ba'], 230, 350, false);
-  skylineRow(ctx, ['#8d94ad', '#7e859e', '#868da6'], 170, 290, true);
+  skylineRow(ctx, ['#a7aec5', '#9ba3ba'], 230, 350, false, litCtx);
+  skylineRow(ctx, ['#8d94ad', '#7e859e', '#868da6'], 170, 290, true, litCtx);
 
   // atmospheric fade: the whole layer melts into the warm horizon haze
   const haze = ctx.createLinearGradient(0, H - 340, 0, H);
@@ -98,6 +258,7 @@ function farSkyline(scene: Phaser.Scene): void {
   ctx.fillRect(0, 0, W, H);
 
   c.refresh();
+  lit.refresh();
 }
 
 function skylineRow(
@@ -106,6 +267,7 @@ function skylineRow(
   minH: number,
   maxH: number,
   detailed: boolean,
+  litCtx?: CanvasRenderingContext2D,
 ): void {
   let x = 0;
   let i = 0;
@@ -134,6 +296,11 @@ function skylineRow(
         const tx = x + 8 + Math.random() * (bw - 16);
         ctx.fillRect(tx, top - 26, 2, 26);
         ctx.fillRect(tx - 5, top - 18, 12, 2);
+        // aircraft-warning beacon, only visible after dark
+        if (litCtx) {
+          litCtx.fillStyle = 'rgba(255, 96, 84, 0.9)';
+          litCtx.fillRect(tx - 1, top - 28, 3, 3);
+        }
       } else if (roll < 0.8) {
         // AC / stairwell boxes
         ctx.fillRect(x + bw * 0.15, top - 8, bw * 0.28, 8);
@@ -148,6 +315,14 @@ function skylineRow(
       for (let wy = top + 14; wy < H - 60; wy += 26) {
         for (let wx = x + 8; wx < x + bw - 12; wx += 20) {
           const r = Math.random();
+          // after dark roughly half the homes have someone in — the daytime
+          // warm ones plus a fresh random set light up on the overlay
+          if (litCtx && (r < 0.14 || Math.random() < 0.42)) {
+            litCtx.fillStyle = 'rgba(255, 214, 130, 0.1)';
+            litCtx.fillRect(wx - 3, wy - 3, 14, 18);
+            litCtx.fillStyle = 'rgba(250, 216, 140, 0.9)';
+            litCtx.fillRect(wx, wy, 8, 12);
+          }
           if (r < 0.14) {
             ctx.fillStyle = 'rgba(244, 226, 170, 0.75)';
           } else if (r < 0.72) {
@@ -156,6 +331,15 @@ function skylineRow(
             continue;
           }
           ctx.fillRect(wx, wy, 8, 12);
+        }
+      }
+    } else if (litCtx) {
+      // the distant unlit row gets sparse pinprick windows so it doesn't
+      // vanish into the night sky entirely
+      for (let k = 0; k < bw / 24; k++) {
+        if (Math.random() < 0.35) {
+          litCtx.fillStyle = 'rgba(244, 214, 150, 0.55)';
+          litCtx.fillRect(x + 6 + Math.random() * (bw - 14), top + 12 + Math.random() * (bh * 0.5), 4, 6);
         }
       }
     }
@@ -277,6 +461,20 @@ function street(scene: Phaser.Scene): void {
     ctx.fillRect(x + 6 + (x % 3) * 9, h - 17, 5, 3);
   }
 
+  c.refresh();
+}
+
+/** soft warm radial disc, reused (rescaled) for the street-lamp halo and core */
+function lampGlow(scene: Phaser.Scene): void {
+  const S = 128;
+  const c = scene.textures.createCanvas('lamp-glow', S, S)!;
+  const ctx = c.getContext();
+  const g = ctx.createRadialGradient(S / 2, S / 2, 2, S / 2, S / 2, S / 2 - 2);
+  g.addColorStop(0, 'rgba(255, 228, 160, 0.95)');
+  g.addColorStop(0.3, 'rgba(255, 200, 110, 0.42)');
+  g.addColorStop(1, 'rgba(255, 170, 70, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
   c.refresh();
 }
 

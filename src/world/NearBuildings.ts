@@ -66,6 +66,9 @@ export class NearBuildingsLayer {
   private facades: FacadeDef[];
   private connectors: string[];
   private lastKey = '';
+  /** emissive overlays (lit café windows), alpha driven by DayNight glow */
+  private glows: Phaser.GameObjects.Image[] = [];
+  private glowAlpha = 0;
 
   constructor(scene: Phaser.Scene, depth: number) {
     this.scene = scene;
@@ -121,7 +124,43 @@ export class NearBuildingsLayer {
       .setTint(item.tint)
       .setPipeline(BUILDING_PALETTE_PIPELINE);
     this.sprites.push(sprite);
+    // the café gets an emissive lit-windows overlay that fades in after dark;
+    // plain ADD blend, no repaint pipeline — warm light is warm on any paint job
+    const glowKey = `${item.def.key}-lit`;
+    if (this.scene.textures.exists(glowKey)) {
+      const glow = this.scene.add
+        .image(x, BASELINE, glowKey)
+        .setOrigin(0, 1)
+        .setScale(item.scale)
+        .setFlipX(item.flip)
+        .setDepth(this.depth + 0.01)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setAlpha(this.glowAlpha);
+      this.sprites.push(glow);
+      this.glows.push(glow);
+    }
     this.cursor = x + sprite.displayWidth;
+  }
+
+  /** debug: force a specific facade to be the next building placed; it enters
+   * from the right edge like any planned block (~4 s at parallax speed) */
+  queueNext(key: string): void {
+    const def = this.facades.find((f) => f.key === key);
+    if (!def) return;
+    this.queue.unshift({
+      def,
+      scale: this.scaleFor(def),
+      flip: def.flippable && Math.random() < 0.5,
+      tint: buildingPaletteTint(0, 0),
+      gapBefore: 24,
+    });
+  }
+
+  /** set the emissive-window intensity (0 = day, 1 = deep night) */
+  setGlow(alpha: number): void {
+    this.glowAlpha = alpha;
+    this.glows = this.glows.filter((g) => g.active);
+    for (const g of this.glows) g.setAlpha(alpha);
   }
 
   // ---------------------------------------------------------- planning

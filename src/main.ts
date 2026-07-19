@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
 import { W, H } from './world/textures';
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.WEBGL,
   parent: 'game',
   width: W,
@@ -27,3 +27,13 @@ new Phaser.Game({
   },
   scene: [GameScene],
 });
+
+// mobile browsers fire the rotation resize while the old viewport numbers
+// are still live, so FIT keeps the previous orientation's size; re-measure
+// once the viewport settles (twice — some devices report late)
+const remeasure = (): void => {
+  setTimeout(() => game.scale.refresh(), 300);
+  setTimeout(() => game.scale.refresh(), 900);
+};
+screen.orientation?.addEventListener('change', remeasure);
+window.addEventListener('orientationchange', remeasure);

@@ -5,6 +5,7 @@ import { GuanoEffects, preloadGuanoEffects } from '../effects/GuanoEffects';
 import {
   ensureVictimPalettePipeline,
   victimPaletteTint,
+  VictimPalettePipeline,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
 import { buildTextures, W, H, GROUND_Y, SIDEWALK_H } from '../world/textures';
@@ -13,7 +14,13 @@ import {
   BUILDING_SPRITES,
   CONNECTOR_SPRITES,
 } from '../world/NearBuildings';
-import { ensureBuildingPalettePipeline } from '../world/BuildingPalettePipeline';
+import {
+  ensureBuildingPalettePipeline,
+  BuildingPalettePipeline,
+  BUILDING_PALETTE_PIPELINE,
+} from '../world/BuildingPalettePipeline';
+import { DayNight, type DayLook } from '../world/DayNight';
+import { LampFx } from '../world/LampFx';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, isTouchDevice } from '../input/TouchControls';
@@ -38,11 +45,22 @@ const PIGEON_SCALE = 0.38;
 const VICTIM_SCALE = 0.58; // pedestrians and cars
 const HYDRANT_SCALE = 0.5;
 const PICKUP_SCALE = 0.34;
-const PED_VARIANT_COUNT = 6;
+const PED_VARIANT_COUNT = 7;
+// The inline skater outruns the world scroll: high-value, high-lead target.
+const SKATER_VARIANT = 6;
+const SKATER_BASE_SCORE = 40;
+/** frames per stride pose (~150 ms each across the 4-pose cycle) */
+const SKATER_STRIDE_FRAMES = 9;
+/** texture-key suffixes in cycle order: push -> lift -> glide -> lean-in */
+const SKATER_STRIDE_POSES = ['', '-c', '-b', '-d'];
 const PEDESTRIAN_DEPTH = 5;
 // street furniture (lamps/trees/mailboxes/hydrants) stands at the curb edge,
 // closer to camera than the pedestrians walking against the buildings
 const STREET_PROP_DEPTH = 5.05;
+// minimum center-to-center spacing between pieces of street furniture at spawn
+// time; everything ground-scrolls at the same speed, so separation on spawn is
+// separation forever (widest pair — tree ~64px + hydrant ~48px — needs 56px)
+const STREET_PROP_GAP = 110;
 const CAR_DEPTH = 5.1; // the road lane is closer to camera than the pavement
 // Pedestrians walk on the sidewalk band against the buildings, not on the
 // curb: their ground line sits above GROUND_Y (the curb/road line).
@@ -68,6 +86,9 @@ const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 // Ran-dry lockout releases once this much pressure rebuilds. Kept very short
 // (~1.3s) — just enough to stop dribble-firing off a refilling tank.
 const EMPTY_LOCK_RELEASE = 3;
+// A dump shorter than this (~0.75s) doesn't earn the pleased face — quick taps
+// shouldn't flash relief
+const PLEASED_MIN_DUMP_FRAMES = 45;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
@@ -133,6 +154,7 @@ const PED_LINES = [
   'NOT THE BAG!',
   'MY MAP!',
   'BRO! SERIOUSLY?!',
+  'DUDE, MY HOODIE!',
 ];
 // rainbow goo delights instead of disgusts — same characters, opposite mood
 const PED_LINES_RAINBOW = [
@@ -142,6 +164,7 @@ const PED_LINES_RAINBOW = [
   'CONTENT GOLD!',
   'BEST TRIP EVER!',
   'SICK COLORS!',
+  'RADICAL!!',
 ];
 const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
@@ -203,13 +226,18 @@ export class GameScene extends Phaser.Scene {
   private flapPhase = 0;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
+  /** lit-windows overlay over bgFar, faded in after dark */
+  private bgFarLit!: Phaser.GameObjects.TileSprite;
   private bgNear!: NearBuildingsLayer;
   private sidewalkTs!: Phaser.GameObjects.TileSprite;
   private streetTs!: Phaser.GameObjects.TileSprite;
   private clouds: Phaser.GameObjects.Image[] = [];
   /** decorative sidewalk furniture (lamps/trees/mailboxes), ground-scrolled */
-  private props: Phaser.GameObjects.Image[] = [];
+  private props: { img: Phaser.GameObjects.Image; fx?: LampFx }[] = [];
   private propTimer = 1200;
+  private dayNight!: DayNight;
+  private buildingPipeline!: BuildingPalettePipeline;
+  private victimPipeline!: VictimPalettePipeline;
 
   private victims: Victim[] = [];
   private hydrants: Hydrant[] = [];
@@ -254,6 +282,10 @@ export class GameScene extends Phaser.Scene {
   private bellyRumbleCooldown = 0;
   /** poop held but the tank is empty/locked — drives the hungry portrait */
   private squeezingEmpty = false;
+  /** how long the current/last voluntary dump has been held, in frames */
+  private poopHeldFrames = 0;
+  /** hungry was shown this cycle — suppress pleased until pressure rebuilds */
+  private pleasedBlocked = false;
   private wobbleT = 0;
 
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
@@ -325,6 +357,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image('portrait-pleased', 'assets/portraits/pleased.png');
     this.load.image('portrait-panic', 'assets/portraits/panic.png');
     this.load.image('portrait-hungry', 'assets/portraits/hungry.png');
+    this.load.image('tap-hand', 'assets/ui/tap-hand.png');
+    this.load.image('drag-hand', 'assets/ui/drag-hand.png');
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
@@ -336,6 +370,13 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
       this.load.image(`ped-${i}-rainbow`, `assets/sprites/ped-${i}-rainbow.png`);
     }
+    // extra stride poses; the skater runs a 4-frame leg cycle instead of bobbing
+    for (const suffix of SKATER_STRIDE_POSES.slice(1)) {
+      this.load.image(
+        `ped-${SKATER_VARIANT}${suffix}`,
+        `assets/sprites/ped-${SKATER_VARIANT}${suffix}.png`,
+      );
+    }
     for (let i = 0; i < 3; i++) {
       this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
       this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
@@ -343,6 +384,8 @@ export class GameScene extends Phaser.Scene {
     for (const key of [...BUILDING_SPRITES, ...CONNECTOR_SPRITES]) {
       this.load.image(key, `assets/sprites/${key}.png`);
     }
+    // emissive café windows, ADD-blended over the facade after dark
+    this.load.image('bg-building-2-lit', 'assets/sprites/bg-building-2-lit.png');
     for (let i = 0; i < 3; i++) {
       this.load.image(`bg-cloud-${i}`, `assets/sprites/bg-cloud-${i}.png`);
     }
@@ -369,18 +412,32 @@ export class GameScene extends Phaser.Scene {
     ensureVictimPalettePipeline(this);
     ensureBuildingPalettePipeline(this);
 
-    this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(W, H).setDepth(0);
+    // sky pair (base + crossfade overlay) is owned by the day/night cycle
+    this.dayNight = new DayNight(this);
+    this.buildingPipeline = (
+      this.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer
+    ).pipelines.get(BUILDING_PALETTE_PIPELINE) as BuildingPalettePipeline;
+    this.victimPipeline = (
+      this.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer
+    ).pipelines.get(VICTIM_PALETTE_PIPELINE) as VictimPalettePipeline;
     // clouds live between the sky and the far skyline, each with its own drift
     for (let i = 0; i < 5; i++) {
+      const alpha = 0.7 + Math.random() * 0.2;
       const cloud = this.add
         .image(Math.random() * W, 36 + Math.random() * 150, `bg-cloud-${i % 3}`)
         .setDepth(0.5)
-        .setAlpha(0.7 + Math.random() * 0.2)
+        .setAlpha(alpha)
         .setScale(0.45 + Math.random() * 0.6);
       cloud.setData('drift', 0.1 + Math.random() * 0.12);
+      cloud.setData('baseAlpha', alpha);
       this.clouds.push(cloud);
     }
     this.bgFar = this.add.tileSprite(0, 0, W, H, 'bg-far').setOrigin(0, 0).setDepth(1);
+    this.bgFarLit = this.add
+      .tileSprite(0, 0, W, H, 'bg-far-lit')
+      .setOrigin(0, 0)
+      .setDepth(1.01)
+      .setAlpha(0);
     // pavement behind the facades, scrolling with them so stoops stay planted
     this.sidewalkTs = this.add
       .tileSprite(0, GROUND_Y - 6 - SIDEWALK_H, W, SIDEWALK_H, 'sidewalk')
@@ -443,6 +500,12 @@ export class GameScene extends Phaser.Scene {
       },
       musicFrantic: () => this.music.franticNow,
       comboRank: () => this.rankTier,
+      setTimeOfDay: (look: DayLook) => this.dayNight.jump(look),
+      nextTimeOfDay: () => this.dayNight.jumpNext(),
+      timeOfDay: () => this.dayNight.info(),
+      spawnProp: (key: 'bg-lamp' | 'bg-tree' | 'bg-mailbox' = 'bg-lamp', x?: number) =>
+        this.spawnProp(key, x),
+      spawnBuilding: (key = 'bg-building-2') => this.bgNear.queueNext(key),
       touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
   }
@@ -610,10 +673,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Compact always-on development palette for testing scene objects on demand. */
+  /** Development palette for testing scene objects on demand via ?debug. */
   private createDebugMenu(): void {
-    // phones: it sits inside the right poop zone — hidden unless ?debug is set
-    if (isTouchDevice() && !new URLSearchParams(location.search).has('debug')) return;
+    const params = new URLSearchParams(location.search);
+    if (!params.has('debug')) return;
     const x = W - 174;
     const y = 106;
     const buttonW = 48;
@@ -665,6 +728,8 @@ export class GameScene extends Phaser.Scene {
     addButton('COFF', 2, 2, () => spawnHere('coffee'));
     addButton('POD', 0, 3, () => spawnHere('pea'));
     addButton('GAS', 1, 3, () => this.activateGas());
+    addButton('TIME', 2, 3, () => this.dayNight.jumpNext());
+    addButton('CAFE', 0, 4, () => this.bgNear.queueNext('bg-building-2'));
   }
 
   update(_time: number, deltaMs: number): void {
@@ -678,11 +743,47 @@ export class GameScene extends Phaser.Scene {
     this.updateVictims(f, deltaMs);
     this.updateHydrants(f, deltaMs);
     this.updateGuano(f);
+    // after all spawns, so nothing shows one untinted frame
+    this.applyDayNight(f);
     this.updateHud(f);
+  }
+
+  /** advance the time-of-day cycle and push its light into everything it touches */
+  private applyDayNight(f: number): void {
+    const dn = this.dayNight;
+    dn.update(f);
+    const worldTint = dn.ambientTint();
+    const actorTint = dn.actorTint();
+
+    this.bgFar.setTint(worldTint);
+    this.bgFarLit.setAlpha(dn.farWindowAlpha);
+    this.sidewalkTs.setTint(worldTint);
+    this.streetTs.setTint(worldTint);
+    for (const c of this.clouds) {
+      c.setTint(worldTint).setAlpha((c.getData('baseAlpha') as number) * dn.cloudAlpha);
+    }
+    for (const p of this.props) {
+      p.img.setTint(worldTint);
+      p.fx?.update(f, dn.glow);
+    }
+    for (const h of this.hydrants) {
+      h.sprite.setTint(worldTint);
+      h.jetCol.setTint(worldTint);
+      h.crown.setTint(worldTint);
+    }
+    for (const pk of this.pickups) pk.sprite.setTint(actorTint);
+    this.pigeonImg.setTint(actorTint);
+    this.bgNear.setGlow(dn.glow);
+
+    const [ar, ag, ab] = dn.ambientVec();
+    this.buildingPipeline.setAmbient(ar, ag, ab);
+    const [vr, vg, vb] = dn.actorVec();
+    this.victimPipeline.setAmbient(vr, vg, vb);
   }
 
   private scrollWorld(f: number): void {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
+    this.bgFarLit.tilePositionX = this.bgFar.tilePositionX;
     this.bgNear.update(SCROLL * 0.55 * f);
     this.sidewalkTs.tilePositionX += SCROLL * 0.55 * f;
     this.streetTs.tilePositionX += SCROLL * f;
@@ -696,25 +797,43 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** true when no street furniture (prop or hydrant) sits within the gap of x */
+  private streetClearAt(x: number): boolean {
+    return (
+      this.props.every((p) => Math.abs(p.img.x - x) >= STREET_PROP_GAP) &&
+      this.hydrants.every((h) => Math.abs(h.sprite.x - x) >= STREET_PROP_GAP)
+    );
+  }
+
+  private spawnProp(key: 'bg-lamp' | 'bg-tree' | 'bg-mailbox', x = W + 90): void {
+    const prop = this.add
+      .image(x, 0, key)
+      .setDepth(STREET_PROP_DEPTH)
+      .setScale(0.21 + Math.random() * 0.03);
+    if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
+    prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
+    // lamps carry their own after-dark glow + moths
+    this.props.push({ img: prop, fx: key === 'bg-lamp' ? new LampFx(this, prop) : undefined });
+  }
+
   /** sidewalk furniture scrolls with the ground, in front of the pedestrians */
   private updateProps(f: number, deltaMs: number): void {
     this.propTimer -= deltaMs;
     if (this.propTimer <= 0) {
-      const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
-      const key = kinds[(Math.random() * kinds.length) | 0];
-      const prop = this.add
-        .image(W + 90, 0, key)
-        .setDepth(STREET_PROP_DEPTH)
-        .setScale(0.21 + Math.random() * 0.03);
-      if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
-      prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
-      this.props.push(prop);
-      this.propTimer = 2400 + Math.random() * 3600;
+      if (this.streetClearAt(W + 90)) {
+        const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
+        this.spawnProp(kinds[(Math.random() * kinds.length) | 0]);
+        this.propTimer = 2400 + Math.random() * 3600;
+      } else {
+        // spawn slot occupied — wait for the blocker to scroll clear
+        this.propTimer = 250;
+      }
     }
     this.props = this.props.filter((p) => {
-      p.x -= SCROLL * f;
-      if (p.x < -140) {
-        p.destroy();
+      p.img.x -= SCROLL * f;
+      if (p.img.x < -140) {
+        p.fx?.destroy();
+        p.img.destroy();
         return false;
       }
       return true;
@@ -773,10 +892,15 @@ export class GameScene extends Phaser.Scene {
   private updatePickups(f: number, deltaMs: number): void {
     this.rainbowPickupTimer -= deltaMs;
     if (this.rainbowPickupTimer <= 0) {
-      this.spawnPickup('rainbow');
-      this.rainbowPickupTimer =
-        RAINBOW_PICKUP_MIN_MS +
-        Math.random() * (RAINBOW_PICKUP_MAX_MS - RAINBOW_PICKUP_MIN_MS);
+      if (this.dayNight.isNight) {
+        // no rainbows after dark (backlog rule) — keep rechecking until sunrise
+        this.rainbowPickupTimer = 3000 + Math.random() * 3000;
+      } else {
+        this.spawnPickup('rainbow');
+        this.rainbowPickupTimer =
+          RAINBOW_PICKUP_MIN_MS +
+          Math.random() * (RAINBOW_PICKUP_MAX_MS - RAINBOW_PICKUP_MIN_MS);
+      }
     }
 
     this.itemPickupTimer -= deltaMs;
@@ -878,8 +1002,13 @@ export class GameScene extends Phaser.Scene {
     } else if (v === 1) {
       accentHue = RUNNER_HAIR_HUES[(Math.random() * RUNNER_HAIR_HUES.length) | 0];
     }
+    // Walkers always drift left on screen (own vx never beats SCROLL), so they
+    // enter from the right. A rightward skater outruns the scroll and must
+    // enter from the left instead.
+    const vx =
+      v === SKATER_VARIANT ? dir * (2.5 + Math.random() * 1.0) : dir * (0.3 + Math.random() * 0.5);
     const sprite = this.add
-      .sprite(W + 40, 0, `ped-${v}`)
+      .sprite(vx > SCROLL ? -40 : W + 40, 0, `ped-${v}`)
       .setScale(VICTIM_SCALE)
       .setDepth(PEDESTRIAN_DEPTH)
       .setFlipX(dir > 0)
@@ -890,7 +1019,7 @@ export class GameScene extends Phaser.Scene {
       sprite,
       kind: 'ped',
       variant: v,
-      vx: dir * (0.3 + Math.random() * 0.5),
+      vx,
       hitCooldown: 0,
       bobT: Math.random() * 10,
       reactTimer: 0,
@@ -993,8 +1122,13 @@ export class GameScene extends Phaser.Scene {
   private updateHydrants(f: number, deltaMs: number): void {
     this.hydrantTimer -= deltaMs;
     if (this.hydrantTimer <= 0) {
-      this.spawnHydrant();
-      this.hydrantTimer = 9000 + Math.random() * 8000;
+      if (this.streetClearAt(W + 40)) {
+        this.spawnHydrant();
+        this.hydrantTimer = 9000 + Math.random() * 8000;
+      } else {
+        // spawn slot occupied — wait for the blocker to scroll clear
+        this.hydrantTimer = 250;
+      }
     }
 
     for (const h of this.hydrants) {
@@ -1022,8 +1156,9 @@ export class GameScene extends Phaser.Scene {
         h.timer = 130;
         this.startHydrantJet(h);
         // always tall enough to reach the default cruise line (forces a climb
-        // to dodge) but never so tall the ceiling clamp can't out-climb it
-        h.jetMaxH = 280 + Math.random() * 70;
+        // to dodge; the hit check needs ≥ ~270px) but capped well under the
+        // ceiling so the column never looks like it spans the whole screen
+        h.jetMaxH = 280 + Math.random() * 50;
       } else if (h.state === 'burst' && h.timer <= 0) {
         h.state = 'idle';
         h.splashed = true; // burst spent — never re-arm
@@ -1180,7 +1315,26 @@ export class GameScene extends Phaser.Scene {
       }
       if (v.kind === 'ped') {
         v.bobT += 0.25 * f;
-        v.sprite.y = PED_GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * -3;
+        if (v.variant === SKATER_VARIANT) {
+          if (v.reactTimer > 0) {
+            v.sprite.setAngle(0);
+          } else {
+            // 4-pose stride cycle for the leg-pumping speed read
+            const stridePhase = v.bobT / (0.25 * SKATER_STRIDE_FRAMES);
+            const pose = SKATER_STRIDE_POSES[(stridePhase | 0) % SKATER_STRIDE_POSES.length];
+            const key = `ped-${SKATER_VARIANT}${pose}`;
+            if (v.sprite.texture.key !== key) v.sprite.setTexture(key);
+            // continuous lean synced to the pump: the eye reads the smooth
+            // rock as in-between motion the poses don't quite have
+            const fwd = v.sprite.flipX ? 1 : -1;
+            v.sprite.setAngle(
+              fwd * (2 + Math.sin((stridePhase * Math.PI) / 2) * 2.5),
+            );
+          }
+        }
+        // skates glide; walkers bob a full 3px
+        const bob = v.variant === SKATER_VARIANT ? -1.5 : -3;
+        v.sprite.y = PED_GROUND_Y - v.sprite.displayHeight / 2 + Math.abs(Math.sin(v.bobT)) * bob;
       } else {
         v.sprite.y = GROUND_Y + 32 - v.sprite.displayHeight / 2;
       }
@@ -1196,7 +1350,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.victims = this.victims.filter((v) => {
-      if (v.sprite.x < -160) {
+      // rightward skaters outrun the scroll and exit stage right
+      if (v.sprite.x < -160 || v.sprite.x > W + 160) {
         v.sprite.destroy();
         return false;
       }
@@ -1227,7 +1382,9 @@ export class GameScene extends Phaser.Scene {
     this.comboTimer = 120;
     // the visible counter is uncapped (rank spectacle); scoring plateaus at x8
     this.combo += 1;
-    const base = v.kind === 'car' ? 25 : 10;
+    // The skater pays 4x a walker: he's fast, and the lead is the skill test.
+    const base =
+      v.kind === 'car' ? 25 : v.variant === SKATER_VARIANT ? SKATER_BASE_SCORE : 10;
     const pts = base * Math.min(this.combo, 8);
     this.score += pts;
 
@@ -1346,7 +1503,10 @@ export class GameScene extends Phaser.Scene {
     const digestionRate =
       PASSIVE_DIGESTION_PER_FRAME * (this.coffeeTimer > 0 ? COFFEE_FILL_MULTIPLIER : 1);
     this.meter = Math.min(100, this.meter + digestionRate * f);
-    if (this.meter >= EMPTY_LOCK_RELEASE) this.emptyLock = false;
+    if (this.meter >= EMPTY_LOCK_RELEASE) {
+      this.emptyLock = false;
+      this.pleasedBlocked = false;
+    }
 
     // full = involuntary blowout: one huge uncontrolled blast until empty
     if (this.meter >= 100 && this.dumpKind === 'none') {
@@ -1358,11 +1518,22 @@ export class GameScene extends Phaser.Scene {
     const wantsPoop = this.keys.poop.isDown || this.pointerPoop || this.touch.poop;
     const wasPooping = this.pooping;
     this.pooping = this.dumpKind === 'none' && !this.emptyLock && wantsPoop && this.meter > 0;
-    if (wasPooping && !this.pooping) this.relievedTimer = 60;
+    if (!wasPooping && this.pooping) this.poopHeldFrames = 0;
+    if (this.pooping) this.poopHeldFrames += f;
+    // only a properly long dump earns the pleased face — quick taps stay neutral
+    if (wasPooping && !this.pooping && this.poopHeldFrames >= PLEASED_MIN_DUMP_FRAMES) {
+      this.relievedTimer = 60;
+    }
 
     // squeezing an empty tank: telegraph WHY nothing comes out — an empty-belly
     // rumble and a hungry face instead of silently eating the input
     this.squeezingEmpty = wantsPoop && !this.pooping && this.dumpKind === 'none';
+    // hungry → pleased reads as an abrupt mood swing; once hungry shows, hold
+    // off pleased until the lock releases
+    if (this.squeezingEmpty) {
+      this.pleasedBlocked = true;
+      this.relievedTimer = 0;
+    }
     this.bellyRumbleCooldown = Math.max(0, this.bellyRumbleCooldown - f);
     if (this.squeezingEmpty && this.bellyRumbleCooldown <= 0) {
       this.bellyRumbleCooldown = 130; // sound runs ~1.7s — don't let it overlap itself
@@ -1459,7 +1630,7 @@ export class GameScene extends Phaser.Scene {
     if (this.dumpKind === 'blowout' || this.meter >= 92) return 'panic';
     if (this.pooping || this.dumpKind === 'scare' || this.meter > 85) return 'strain';
     if (this.squeezingEmpty) return 'hungry';
-    if (this.relievedTimer > 0 || this.emptyLock) return 'pleased';
+    if ((this.relievedTimer > 0 || this.emptyLock) && !this.pleasedBlocked) return 'pleased';
     return 'ready';
   }
 
