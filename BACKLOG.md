@@ -18,9 +18,7 @@ no new decisions. Ordered by payoff-per-effort:
 2. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
    vx ~2.5–3.5 (vs 0.3–0.8 walkers), either direction, base score 40; extend
    `PED_LINES` / `PED_LINES_RAINBOW`; verify `VictimPalettePipeline` variant packing
-   handles a 4th ped.
-- Freebie alongside: randomize the hydrant burst trigger distance
-  (`pigeon.x + 230` → `+ 200 + rand()*80`, rolled at spawn).
+   handles a 4th ped. Will require two sprites to show that it's moving legs, left in front, then right in front, will give speed feeling.
 
 **Next asset set:** skater sheet (`ped-3` / `ped-3-r` / `ped-3-rainbow`, matching the
 pedestrian sheet layout) via the codex-image → `ART_LOG.md` pipeline. Deferred to later
@@ -45,8 +43,6 @@ this slot in alongside the normal flight frames.
 
 - Peds reacting to the water; hydrant splash puddle; sound; terrified portrait cue
   during warn.
-- Burst trigger is now deterministic (pigeon.x + 230) — consider randomizing the trigger
-  distance a little if the dodge starts feeling too predictable.
 
 ## Idea dump (user, 2026-07-17)
 
@@ -63,8 +59,13 @@ this slot in alongside the normal flight frames.
   into a car, honk scares more peds…)
 - **Character interactions:** matching or compatible pedestrians occasionally pause when
   they meet and play a short paired gag before continuing. Examples: two gym bros stop to
-  out-flex each other; two granddads lean on their canes and gossip. Use proximity plus a
+  out-flex each other; two granddads lean on their canes and gossip. Also use sound for the gossip. Use proximity plus a
   per-character cooldown so interactions stay surprising and do not jam pedestrian flow.
+
+**Sounds**
+- Sound for character interation (once done)
+- Sound for some of pedestrain and car reactions - should replace text pop-ups
+- Klezmer should play a little longer (not just fade off) - and probably be synchronized with different combo levels
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =
@@ -82,10 +83,9 @@ this slot in alongside the normal flight frames.
 - Occasional events, e.g. a Politiker motorcade (or different levels/themes entirely).
 - Window washer (mid-air platform/victim on a suspended cradle).
 - Drones (airborne hazard or target at flight altitude).
+- Sunrise/day/sunset/night change - also effects characters (e.g. adding stationary hooker near a lamp at midnight, robberer etc.),
+and some pick-up are effected (e.g. no rainbow at night). Also shaders of course should be affected, as well as background naturally.
 
-**Visuals**
-- Slightly decrease model size? (another pass — sprites were rebalanced 2026-07-17,
-  see CHANGELOG).
 
 ## Other candidates
 
