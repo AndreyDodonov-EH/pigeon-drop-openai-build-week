@@ -21,12 +21,13 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
   per-character cooldown so interactions stay surprising and do not jam pedestrian flow.
 
 **Pooping**
-- combine pooping (e.g. gas (pea pod) + rainbow = rainbow gas!) Make sure to keep the code ouf of GameScene file not too grow it even further - it's separate logic
+- ~~combine pooping (e.g. gas (pea pod) + rainbow = rainbow gas!)~~ DONE: rainbow gas (pastel hue-cycling clouds, delighted victims, "RAINBOW GAS!" popup); combo logic lives in GasSim/GuanoEffects + src/effects/combos.ts
+- pea pod + chilli - fiery explosion (extend the GuanoStream flags + combos.ts table the same way)
+
+
 
 **Sounds**
 - Sound for character interation (once done)
-
-
 - Slighly crackling sound when we poo in chilli mode
 
 **Pickups**

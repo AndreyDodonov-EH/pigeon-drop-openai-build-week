@@ -41,6 +41,7 @@ export function preloadGuanoEffects(scene: Phaser.Scene): void {
     'assets/audio/gas-whoosh.mp3',
   ]);
   scene.load.audio('sfx-gas-loop', ['assets/audio/gas-loop.ogg', 'assets/audio/gas-loop.mp3']);
+  scene.load.audio('sfx-boom', ['assets/audio/boom.ogg', 'assets/audio/boom.mp3']);
 }
 
 /**
@@ -56,6 +57,7 @@ export class GuanoEffects {
   private readonly fireEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly sparkEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
 
+  private readonly fireDepth: number;
   private emitCarry = 0;
   private gasEmitCarry = 0;
   private rainbowHue = 0;
@@ -78,6 +80,7 @@ export class GuanoEffects {
     this.gasSim.boundsW = options.boundsW;
     this.gasSim.worldVx = options.worldVx;
     this.gasLayer = new GasLayer(scene, options.boundsW, options.boundsH, options.gasDepth);
+    this.fireDepth = options.fireDepth;
 
     this.ensureFlameTexture();
     this.fireEmitter = scene.add
@@ -129,6 +132,7 @@ export class GuanoEffects {
 
   resetRainbowHue(): void {
     this.rainbowHue = 0;
+    this.gasSim.resetRainbowPhase();
   }
 
   /** A fresh gas pickup re-arms the opening heave even during a held stream. */
@@ -148,7 +152,15 @@ export class GuanoEffects {
       this.gasEmitCarry += count * 0.32;
       const gasCount = Math.floor(this.gasEmitCarry);
       this.gasEmitCarry -= gasCount;
-      if (gasCount > 0) this.gasSim.emit(stream.x, stream.y, stream.wild, gasCount);
+      if (gasCount > 0)
+        this.gasSim.emit(
+          stream.x,
+          stream.y,
+          stream.wild,
+          gasCount,
+          stream.rainbow,
+          stream.fire,
+        );
       return;
     }
 
@@ -194,6 +206,7 @@ export class GuanoEffects {
     this.updateFireFx();
     this.gasSim.step(f, gasTargets);
     this.gasLayer.render(this.gasSim.particles);
+    this.updateGasFireFx();
   }
 
   stopGasStream(): void {
@@ -238,6 +251,61 @@ export class GuanoEffects {
         );
       }
       if (Math.random() < 0.12) this.sparkEmitter.emitParticleAt(particle.x, particle.y - 2);
+    }
+  }
+
+  /**
+   * The dragon-breath detonation: ignites the whole airborne cloud and dresses
+   * the blast point with a flash, a fireball, and an expanding shockwave ring.
+   */
+  igniteGas(x: number, y: number): void {
+    this.gasSim.ignite(x, y);
+    this.fireEmitter.explode(70, x, y);
+    this.sparkEmitter.explode(32, x, y);
+
+    const flash = this.scene.add
+      .circle(x, y, 42, 0xfff2b0, 0.9)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(this.fireDepth);
+    this.scene.tweens.add({
+      targets: flash,
+      scale: 3.4,
+      alpha: 0,
+      duration: 190,
+      ease: 'Quad.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+
+    const ring = this.scene.add
+      .circle(x, y, 30)
+      .setStrokeStyle(11, 0xffce42, 0.85)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(this.fireDepth);
+    this.scene.tweens.add({
+      targets: ring,
+      scale: 8.5,
+      alpha: 0,
+      duration: 480,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  /** Dresses burning gas parcels the same way, spread across each cloud's body. */
+  private updateGasFireFx(): void {
+    const particles = this.gasSim.particles;
+    if (particles.length === 0) return;
+    for (let i = 0; i < 10; i++) {
+      const particle = particles[(Math.random() * particles.length) | 0];
+      if (!particle.fire) continue;
+      const spread = particle.radius * 0.6;
+      if (Math.random() < 0.55) {
+        this.fireEmitter.emitParticleAt(
+          particle.x + (Math.random() - 0.5) * spread,
+          particle.y + (Math.random() - 0.5) * spread * 0.7,
+        );
+      }
+      if (Math.random() < 0.08) this.sparkEmitter.emitParticleAt(particle.x, particle.y);
     }
   }
 

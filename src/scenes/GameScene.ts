@@ -2,13 +2,14 @@ import Phaser from 'phaser';
 import type { Collider, Particle } from '../goo/GooSim';
 import { getAlphaMask } from '../goo/alphaMask';
 import { GuanoEffects, preloadGuanoEffects } from '../effects/GuanoEffects';
+import { comboOnPickup } from '../effects/combos';
 import {
   ensureVictimPalettePipeline,
   victimPaletteTint,
   VictimPalettePipeline,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
-import { buildTextures, W, H, GROUND_Y, SIDEWALK_H } from '../world/textures';
+import { buildTextures, W, H, GROUND_Y, SIDEWALK_H, MOBILE } from '../world/textures';
 import {
   NearBuildingsLayer,
   BUILDING_SPRITES,
@@ -23,8 +24,9 @@ import { DayNight, type DayLook } from '../world/DayNight';
 import { LampFx } from '../world/LampFx';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
-import { TouchControls, isTouchDevice } from '../input/TouchControls';
+import { TouchControls, DiveRatchet, isTouchDevice } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
+import { PauseMenu } from '../ui/PauseMenu';
 import { rankForCombo, type ComboRank } from '../ui/ranks';
 import { t } from '../i18n';
 
@@ -41,9 +43,16 @@ const COLOR_WATER = '#a8dcf2';
 const RAINBOW_COLORS = [0xff5b57, 0xff9d3e, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8];
 
 // ---- sprite scales ----
+// Phones squeeze the fixed 540px design height onto a palm-sized screen and
+// the street read like a miniature there, so every street-level model gets
+// one shared bump on coarse-pointer devices. Applied uniformly (victims,
+// hydrants, props) so their relative proportions match desktop.
+const MOBILE_MODEL_BUMP = MOBILE ? 1.4 : 1;
 const PIGEON_SCALE = 0.38;
-const VICTIM_SCALE = 0.58; // pedestrians and cars
-const HYDRANT_SCALE = 0.5;
+const VICTIM_SCALE = 0.58 * MOBILE_MODEL_BUMP; // pedestrians and cars
+const HYDRANT_SCALE = 0.5 * MOBILE_MODEL_BUMP;
+/** texture px from the hydrant's base to its open neck (the jet's origin) */
+const HYDRANT_CAP_H = 92;
 const PICKUP_SCALE = 0.34;
 const PED_VARIANT_COUNT = 7;
 // The inline skater outruns the world scroll: high-value, high-lead target.
@@ -79,8 +88,8 @@ const RAINBOW_PICKUP_FIRST_MS = 2500;
 const RAINBOW_PICKUP_MIN_MS = 12000;
 const RAINBOW_PICKUP_MAX_MS = 20000;
 const ITEM_PICKUP_FIRST_MS = 4200;
-const ITEM_PICKUP_MIN_MS = 5000;
-const ITEM_PICKUP_MAX_MS = 9000;
+const ITEM_PICKUP_MIN_MS = 3500;
+const ITEM_PICKUP_MAX_MS = 6000;
 const PEA_LOOK_FRAME_FRAMES = 18;
 const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 // Ran-dry lockout releases once this much pressure rebuilds. Kept very short
@@ -93,6 +102,7 @@ const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
 const CHILLI_DURATION = 60 * 8;
+const BOOM_RADIUS = 250; // dragon-breath detonation reach, px around the pickup
 const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
 // A continuous goo stream lands as one shifting puddle, not a machine-gun row
 // of discrete drops. Keep street impacts far enough apart that the short sample
@@ -105,6 +115,23 @@ const PICKUP_GRAB_Y = 30;
 const ITEM_PICKUP_KINDS = ['bread', 'fries', 'kebab', 'chilli', 'coffee', 'pea'] as const;
 type ItemPickupKind = (typeof ITEM_PICKUP_KINDS)[number];
 type PickupKind = 'rainbow' | ItemPickupKind;
+
+// Picking things up is the engaging part, and food only nudges the meter, so it
+// can spawn generously. Foods weigh double; combined with the shorter spawn
+// interval above, food shows up ~2x as often while effect items (chilli,
+// coffee, pea) keep roughly their old cadence.
+const ITEM_PICKUP_WEIGHTS: Record<ItemPickupKind, number> = {
+  bread: 2,
+  fries: 2,
+  kebab: 2,
+  chilli: 1,
+  coffee: 1,
+  pea: 1,
+};
+const ITEM_PICKUP_TOTAL_WEIGHT = ITEM_PICKUP_KINDS.reduce(
+  (sum, kind) => sum + ITEM_PICKUP_WEIGHTS[kind],
+  0,
+);
 
 interface ItemPickupEffect {
   pressureGain?: number;
@@ -170,6 +197,13 @@ const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
 const REACT_FRAMES = 90;
 
+// Post-hit conspiratorial glance: the pigeon turns to face the camera for a beat
+// after a juicy hit ("you saw that, right?"). Reserved for rainbow hits, combos,
+// and blowout connects — plus a cooldown — so it stays a punchline, not a tic.
+const GLANCE_FRAMES = 75;
+const GLANCE_COOLDOWN_MS = 6000;
+const GLANCE_MIN_COMBO = 3;
+
 // Voiced hit reactions stay a garnish, not a soundtrack: only the loud personalities
 // vocalize (suit guy, granddad, influencer, gym bro; the van keeps its text line), a coin flip
 // thins them further, and one shared cooldown keeps a combo from becoming a chorus.
@@ -224,6 +258,9 @@ export class GameScene extends Phaser.Scene {
   private pigeonY = START_Y;
   private pigeonVy = 0;
   private flapPhase = 0;
+  /** frames left of the post-hit look-at-camera glance */
+  private glanceFrames = 0;
+  private nextGlanceAt = 0;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
   /** lit-windows overlay over bgFar, faded in after dark */
@@ -290,8 +327,14 @@ export class GameScene extends Phaser.Scene {
 
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
   private pointerFly = false;
+  private pointerDive = false;
   private pointerPoop = false;
+  private mouseRatchet = new DiveRatchet();
   private touch!: TouchControls;
+  private pauseMenu!: PauseMenu;
+  private gamePaused = false;
+  /** tweens frozen by the pause — resume only these, not ones paused by others */
+  private tweensFrozenByPause: Phaser.Tweens.Tween[] = [];
   /** debug override used by screenshot scripts; gameplay uses rainbowTimer */
   private rainbowDebug = false;
   private rainbowTimer = 0;
@@ -362,6 +405,9 @@ export class GameScene extends Phaser.Scene {
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
+    this.load.image('pigeon-look-f0', 'assets/sprites/pigeon-look-f0.png');
+    this.load.image('pigeon-look-f1', 'assets/sprites/pigeon-look-f1.png');
+    this.load.image('pigeon-look-f2', 'assets/sprites/pigeon-look-f2.png');
     this.load.image('car-0', 'assets/sprites/car-0.png');
     this.load.image('car-1', 'assets/sprites/car-1.png');
     this.load.image('car-2', 'assets/sprites/car-2.png');
@@ -469,8 +515,14 @@ export class GameScene extends Phaser.Scene {
 
     this.createHud();
     this.createInput();
+    this.pauseMenu = new PauseMenu(this, () => this.togglePause());
     this.createDebugMenu();
-    if (shouldShowWizard()) new FirstRunWizard(this);
+    if (shouldShowWizard()) {
+      // pause controls hide behind the wizard so its dismissing tap/keypress
+      // can't double as a pause (P/ESC would start the game already paused)
+      this.pauseMenu.setEnabled(false);
+      new FirstRunWizard(this, () => this.pauseMenu.setEnabled(true));
+    }
     this.music = new MusicManager(this);
     this.music.start();
 
@@ -479,7 +531,10 @@ export class GameScene extends Phaser.Scene {
       scene: this,
       setFly: (v: boolean) => (this.pointerFly = v),
       setPoop: (v: boolean) => (this.pointerPoop = v),
+      setPaused: (v: boolean) => this.setPaused(v),
+      isPaused: () => this.gamePaused,
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
+      setGas: (v: boolean) => (this.gasTimer = v ? GAS_DURATION : 0),
       particleCount: () => this.guanoFx.particleCount,
       gasParticleCount: () => this.guanoFx.gasParticleCount,
       spawnHydrant: () => this.spawnHydrant(),
@@ -498,6 +553,7 @@ export class GameScene extends Phaser.Scene {
         this.combo = v;
         this.comboTimer = 120;
       },
+      glance: (frames = GLANCE_FRAMES) => (this.glanceFrames = frames),
       musicFrantic: () => this.music.franticNow,
       comboRank: () => this.rankTier,
       setTimeOfDay: (look: DayLook) => this.dayNight.jump(look),
@@ -615,8 +671,9 @@ export class GameScene extends Phaser.Scene {
     this.add.image(px, py, 'hud-meter-arc').setDepth(10).setDisplaySize(plateSize, plateSize);
     this.effectMeters = this.add.graphics().setDepth(12);
 
+    // right-aligned left of the pause button, which owns the true corner
     this.scoreText = this.add
-      .text(W - 24, 18, '0', {
+      .text(W - 72, 18, '0', {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '34px',
         color: COLOR_CREAM,
@@ -626,7 +683,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setDepth(10);
     this.comboText = this.add
-      .text(W - 24, 58, '', {
+      .text(W - 72, 58, '', {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '20px',
         color: COLOR_AMBER,
@@ -660,17 +717,59 @@ export class GameScene extends Phaser.Scene {
     };
     this.input.mouse?.disableContextMenu();
     this.touch = new TouchControls(this);
-    // mouse only — touch pointers are owned by TouchControls' split zones
+    // mouse only — touch pointers are owned by TouchControls' split zones.
+    // LMB mirrors the touch left zone: hold to climb, drag down while held to
+    // dive (same ratchet); RMB holds the rip. Per-button so LMB+RMB combine.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (p.wasTouch) return;
-      if (p.rightButtonDown()) this.pointerPoop = true;
-      else this.pointerFly = true;
+      if (p.wasTouch || this.gamePaused) return;
+      if (p.button === 2) this.pointerPoop = true;
+      else if (p.button === 0) {
+        this.pointerFly = true;
+        this.mouseRatchet.begin(p.y);
+      }
+    });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      // leftButtonDown gate also keeps debug SP.setFly() holds ratchet-free
+      if (p.wasTouch || !p.leftButtonDown() || !(this.pointerFly || this.pointerDive)) return;
+      this.mouseRatchet.move(p.y);
+      this.pointerDive = this.mouseRatchet.dive;
+      this.pointerFly = !this.pointerDive;
     });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
       if (p.wasTouch) return;
-      if (!p.rightButtonDown()) this.pointerFly = false;
-      this.pointerPoop = false;
+      if (p.button === 0) {
+        this.pointerFly = false;
+        this.pointerDive = false;
+      }
+      if (p.button === 2) this.pointerPoop = false;
     });
+  }
+
+  private togglePause(): void {
+    this.setPaused(!this.gamePaused);
+  }
+
+  private setPaused(paused: boolean): void {
+    if (paused === this.gamePaused) return;
+    this.gamePaused = paused;
+    this.pointerFly = false;
+    this.pointerDive = false;
+    this.pointerPoop = false;
+    this.touch.releaseAll();
+    this.pauseMenu.setPaused(paused);
+
+    // The scene itself must keep stepping so its pause controls stay live.
+    // Freeze every other clocked subsystem explicitly instead.
+    this.time.paused = paused;
+    if (paused) {
+      this.tweensFrozenByPause = this.tweens.getTweens().filter((tw) => tw.isPlaying());
+      this.tweensFrozenByPause.forEach((tw) => tw.pause());
+      this.sound.pauseAll();
+    } else {
+      this.tweensFrozenByPause.forEach((tw) => tw.resume());
+      this.tweensFrozenByPause = [];
+      this.sound.resumeAll();
+    }
   }
 
   /** Development palette for testing scene objects on demand via ?debug. */
@@ -733,6 +832,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
+    if (this.gamePaused) return;
     // normalize to 60 Hz frame units used by the sim
     const f = Math.min(deltaMs / (1000 / 60), 2);
 
@@ -809,7 +909,7 @@ export class GameScene extends Phaser.Scene {
     const prop = this.add
       .image(x, 0, key)
       .setDepth(STREET_PROP_DEPTH)
-      .setScale(0.21 + Math.random() * 0.03);
+      .setScale((0.21 + Math.random() * 0.03) * MOBILE_MODEL_BUMP);
     if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
     prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
     // lamps carry their own after-dark glow + moths
@@ -842,7 +942,7 @@ export class GameScene extends Phaser.Scene {
 
   private updatePigeon(f: number): void {
     const up = this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly || this.touch.fly;
-    const down = this.keys.down.isDown || this.touch.dive;
+    const down = this.keys.down.isDown || this.pointerDive || this.touch.dive;
     // it's a bird, not a brick: velocity trims toward an input-chosen target,
     // so releasing everything levels off and holds the current altitude
     const targetVy = up ? -3.6 : down ? 4.2 : 0;
@@ -853,7 +953,12 @@ export class GameScene extends Phaser.Scene {
     // wing flap: fast while climbing, steady hover beat, lazy dive glide
     this.flapPhase += (up ? 0.22 : down ? 0.05 : 0.11) * f;
     const flapSeq = [0, 1, 2, 1];
-    this.pigeonImg.setTexture(`pigeon-f${flapSeq[Math.floor(this.flapPhase) % 4]}`);
+    // post-hit glance at the camera; any steering input snaps the head back —
+    // eye contact must never read as "nothing is happening" mid-maneuver
+    if (up || down) this.glanceFrames = 0;
+    else this.glanceFrames = Math.max(0, this.glanceFrames - f);
+    const head = this.glanceFrames > 0 ? 'pigeon-look-f' : 'pigeon-f';
+    this.pigeonImg.setTexture(`${head}${flapSeq[Math.floor(this.flapPhase) % 4]}`);
 
     // blowout telegraph: wobbly flight ramping up as the meter tops out
     const wobbleAmp =
@@ -889,6 +994,15 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private pickItemKind(): ItemPickupKind {
+    let r = Math.random() * ITEM_PICKUP_TOTAL_WEIGHT;
+    for (const kind of ITEM_PICKUP_KINDS) {
+      r -= ITEM_PICKUP_WEIGHTS[kind];
+      if (r < 0) return kind;
+    }
+    return ITEM_PICKUP_KINDS[0];
+  }
+
   private updatePickups(f: number, deltaMs: number): void {
     this.rainbowPickupTimer -= deltaMs;
     if (this.rainbowPickupTimer <= 0) {
@@ -905,8 +1019,7 @@ export class GameScene extends Phaser.Scene {
 
     this.itemPickupTimer -= deltaMs;
     if (this.itemPickupTimer <= 0) {
-      const kind = ITEM_PICKUP_KINDS[(Math.random() * ITEM_PICKUP_KINDS.length) | 0];
-      this.spawnPickup(kind);
+      this.spawnPickup(this.pickItemKind());
       this.itemPickupTimer =
         ITEM_PICKUP_MIN_MS + Math.random() * (ITEM_PICKUP_MAX_MS - ITEM_PICKUP_MIN_MS);
     }
@@ -947,6 +1060,7 @@ export class GameScene extends Phaser.Scene {
       this.rainbowTimer = RAINBOW_DURATION;
       this.guanoFx.resetRainbowHue();
       this.pickupBurst(x, y, RAINBOW_COLORS);
+      this.announceCombo(kind, x, y);
       return;
     }
 
@@ -961,6 +1075,40 @@ export class GameScene extends Phaser.Scene {
     }
     if (kind === 'pea') this.activateGas();
     this.pickupBurst(x, y, effect.burstColors);
+    this.announceCombo(kind, x, y);
+  }
+
+  private announceCombo(kind: PickupKind, x: number, y: number): void {
+    const combo = comboOnPickup(kind, {
+      rainbow: this.rainbowTimer,
+      gas: this.gasTimer,
+      chilli: this.chilliTimer,
+    });
+    if (!combo) return;
+    this.popup(x, y - 30, combo.text, combo.color, 20);
+    // Bare timer resets on purpose: no resetRainbowHue/rearmGasHeave, so the
+    // already-running effect extends seamlessly instead of visibly restarting.
+    for (const effect of combo.refresh) {
+      if (effect === 'rainbow') this.rainbowTimer = RAINBOW_DURATION;
+      if (effect === 'gas') this.gasTimer = GAS_DURATION;
+      if (effect === 'chilli') this.chilliTimer = CHILLI_DURATION;
+    }
+    if (combo.boom) this.detonate(x, y);
+  }
+
+  /** Dragon breath detonates on completion: the airborne cloud ignites and everyone near the blast feels it. */
+  private detonate(x: number, y: number): void {
+    this.guanoFx.igniteGas(x, y);
+    this.cameras.main.shake(280, 0.011);
+    this.sound.play('sfx-boom', {
+      volume: 0.7 * SFX_VOLUME,
+      rate: Phaser.Math.FloatBetween(0.95, 1.05),
+    });
+    for (const v of this.victims) {
+      const dx = v.collider.x - x;
+      const dy = v.collider.y - y;
+      if (dx * dx + dy * dy <= BOOM_RADIUS * BOOM_RADIUS) this.onVictimHit(v, false, 'gas', true);
+    }
   }
 
   private activateGas(): void {
@@ -1135,7 +1283,7 @@ export class GameScene extends Phaser.Scene {
       h.sprite.x -= SCROLL * f;
       // hydrants sit on the ground; the open neck is a fixed height above it
       // (both textures share one padded canvas, so a swap never shifts the base)
-      const capY = GROUND_Y - 46;
+      const capY = GROUND_Y - HYDRANT_CAP_H * HYDRANT_SCALE;
 
       h.timer -= f;
       // guaranteed threat: instead of a random idle cycle (which let hydrants
@@ -1363,7 +1511,7 @@ export class GameScene extends Phaser.Scene {
     this.onVictimHit(v, p.rainbow, 'goo');
   }
 
-  private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas'): void {
+  private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas', fire = false): void {
     // even a cooldown-gated touch proves the volley connected
     this.salvoHit = true;
     if (v.hitCooldown > 0) return;
@@ -1388,12 +1536,20 @@ export class GameScene extends Phaser.Scene {
     const pts = base * Math.min(this.combo, 8);
     this.score += pts;
 
-    // Rainbow goo flips the mood. Gas stays disgusting but gets its own hit verb.
+    // Rainbow flips the mood for goo and gas alike; each source keeps its own verbs.
     const label =
       source === 'gas'
         ? v.kind === 'car'
-          ? 'PFFFFT!'
-          : 'GASSED!'
+          ? joyful
+            ? 'FRESH BREEZE!'
+            : fire
+              ? 'PAINT BUBBLES!'
+              : 'PFFFFT!'
+          : joyful
+            ? 'DELIGHTFUL!'
+            : fire
+              ? 'SCORCHED!'
+              : 'GASSED!'
         : v.kind === 'car'
           ? 'DING!'
           : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
@@ -1402,6 +1558,14 @@ export class GameScene extends Phaser.Scene {
     // reaction frame (outraged or delighted), reverted by updateVictims after REACT_FRAMES
     v.sprite.setTexture(`${v.kind}-${v.variant}${joyful ? '-rainbow' : '-r'}`);
     v.reactTimer = REACT_FRAMES;
+
+    // the conspiratorial glance: only the juicy connects earn eye contact
+    const juicy =
+      joyful || this.combo >= GLANCE_MIN_COMBO || this.dumpKind === 'blowout';
+    if (juicy && this.time.now >= this.nextGlanceAt) {
+      this.glanceFrames = GLANCE_FRAMES;
+      this.nextGlanceAt = this.time.now + GLANCE_COOLDOWN_MS;
+    }
 
     // A voiced reaction replaces this hit's text line (backlog: sound over pop-ups);
     // gating constants are defined next to the line tables.
@@ -1582,7 +1746,7 @@ export class GameScene extends Phaser.Scene {
         y: v.collider.y,
         hw: v.collider.hw,
         hh: v.collider.hh,
-        onHit: () => this.onVictimHit(v, false, 'gas'),
+        onHit: (rainbow: boolean, fire: boolean) => this.onVictimHit(v, rainbow, 'gas', fire),
       })),
     );
   }

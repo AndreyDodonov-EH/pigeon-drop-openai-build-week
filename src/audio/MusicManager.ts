@@ -12,7 +12,7 @@ const FADE_MS = 900;
 const KLEZMER_FADE_OUT_MS = 2400;
 // After the combo breaks the party doesn't stop on a dime: klezmer holds for
 // two bars, then takes its long release.
-const KLEZMER_HOLD_MS = 4000;
+const KLEZMER_HOLD_MS = 1000;
 const ECHO_OFFSET_S = 60 / 120 / 2; // eighth note at 120 BPM
 const ECHO_AT_COMBO = 2;
 const KLEZMER_AT_COMBO = 4;
