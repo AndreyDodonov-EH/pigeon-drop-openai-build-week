@@ -15,14 +15,15 @@ export const GROUND_Y = 484;
  * this tile, so they stay seamless whatever W ends up being. */
 const TILE_W = 960;
 
-/** Design height is fixed at 540 — all vertical gameplay is tuned to it. On
- * phones (coarse pointer) the width stretches to the device's aspect ratio so
- * the playfield fills the screen edge-to-edge instead of pillarboxing;
- * desktop keeps the calibrated 960×540. Capped at ~21:9. */
+/** Design height is fixed at 540 — all vertical gameplay is tuned to it. The
+ * width stretches to the viewport's aspect ratio so the playfield fills the
+ * screen edge-to-edge instead of pillarboxing: phones (coarse pointer) use the
+ * device screen (landscape long/short, since play is landscape), desktop uses
+ * the browser window at load. Clamped between 16:9 (960) and ~21:9. */
 export const W = (() => {
-  if (!window.matchMedia('(pointer: coarse)').matches) return 960;
-  const long = Math.max(screen.width, screen.height);
-  const short = Math.min(screen.width, screen.height);
+  const mobile = window.matchMedia('(pointer: coarse)').matches;
+  const long = mobile ? Math.max(screen.width, screen.height) : window.innerWidth;
+  const short = mobile ? Math.min(screen.width, screen.height) : window.innerHeight;
   return Math.round(H * Math.min(Math.max(long / short, 960 / 540), 1280 / 540));
 })();
 
