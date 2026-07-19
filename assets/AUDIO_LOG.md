@@ -298,3 +298,13 @@ not a sharp shout, no karate kiai, no scream`).
   speech-like "yeeeah brooo" pitch contour and soft swell onset; `5c-v0` (1.04 s
   gravelly growl, snappier but less phrase-like) kept as first spare. Runtime volume
   unchanged at 0.23 (shipped mean −9.7 dB ≈ previous −10.2).
+
+## boom — 2026-07-20
+
+Dragon-breath detonation (chilli + pea combo completion) one-shot.
+
+- **boom** (explosion, 1.0 s shipped) — master `boom-v0.mp3`. Prompt: `cartoon
+  videogame explosion sound: a gas cloud igniting in a fiery comedic blast, deep boom
+  with a whoosh of flame, short and snappy`. v0 chosen for the single clean impact
+  with smooth decay; `boom-v1` (secondary rumble bumps in the tail, risks reading as
+  multiple events) kept as spare. Played at 0.7 × SFX_VOLUME in `GameScene.detonate`.

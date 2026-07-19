@@ -102,6 +102,7 @@ const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
 const CHILLI_DURATION = 60 * 8;
+const BOOM_RADIUS = 250; // dragon-breath detonation reach, px around the pickup
 const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
 // A continuous goo stream lands as one shifting puddle, not a machine-gun row
 // of discrete drops. Keep street impacts far enough apart that the short sample
@@ -1092,6 +1093,22 @@ export class GameScene extends Phaser.Scene {
       if (effect === 'gas') this.gasTimer = GAS_DURATION;
       if (effect === 'chilli') this.chilliTimer = CHILLI_DURATION;
     }
+    if (combo.boom) this.detonate(x, y);
+  }
+
+  /** Dragon breath detonates on completion: the airborne cloud ignites and everyone near the blast feels it. */
+  private detonate(x: number, y: number): void {
+    this.guanoFx.igniteGas(x, y);
+    this.cameras.main.shake(280, 0.011);
+    this.sound.play('sfx-boom', {
+      volume: 0.7 * SFX_VOLUME,
+      rate: Phaser.Math.FloatBetween(0.95, 1.05),
+    });
+    for (const v of this.victims) {
+      const dx = v.collider.x - x;
+      const dy = v.collider.y - y;
+      if (dx * dx + dy * dy <= BOOM_RADIUS * BOOM_RADIUS) this.onVictimHit(v, false, 'gas', true);
+    }
   }
 
   private activateGas(): void {
@@ -1494,7 +1511,7 @@ export class GameScene extends Phaser.Scene {
     this.onVictimHit(v, p.rainbow, 'goo');
   }
 
-  private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas'): void {
+  private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas', fire = false): void {
     // even a cooldown-gated touch proves the volley connected
     this.salvoHit = true;
     if (v.hitCooldown > 0) return;
@@ -1525,10 +1542,14 @@ export class GameScene extends Phaser.Scene {
         ? v.kind === 'car'
           ? joyful
             ? 'FRESH BREEZE!'
-            : 'PFFFFT!'
+            : fire
+              ? 'PAINT BUBBLES!'
+              : 'PFFFFT!'
           : joyful
             ? 'DELIGHTFUL!'
-            : 'GASSED!'
+            : fire
+              ? 'SCORCHED!'
+              : 'GASSED!'
         : v.kind === 'car'
           ? 'DING!'
           : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
@@ -1725,7 +1746,7 @@ export class GameScene extends Phaser.Scene {
         y: v.collider.y,
         hw: v.collider.hw,
         hh: v.collider.hh,
-        onHit: (rainbow: boolean) => this.onVictimHit(v, rainbow, 'gas'),
+        onHit: (rainbow: boolean, fire: boolean) => this.onVictimHit(v, rainbow, 'gas', fire),
       })),
     );
   }

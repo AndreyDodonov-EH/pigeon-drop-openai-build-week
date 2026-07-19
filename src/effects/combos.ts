@@ -20,6 +20,8 @@ export interface ComboAnnouncement {
    * with the half that was picked up first.
    */
   refresh: ComboEffect[];
+  /** Detonate: ignite the airborne gas cloud in a fireball at the pickup. */
+  boom?: boolean;
 }
 
 export function comboOnPickup(kind: string, t: ComboTimers): ComboAnnouncement | null {
@@ -27,5 +29,9 @@ export function comboOnPickup(kind: string, t: ComboTimers): ComboAnnouncement |
     return { text: 'RAINBOW GAS!', color: '#7be07b', refresh: ['gas'] };
   if (kind === 'pea' && t.rainbow > 0)
     return { text: 'RAINBOW GAS!', color: '#7be07b', refresh: ['rainbow'] };
-  return null; // pea+chilli "fiery explosion" slots in here next
+  if (kind === 'chilli' && t.gas > 0)
+    return { text: 'DRAGON BREATH!', color: '#ff9c42', refresh: ['gas'], boom: true };
+  if (kind === 'pea' && t.chilli > 0)
+    return { text: 'DRAGON BREATH!', color: '#ff9c42', refresh: ['chilli'], boom: true };
+  return null;
 }

@@ -19,6 +19,7 @@ export interface GasParticle {
   alpha: number;
   tint: number;
   rainbow: boolean;
+  fire: boolean;
   phase: number;
   spin: number;
   hitIds: Set<number>;
@@ -30,7 +31,7 @@ export interface GasTarget {
   y: number;
   hw: number;
   hh: number;
-  onHit: (rainbow: boolean) => void;
+  onHit: (rainbow: boolean, fire: boolean) => void;
 }
 
 const GAS_TINTS = [0x477f35, 0x6ca843, 0x91c957, 0xb7dc78];
@@ -40,6 +41,9 @@ const RAINBOW_GAS_TINTS = [
   0xff8080, 0xffbf80, 0xffff80, 0xbfff80, 0x80ff80, 0x80ffbf,
   0x80ffff, 0x80bfff, 0x8080ff, 0xbf80ff, 0xff80ff, 0xff80bf,
 ];
+
+// same pastel rule as above, walked from ember-yellow down to smoulder-red
+const FIRE_GAS_TINTS = [0xffe08a, 0xffb066, 0xff8a5c, 0xf05e4d];
 
 export class GasSim {
   readonly particles: GasParticle[] = [];
@@ -51,13 +55,15 @@ export class GasSim {
     this.rainbowPhase = 0;
   }
 
-  emit(x: number, y: number, wild: boolean, count = 1, rainbow = false): void {
+  emit(x: number, y: number, wild: boolean, count = 1, rainbow = false, fire = false): void {
     for (let i = 0; i < count; i++) {
       const startRadius = 9 + Math.random() * 5;
       let tint: number;
       if (rainbow) {
         this.rainbowPhase += 0.35;
         tint = RAINBOW_GAS_TINTS[Math.floor(this.rainbowPhase) % RAINBOW_GAS_TINTS.length];
+      } else if (fire) {
+        tint = FIRE_GAS_TINTS[(Math.random() * FIRE_GAS_TINTS.length) | 0];
       } else {
         tint = GAS_TINTS[(Math.random() * GAS_TINTS.length) | 0];
       }
@@ -75,10 +81,30 @@ export class GasSim {
         alpha: 0,
         tint,
         rainbow,
+        fire,
         phase: Math.random() * Math.PI * 2,
         spin: (Math.random() - 0.5) * 0.018,
         hitIds: new Set<number>(),
       });
+    }
+  }
+
+  /**
+   * Detonation: every airborne parcel catches fire and is shoved radially
+   * away from the blast point, hardest near the centre. Rainbow parcels burn
+   * too — an explosion outranks whimsy.
+   */
+  ignite(x: number, y: number): void {
+    for (const p of this.particles) {
+      p.fire = true;
+      p.rainbow = false;
+      p.tint = FIRE_GAS_TINTS[(Math.random() * FIRE_GAS_TINTS.length) | 0];
+      const dx = p.x - x;
+      const dy = p.y - y;
+      const d = Math.hypot(dx, dy) || 1;
+      const kick = 150 / (d + 20);
+      p.vx += (dx / d) * kick;
+      p.vy += (dy / d) * kick;
     }
   }
 
@@ -93,7 +119,8 @@ export class GasSim {
       // own heat/buoyancy increasingly wins vertically as the initial jet dies.
       const drag = Math.pow(0.985, f);
       p.vx = (p.vx + (-this.worldVx * 1.2 - p.vx) * 0.018 * f) * drag;
-      p.vy = p.vy * drag - (0.038 + lifeT * 0.045) * f;
+      // hot parcels are extra buoyant, so dragon breath climbs visibly faster
+      p.vy = p.vy * drag - (0.038 + lifeT * 0.045) * (p.fire ? 1.4 : 1) * f;
       p.phase += (0.055 + lifeT * 0.035) * f;
       const turbulence = 0.055 + lifeT * 0.09;
       p.x += (p.vx + Math.sin(p.phase * 1.7) * turbulence) * f;
@@ -113,7 +140,7 @@ export class GasSim {
         const hitRadius = p.radius * 0.72;
         if (dx * dx + dy * dy > hitRadius * hitRadius) continue;
         p.hitIds.add(target.id);
-        target.onHit(p.rainbow);
+        target.onHit(p.rainbow, p.fire);
       }
 
       if (p.x < -p.radius || p.x > this.boundsW + p.radius || p.y < -p.radius) continue;
