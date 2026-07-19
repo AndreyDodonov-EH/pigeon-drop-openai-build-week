@@ -18,6 +18,7 @@ precision mediump float;
 #endif
 
 uniform sampler2D uMainSampler[%count%];
+uniform vec3 uAmbient;
 
 varying vec2 outTexCoord;
 varying float outTexId;
@@ -189,6 +190,9 @@ void main() {
   accentRecolored = mix(accentRecolored, accentTarget, blondeLift);
   color = mix(color, accentRecolored, accentMaterial * 0.82);
 
+  // Time-of-day ambient light (softer than the scenery's so victims stay readable).
+  color *= uAmbient;
+
   // Phaser's sprite renderer uses premultiplied alpha.
   gl_FragColor = vec4(color * outTint.a, texture.a * outTint.a);
 }
@@ -203,8 +207,23 @@ void main() {
  * single draw batch without extra texture memory or reaction-frame variants.
  */
 export class VictimPalettePipeline extends Phaser.Renderer.WebGL.Pipelines.MultiPipeline {
+  private ambientR = 1;
+  private ambientG = 1;
+  private ambientB = 1;
+
   constructor(game: Phaser.Game) {
     super({ game, fragShader: FRAG });
+  }
+
+  /** DayNight pushes the current actor-ambient light color here once per frame. */
+  setAmbient(r: number, g: number, b: number): void {
+    this.ambientR = r;
+    this.ambientG = g;
+    this.ambientB = b;
+  }
+
+  onPreRender(): void {
+    this.set3f('uAmbient', this.ambientR, this.ambientG, this.ambientB);
   }
 }
 

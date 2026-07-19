@@ -3,6 +3,19 @@
 Reuse these exact prompts (with the listed reference attachments) when regenerating or
 extending a set — consistency depends on it.
 
+## assets/masters/bg-building-2-lit.png → public/assets/sprites/bg-building-2-lit.png — 2026-07-19
+
+- **Source inspected:** `public/assets/sprites/bg-building-2.png` (281×359 palettized PNG; converted to RGBA before processing)
+- **Method:** procedural Pillow overlay (no image generation)
+- **Output:** exact 281×359 RGBA additive-light pass; master is uncompressed, shipping copy was colour-reduced with `pngquant --force --skip-if-larger` and restored to RGBA for the runtime contract.
+- **Post-processing:** palette/chroma-keyed, tightly bounded blue-grey upper-pane and warm/olive storefront masks; four individually varied dim upper glows; `#ffdca0` core; 2 px tight and 7 px wide orange bloom; three radial pendant-lamp glows; alpha constrained to the facade silhouette plus a ≤3 px spill.
+- **QA:** `assets/masters/bg-building-2-lit-qa.png`, composited over `#2a2f45` after multiplying the base RGB channels by `(0.45, 0.50, 0.75)`, then ADD compositing the overlay.
+- **Builder:** `tools/build_bg_building_2_lit.py`
+- **Revision (2026-07-19):** reduced storefront core alpha from 180 to 102 (57% of prior / 43% reduction), changed its core from pale cream `#ffdca0` to saturated amber `#ffc878`, retained the orange `#ff9a45` bloom and the three lamp blobs, and eroded the storefront glass mask by one pixel to reveal interior mullions. Raised upper pane levels to 76--82 (75--80% of the new storefront reference) so the arched windows read as warm lit glass.
+- **Revision 2 (2026-07-19):** replaced upper-window chroma keying with four manually frame-traced, one-pixel-inset arched pane masks seeded from a dark-value (`max(R,G,B) < 145`) selection and morphologically closed/filled. Pane coverage is 774 / 1193 / 974 / 856 pixels. Added the previously omitted narrow right pane of the left storefront so the third pendant at `(133,276)` is on glass; pendant centers are now `(71,276)`, `(98,277)`, `(133,276)`. Added direct coverage QA: `assets/masters/bg-building-2-lit-solo-qa.png`.
+- **Revision 3 (2026-07-19):** replaced threshold-fragmented storefront masks with three full, one-pixel-inset pane masks: left display 5460 px, door 1254 px, right window 1824 px. Dark source-detail pixels (`max(R,G,B) < 72`) now reduce the 102-alpha storefront core only to 60%, via a 2 px Gaussian-blurred modulation; this retains soft shelf/pastry silhouettes without zero-alpha holes or ragged notches. Upper panes and all three pendant blobs are unchanged.
+- **Revision 4 (2026-07-19):** replaced the four axis-aligned upper-arch masks with hand-traced, one-pixel-inset `ImageDraw.polygon` fills: `[(74,151),(74,112),(77,107),(82,104),(87,105),(92,109),(92,113),(92,151)]` (861 px), `[(124,148),(124,108),(127,103),(133,99),(139,98),(145,103),(145,108),(145,148)]` (1052 px), `[(185,149),(186,106),(187,102),(191,100),(197,101),(200,106),(201,110),(200,150)]` (765 px), and `[(229,153),(230,115),(231,111),(234,109),(238,110),(241,114),(241,117),(240,153)]` (515 px). The two right polygons follow the side-face lean. Upper bloom is now clipped to a faint two-pixel expansion; the established storefront masks, levels, lamps, and 2 px / 7 px bloom output are unchanged. Added outline validation at `assets/masters/bg-building-2-lit-upper-trace-qa.png`; regenerated the master, pngquant RGBA shipping copy, night composite, and solo-on-slate QA.
+
 ## assets/masters/pigeon-flight-sheet.png → public/assets/sprites/pigeon-f{0,1,2}.png — 2026-07-13
 
 - **References attached:** `images/normal.png`, `images/pleased.png`

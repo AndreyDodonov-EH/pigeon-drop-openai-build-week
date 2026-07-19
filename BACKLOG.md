@@ -42,7 +42,6 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
   nervous/twitchy, cars start maneuvering/swerving, and at the top end even the sun/moon
   looks at you in awe/fear. Needs more sprites/animation states; rank tier is already
   available via `rankForCombo` in `src/ui/ranks.ts`.
-- slight particles or sprite-specific-shaders: for lantern definitely, may be for caffee (especially if added day/night phases)
 - Natural habitat points - e.g. extra building "gym" plus then a lot of bodybuilders near it
 - stationary victims, e.g. people sitting in from of the caffe (caffe building exists already)
 - Higher platforms / screen layers — e.g. flying at balcony level, vertical screen
@@ -50,8 +49,10 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 - Occasional events, e.g. a Politiker motorcade (or different levels/themes entirely).
 - Window washer (mid-air platform/victim on a suspended cradle).
 - Drones (airborne hazard or target at flight altitude).
-- Sunrise/day/sunset/night change - also effects characters (e.g. adding stationary hooker near a lamp at midnight, robberer etc.),
-and some pick-up are effected (e.g. no rainbow at night). Also shaders of course should be affected, as well as background naturally.
+- Night-specific characters for the day/night cycle (the cycle itself shipped 2026-07-19,
+  see CHANGELOG): e.g. stationary hooker near a lamp at midnight, robber, etc. New spawns
+  can key off `DayNight` (`src/world/DayNight.ts` — `isNight` / `nightness`), same as the
+  no-rainbow-at-night pickup rule already does. Car headlights at night would also sell it.
 
 **Webpage**
 - Add icon (favicon)

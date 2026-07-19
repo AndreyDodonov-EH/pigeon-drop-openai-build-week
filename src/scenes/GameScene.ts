@@ -5,6 +5,7 @@ import { GuanoEffects, preloadGuanoEffects } from '../effects/GuanoEffects';
 import {
   ensureVictimPalettePipeline,
   victimPaletteTint,
+  VictimPalettePipeline,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
 import { buildTextures, W, H, GROUND_Y, SIDEWALK_H } from '../world/textures';
@@ -13,7 +14,13 @@ import {
   BUILDING_SPRITES,
   CONNECTOR_SPRITES,
 } from '../world/NearBuildings';
-import { ensureBuildingPalettePipeline } from '../world/BuildingPalettePipeline';
+import {
+  ensureBuildingPalettePipeline,
+  BuildingPalettePipeline,
+  BUILDING_PALETTE_PIPELINE,
+} from '../world/BuildingPalettePipeline';
+import { DayNight, type DayLook } from '../world/DayNight';
+import { LampFx } from '../world/LampFx';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, isTouchDevice } from '../input/TouchControls';
@@ -219,13 +226,18 @@ export class GameScene extends Phaser.Scene {
   private flapPhase = 0;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
+  /** lit-windows overlay over bgFar, faded in after dark */
+  private bgFarLit!: Phaser.GameObjects.TileSprite;
   private bgNear!: NearBuildingsLayer;
   private sidewalkTs!: Phaser.GameObjects.TileSprite;
   private streetTs!: Phaser.GameObjects.TileSprite;
   private clouds: Phaser.GameObjects.Image[] = [];
   /** decorative sidewalk furniture (lamps/trees/mailboxes), ground-scrolled */
-  private props: Phaser.GameObjects.Image[] = [];
+  private props: { img: Phaser.GameObjects.Image; fx?: LampFx }[] = [];
   private propTimer = 1200;
+  private dayNight!: DayNight;
+  private buildingPipeline!: BuildingPalettePipeline;
+  private victimPipeline!: VictimPalettePipeline;
 
   private victims: Victim[] = [];
   private hydrants: Hydrant[] = [];
@@ -372,6 +384,8 @@ export class GameScene extends Phaser.Scene {
     for (const key of [...BUILDING_SPRITES, ...CONNECTOR_SPRITES]) {
       this.load.image(key, `assets/sprites/${key}.png`);
     }
+    // emissive café windows, ADD-blended over the facade after dark
+    this.load.image('bg-building-2-lit', 'assets/sprites/bg-building-2-lit.png');
     for (let i = 0; i < 3; i++) {
       this.load.image(`bg-cloud-${i}`, `assets/sprites/bg-cloud-${i}.png`);
     }
@@ -398,18 +412,32 @@ export class GameScene extends Phaser.Scene {
     ensureVictimPalettePipeline(this);
     ensureBuildingPalettePipeline(this);
 
-    this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(W, H).setDepth(0);
+    // sky pair (base + crossfade overlay) is owned by the day/night cycle
+    this.dayNight = new DayNight(this);
+    this.buildingPipeline = (
+      this.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer
+    ).pipelines.get(BUILDING_PALETTE_PIPELINE) as BuildingPalettePipeline;
+    this.victimPipeline = (
+      this.game.renderer as Phaser.Renderer.WebGL.WebGLRenderer
+    ).pipelines.get(VICTIM_PALETTE_PIPELINE) as VictimPalettePipeline;
     // clouds live between the sky and the far skyline, each with its own drift
     for (let i = 0; i < 5; i++) {
+      const alpha = 0.7 + Math.random() * 0.2;
       const cloud = this.add
         .image(Math.random() * W, 36 + Math.random() * 150, `bg-cloud-${i % 3}`)
         .setDepth(0.5)
-        .setAlpha(0.7 + Math.random() * 0.2)
+        .setAlpha(alpha)
         .setScale(0.45 + Math.random() * 0.6);
       cloud.setData('drift', 0.1 + Math.random() * 0.12);
+      cloud.setData('baseAlpha', alpha);
       this.clouds.push(cloud);
     }
     this.bgFar = this.add.tileSprite(0, 0, W, H, 'bg-far').setOrigin(0, 0).setDepth(1);
+    this.bgFarLit = this.add
+      .tileSprite(0, 0, W, H, 'bg-far-lit')
+      .setOrigin(0, 0)
+      .setDepth(1.01)
+      .setAlpha(0);
     // pavement behind the facades, scrolling with them so stoops stay planted
     this.sidewalkTs = this.add
       .tileSprite(0, GROUND_Y - 6 - SIDEWALK_H, W, SIDEWALK_H, 'sidewalk')
@@ -472,6 +500,12 @@ export class GameScene extends Phaser.Scene {
       },
       musicFrantic: () => this.music.franticNow,
       comboRank: () => this.rankTier,
+      setTimeOfDay: (look: DayLook) => this.dayNight.jump(look),
+      nextTimeOfDay: () => this.dayNight.jumpNext(),
+      timeOfDay: () => this.dayNight.info(),
+      spawnProp: (key: 'bg-lamp' | 'bg-tree' | 'bg-mailbox' = 'bg-lamp', x?: number) =>
+        this.spawnProp(key, x),
+      spawnBuilding: (key = 'bg-building-2') => this.bgNear.queueNext(key),
       touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
   }
@@ -694,6 +728,8 @@ export class GameScene extends Phaser.Scene {
     addButton('COFF', 2, 2, () => spawnHere('coffee'));
     addButton('POD', 0, 3, () => spawnHere('pea'));
     addButton('GAS', 1, 3, () => this.activateGas());
+    addButton('TIME', 2, 3, () => this.dayNight.jumpNext());
+    addButton('CAFE', 0, 4, () => this.bgNear.queueNext('bg-building-2'));
   }
 
   update(_time: number, deltaMs: number): void {
@@ -707,11 +743,47 @@ export class GameScene extends Phaser.Scene {
     this.updateVictims(f, deltaMs);
     this.updateHydrants(f, deltaMs);
     this.updateGuano(f);
+    // after all spawns, so nothing shows one untinted frame
+    this.applyDayNight(f);
     this.updateHud(f);
+  }
+
+  /** advance the time-of-day cycle and push its light into everything it touches */
+  private applyDayNight(f: number): void {
+    const dn = this.dayNight;
+    dn.update(f);
+    const worldTint = dn.ambientTint();
+    const actorTint = dn.actorTint();
+
+    this.bgFar.setTint(worldTint);
+    this.bgFarLit.setAlpha(dn.farWindowAlpha);
+    this.sidewalkTs.setTint(worldTint);
+    this.streetTs.setTint(worldTint);
+    for (const c of this.clouds) {
+      c.setTint(worldTint).setAlpha((c.getData('baseAlpha') as number) * dn.cloudAlpha);
+    }
+    for (const p of this.props) {
+      p.img.setTint(worldTint);
+      p.fx?.update(f, dn.glow);
+    }
+    for (const h of this.hydrants) {
+      h.sprite.setTint(worldTint);
+      h.jetCol.setTint(worldTint);
+      h.crown.setTint(worldTint);
+    }
+    for (const pk of this.pickups) pk.sprite.setTint(actorTint);
+    this.pigeonImg.setTint(actorTint);
+    this.bgNear.setGlow(dn.glow);
+
+    const [ar, ag, ab] = dn.ambientVec();
+    this.buildingPipeline.setAmbient(ar, ag, ab);
+    const [vr, vg, vb] = dn.actorVec();
+    this.victimPipeline.setAmbient(vr, vg, vb);
   }
 
   private scrollWorld(f: number): void {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
+    this.bgFarLit.tilePositionX = this.bgFar.tilePositionX;
     this.bgNear.update(SCROLL * 0.55 * f);
     this.sidewalkTs.tilePositionX += SCROLL * 0.55 * f;
     this.streetTs.tilePositionX += SCROLL * f;
@@ -820,10 +892,15 @@ export class GameScene extends Phaser.Scene {
   private updatePickups(f: number, deltaMs: number): void {
     this.rainbowPickupTimer -= deltaMs;
     if (this.rainbowPickupTimer <= 0) {
-      this.spawnPickup('rainbow');
-      this.rainbowPickupTimer =
-        RAINBOW_PICKUP_MIN_MS +
-        Math.random() * (RAINBOW_PICKUP_MAX_MS - RAINBOW_PICKUP_MIN_MS);
+      if (this.dayNight.isNight) {
+        // no rainbows after dark (backlog rule) — keep rechecking until sunrise
+        this.rainbowPickupTimer = 3000 + Math.random() * 3000;
+      } else {
+        this.spawnPickup('rainbow');
+        this.rainbowPickupTimer =
+          RAINBOW_PICKUP_MIN_MS +
+          Math.random() * (RAINBOW_PICKUP_MAX_MS - RAINBOW_PICKUP_MIN_MS);
+      }
     }
 
     this.itemPickupTimer -= deltaMs;
