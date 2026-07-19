@@ -11,11 +11,13 @@ textual report as proof that the image, alpha, dimensions, or saved files are co
 
 ## Inspiration lane (agy MCP)
 
-`mcp__agy__generate_image` (server: `scripts/agy-mcp.mjs`, via cliproxyapi) produces
-*inspiration/reference* images only, saved to `images/inspiration/` with a `LOG.md`
-provenance line. Never ship these in the game. When one is liked, regenerate the shipping
-asset through this skill's normal workflow (identity invariants, magenta `#ff00ff` chroma
-key, masters + `assets/ART_LOG.md`). `mcp__agy__ask` is available for creative
+The `agy` MCP server (`scripts/agy-mcp.mjs`, via cliproxyapi) offers `generate_image` for
+*inspiration/reference* images, saved to `images/inspiration/` with a `LOG.md` provenance
+line. Its output is creatively strong but stylistically inconsistent and never asset-fit —
+use it to explore composition, gags, and poses, then generate the shipping asset through
+this skill's normal workflow (identity invariants, magenta `#ff00ff` chroma key, masters +
+`assets/ART_LOG.md`), optionally passing the liked inspiration image as a composition
+reference. Never ship an inspiration image in the game. `ask` is available for creative
 math/geometry brainstorming (curves, easing, procedural shapes).
 
 ## Character and style bible
