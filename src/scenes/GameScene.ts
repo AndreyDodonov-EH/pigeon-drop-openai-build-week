@@ -73,6 +73,9 @@ const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 // Ran-dry lockout releases once this much pressure rebuilds. Kept very short
 // (~1.3s) — just enough to stop dribble-firing off a refilling tank.
 const EMPTY_LOCK_RELEASE = 3;
+// A dump shorter than this (~0.75s) doesn't earn the pleased face — quick taps
+// shouldn't flash relief
+const PLEASED_MIN_DUMP_FRAMES = 45;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
@@ -261,6 +264,10 @@ export class GameScene extends Phaser.Scene {
   private bellyRumbleCooldown = 0;
   /** poop held but the tank is empty/locked — drives the hungry portrait */
   private squeezingEmpty = false;
+  /** how long the current/last voluntary dump has been held, in frames */
+  private poopHeldFrames = 0;
+  /** hungry was shown this cycle — suppress pleased until pressure rebuilds */
+  private pleasedBlocked = false;
   private wobbleT = 0;
 
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
@@ -1371,7 +1378,10 @@ export class GameScene extends Phaser.Scene {
     const digestionRate =
       PASSIVE_DIGESTION_PER_FRAME * (this.coffeeTimer > 0 ? COFFEE_FILL_MULTIPLIER : 1);
     this.meter = Math.min(100, this.meter + digestionRate * f);
-    if (this.meter >= EMPTY_LOCK_RELEASE) this.emptyLock = false;
+    if (this.meter >= EMPTY_LOCK_RELEASE) {
+      this.emptyLock = false;
+      this.pleasedBlocked = false;
+    }
 
     // full = involuntary blowout: one huge uncontrolled blast until empty
     if (this.meter >= 100 && this.dumpKind === 'none') {
@@ -1383,11 +1393,22 @@ export class GameScene extends Phaser.Scene {
     const wantsPoop = this.keys.poop.isDown || this.pointerPoop || this.touch.poop;
     const wasPooping = this.pooping;
     this.pooping = this.dumpKind === 'none' && !this.emptyLock && wantsPoop && this.meter > 0;
-    if (wasPooping && !this.pooping) this.relievedTimer = 60;
+    if (!wasPooping && this.pooping) this.poopHeldFrames = 0;
+    if (this.pooping) this.poopHeldFrames += f;
+    // only a properly long dump earns the pleased face — quick taps stay neutral
+    if (wasPooping && !this.pooping && this.poopHeldFrames >= PLEASED_MIN_DUMP_FRAMES) {
+      this.relievedTimer = 60;
+    }
 
     // squeezing an empty tank: telegraph WHY nothing comes out — an empty-belly
     // rumble and a hungry face instead of silently eating the input
     this.squeezingEmpty = wantsPoop && !this.pooping && this.dumpKind === 'none';
+    // hungry → pleased reads as an abrupt mood swing; once hungry shows, hold
+    // off pleased until the lock releases
+    if (this.squeezingEmpty) {
+      this.pleasedBlocked = true;
+      this.relievedTimer = 0;
+    }
     this.bellyRumbleCooldown = Math.max(0, this.bellyRumbleCooldown - f);
     if (this.squeezingEmpty && this.bellyRumbleCooldown <= 0) {
       this.bellyRumbleCooldown = 130; // sound runs ~1.7s — don't let it overlap itself
@@ -1484,7 +1505,7 @@ export class GameScene extends Phaser.Scene {
     if (this.dumpKind === 'blowout' || this.meter >= 92) return 'panic';
     if (this.pooping || this.dumpKind === 'scare' || this.meter > 85) return 'strain';
     if (this.squeezingEmpty) return 'hungry';
-    if (this.relievedTimer > 0 || this.emptyLock) return 'pleased';
+    if ((this.relievedTimer > 0 || this.emptyLock) && !this.pleasedBlocked) return 'pleased';
     return 'ready';
   }
 

@@ -10,7 +10,6 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 ## Idea dump (user, 2026-07-17)
 
 **Targets & scoring**
-- Go to pleased portrait only after a longer dump - also dont go to pleased if we went to hungry
 - Stationary Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
 - Higher-altitude targets: rooftop party.
