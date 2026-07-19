@@ -90,6 +90,11 @@ this slot in alongside the normal flight frames.
 - Sunrise/day/sunset/night change - also effects characters (e.g. adding stationary hooker near a lamp at midnight, robberer etc.),
 and some pick-up are effected (e.g. no rainbow at night). Also shaders of course should be affected, as well as background naturally.
 
+**Webpage**
+- Add icon (favicon)
+- Suggest to make webpage installable (pwa) so that it can then work online (and add bigger icon for it, so that it then looks nice on the phone)
+- Loading screen? Progress bar + splash Art - probably use gemini for inspiration too, but it should match our style more, not so pencil/comic art it does by default
+
 
 ## Other candidates
 
