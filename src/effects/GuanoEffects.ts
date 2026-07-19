@@ -129,6 +129,7 @@ export class GuanoEffects {
 
   resetRainbowHue(): void {
     this.rainbowHue = 0;
+    this.gasSim.resetRainbowPhase();
   }
 
   /** A fresh gas pickup re-arms the opening heave even during a held stream. */
@@ -148,7 +149,8 @@ export class GuanoEffects {
       this.gasEmitCarry += count * 0.32;
       const gasCount = Math.floor(this.gasEmitCarry);
       this.gasEmitCarry -= gasCount;
-      if (gasCount > 0) this.gasSim.emit(stream.x, stream.y, stream.wild, gasCount);
+      if (gasCount > 0)
+        this.gasSim.emit(stream.x, stream.y, stream.wild, gasCount, stream.rainbow);
       return;
     }
 

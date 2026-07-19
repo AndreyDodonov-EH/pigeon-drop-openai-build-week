@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Collider, Particle } from '../goo/GooSim';
 import { getAlphaMask } from '../goo/alphaMask';
 import { GuanoEffects, preloadGuanoEffects } from '../effects/GuanoEffects';
+import { comboOnPickup } from '../effects/combos';
 import {
   ensureVictimPalettePipeline,
   victimPaletteTint,
@@ -515,6 +516,7 @@ export class GameScene extends Phaser.Scene {
       setPaused: (v: boolean) => this.setPaused(v),
       isPaused: () => this.gamePaused,
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
+      setGas: (v: boolean) => (this.gasTimer = v ? GAS_DURATION : 0),
       particleCount: () => this.guanoFx.particleCount,
       gasParticleCount: () => this.guanoFx.gasParticleCount,
       spawnHydrant: () => this.spawnHydrant(),
@@ -1032,6 +1034,7 @@ export class GameScene extends Phaser.Scene {
       this.rainbowTimer = RAINBOW_DURATION;
       this.guanoFx.resetRainbowHue();
       this.pickupBurst(x, y, RAINBOW_COLORS);
+      this.announceCombo(kind, x, y);
       return;
     }
 
@@ -1046,6 +1049,16 @@ export class GameScene extends Phaser.Scene {
     }
     if (kind === 'pea') this.activateGas();
     this.pickupBurst(x, y, effect.burstColors);
+    this.announceCombo(kind, x, y);
+  }
+
+  private announceCombo(kind: PickupKind, x: number, y: number): void {
+    const combo = comboOnPickup(kind, {
+      rainbow: this.rainbowTimer,
+      gas: this.gasTimer,
+      chilli: this.chilliTimer,
+    });
+    if (combo) this.popup(x, y - 30, combo.text, combo.color, 20);
   }
 
   private activateGas(): void {
@@ -1473,12 +1486,16 @@ export class GameScene extends Phaser.Scene {
     const pts = base * Math.min(this.combo, 8);
     this.score += pts;
 
-    // Rainbow goo flips the mood. Gas stays disgusting but gets its own hit verb.
+    // Rainbow flips the mood for goo and gas alike; each source keeps its own verbs.
     const label =
       source === 'gas'
         ? v.kind === 'car'
-          ? 'PFFFFT!'
-          : 'GASSED!'
+          ? joyful
+            ? 'FRESH BREEZE!'
+            : 'PFFFFT!'
+          : joyful
+            ? 'DELIGHTFUL!'
+            : 'GASSED!'
         : v.kind === 'car'
           ? 'DING!'
           : ['SPLAT!', 'GOTCHA!', 'BULLSEYE!'][(Math.random() * 3) | 0];
@@ -1675,7 +1692,7 @@ export class GameScene extends Phaser.Scene {
         y: v.collider.y,
         hw: v.collider.hw,
         hh: v.collider.hh,
-        onHit: () => this.onVictimHit(v, false, 'gas'),
+        onHit: (rainbow: boolean) => this.onVictimHit(v, rainbow, 'gas'),
       })),
     );
   }
