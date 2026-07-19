@@ -88,8 +88,8 @@ const RAINBOW_PICKUP_FIRST_MS = 2500;
 const RAINBOW_PICKUP_MIN_MS = 12000;
 const RAINBOW_PICKUP_MAX_MS = 20000;
 const ITEM_PICKUP_FIRST_MS = 4200;
-const ITEM_PICKUP_MIN_MS = 5000;
-const ITEM_PICKUP_MAX_MS = 9000;
+const ITEM_PICKUP_MIN_MS = 3500;
+const ITEM_PICKUP_MAX_MS = 6000;
 const PEA_LOOK_FRAME_FRAMES = 18;
 const PASSIVE_DIGESTION_PER_FRAME = 0.035;
 // Ran-dry lockout releases once this much pressure rebuilds. Kept very short
@@ -114,6 +114,23 @@ const PICKUP_GRAB_Y = 30;
 const ITEM_PICKUP_KINDS = ['bread', 'fries', 'kebab', 'chilli', 'coffee', 'pea'] as const;
 type ItemPickupKind = (typeof ITEM_PICKUP_KINDS)[number];
 type PickupKind = 'rainbow' | ItemPickupKind;
+
+// Picking things up is the engaging part, and food only nudges the meter, so it
+// can spawn generously. Foods weigh double; combined with the shorter spawn
+// interval above, food shows up ~2x as often while effect items (chilli,
+// coffee, pea) keep roughly their old cadence.
+const ITEM_PICKUP_WEIGHTS: Record<ItemPickupKind, number> = {
+  bread: 2,
+  fries: 2,
+  kebab: 2,
+  chilli: 1,
+  coffee: 1,
+  pea: 1,
+};
+const ITEM_PICKUP_TOTAL_WEIGHT = ITEM_PICKUP_KINDS.reduce(
+  (sum, kind) => sum + ITEM_PICKUP_WEIGHTS[kind],
+  0,
+);
 
 interface ItemPickupEffect {
   pressureGain?: number;
@@ -976,6 +993,15 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private pickItemKind(): ItemPickupKind {
+    let r = Math.random() * ITEM_PICKUP_TOTAL_WEIGHT;
+    for (const kind of ITEM_PICKUP_KINDS) {
+      r -= ITEM_PICKUP_WEIGHTS[kind];
+      if (r < 0) return kind;
+    }
+    return ITEM_PICKUP_KINDS[0];
+  }
+
   private updatePickups(f: number, deltaMs: number): void {
     this.rainbowPickupTimer -= deltaMs;
     if (this.rainbowPickupTimer <= 0) {
@@ -992,8 +1018,7 @@ export class GameScene extends Phaser.Scene {
 
     this.itemPickupTimer -= deltaMs;
     if (this.itemPickupTimer <= 0) {
-      const kind = ITEM_PICKUP_KINDS[(Math.random() * ITEM_PICKUP_KINDS.length) | 0];
-      this.spawnPickup(kind);
+      this.spawnPickup(this.pickItemKind());
       this.itemPickupTimer =
         ITEM_PICKUP_MIN_MS + Math.random() * (ITEM_PICKUP_MAX_MS - ITEM_PICKUP_MIN_MS);
     }
@@ -1058,7 +1083,15 @@ export class GameScene extends Phaser.Scene {
       gas: this.gasTimer,
       chilli: this.chilliTimer,
     });
-    if (combo) this.popup(x, y - 30, combo.text, combo.color, 20);
+    if (!combo) return;
+    this.popup(x, y - 30, combo.text, combo.color, 20);
+    // Bare timer resets on purpose: no resetRainbowHue/rearmGasHeave, so the
+    // already-running effect extends seamlessly instead of visibly restarting.
+    for (const effect of combo.refresh) {
+      if (effect === 'rainbow') this.rainbowTimer = RAINBOW_DURATION;
+      if (effect === 'gas') this.gasTimer = GAS_DURATION;
+      if (effect === 'chilli') this.chilliTimer = CHILLI_DURATION;
+    }
   }
 
   private activateGas(): void {
