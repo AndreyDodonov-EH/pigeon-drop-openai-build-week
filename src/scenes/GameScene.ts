@@ -1477,6 +1477,15 @@ export class GameScene extends Phaser.Scene {
       );
       effectY += 13;
     }
+    if (this.chilliTimer > 0) {
+      this.drawEffectMeter(
+        this.effectMeters,
+        effectY,
+        this.chilliTimer / CHILLI_DURATION,
+        ITEM_PICKUP_EFFECTS.chilli.burstColors,
+      );
+      effectY += 13;
+    }
     if (this.gasTimer > 0) {
       this.drawEffectMeter(this.effectMeters, effectY, this.gasTimer / GAS_DURATION, GAS_COLORS);
     }
