@@ -118,6 +118,11 @@ export class GuanoEffects {
     return this.gooSim.particles.length;
   }
 
+  /** goo still in flight — a hit may yet land */
+  get airborneGooCount(): number {
+    return this.gooSim.airborneCount;
+  }
+
   get gasParticleCount(): number {
     return this.gasSim.particles.length;
   }

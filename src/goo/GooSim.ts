@@ -124,6 +124,13 @@ export class GooSim {
   /** aperiodic 0–1 random walk driving shade wander along the emitted stream */
   private shadeK = Math.random();
 
+  /** particles still falling toward a target — neither stuck nor grounded */
+  get airborneCount(): number {
+    let n = 0;
+    for (const p of this.particles) if (p.state === PState.Free && !p.groundHit) n++;
+    return n;
+  }
+
   constructor(params: Partial<GooParams> = {}) {
     this.params = { ...DEFAULT_PARAMS, ...params };
   }

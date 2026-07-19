@@ -209,3 +209,45 @@ reaction lines. Pedestrian spawning now samples all six characters. The shared v
 palette control expanded from three to six source IDs, with isolated primary-garment masks
 for the influencer's velour tracksuit, tourist's vacation shirt, and gym bro's tank/shorts;
 existing pedestrians and the three car paint mappings remain in the same batched shader.
+
+## Combo ranks — visual phase system (shipped 2026-07-19)
+
+The visual half of the phase system the layered music started. The combo counter is
+uncapped (score multiplier still plateaus at x8 behind the scenes); rank tiers derive
+from the count in `src/ui/ranks.ts` with thresholds deliberately mirroring the music
+layers — SPLAT! at x2 (echo pizzicato enters), DIRTY! at x4 (klezmer enters),
+CRAPTACULAR! at x8 (klezmer max), SHITSTORM!! at x13 (prestige tier beyond the music) —
+so every rank-up lands on an audible change. Conveyed almost entirely visually: the HUD
+counter (now just `x12`, the word COMBO dropped) grows and recolors per tier
+(amber → orange → red → hue-cycling rainbow) with a scale-punch on rank-up; the rank
+name flashes once as a centered one-shot word and disappears; SHITSTORM enters with a
+camera shake. Rank loss (2 s decay or hydrant scare-poop) takes the same diff path in
+`updateHud`: the counter just reverts — the existing scare shake/damage portrait carry
+the drama. Pure spectacle: no difficulty coupling. Debug: `SP.comboRank()` alongside
+the existing `SP.setCombo`.
+
+**Combo no longer dies mid-flight (2026-07-19):** the 2 s combo window measured time
+between *hits*, but goo takes ~0.9 s to fall from cruise to road level — so leading a
+car (the lowest target) routinely spent the whole window airborne and the landing read
+as "hitting a car reset my combo" (a long-standing perception, not a rank-system bug;
+verified: nothing car-specific ever zeroed the combo). Fix: the countdown freezes while
+the stream is firing or any goo is still airborne (`GooSim.airborneCount`: free and not
+yet grounded; exposed as `GuanoEffects.airborneGooCount`). Missed goo grounds within a
+second, so decay resumes almost immediately — a dribble can stall the clock but costs
+pressure, never builds rank.
+
+**Complete miss breaks the chain (2026-07-19):** the airborne-freeze made whiffing free —
+a missed volley just stalled the clock. Now goo volleys are judged as salvos: emission
+arms one (`salvoActive`/`salvoHit` in GameScene), any victim contact — even during a
+per-victim hit cooldown — marks it connected, and when the last particle resolves (stuck
+or grounded, `airborneGooCount === 0` with emission stopped) a virgin salvo zeroes the
+combo with a small grey "MISS…" popup (shown only when combo ≥ 2). Gas clouds drift too
+loosely to judge and never arm a salvo. Side effect by design: an involuntary blowout
+that hits nobody also wipes the chain — wasted pressure now has a score consequence.
+
+**Mood vignette dropped (2026-07-19):** the initial release also tinted the screen edges
+warmer per tier (radial-gradient overlay, pulsing at SHITSTORM). Cut same day: a reddish
+filter over the scene read as a filter, not as the street heating up. The right way to
+convey escalation is world *behavior*, not a screen effect — see the combo-rank world
+reactions idea in `BACKLOG.md`. Text (counter + one-shot rank word) and the music layers
+carry the phase for now.

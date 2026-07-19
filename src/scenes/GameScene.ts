@@ -18,6 +18,7 @@ import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, isTouchDevice } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
+import { rankForCombo, type ComboRank } from '../ui/ranks';
 import { t } from '../i18n';
 
 const SCROLL = 2.1; // world scroll, px/frame
@@ -209,6 +210,12 @@ export class GameScene extends Phaser.Scene {
   private comboTimer = 0;
   private scoreText!: Phaser.GameObjects.Text;
   private comboText!: Phaser.GameObjects.Text;
+  private rankTier = 0;
+  private rankHue = 0;
+  /** a goo volley is in the world (firing or still falling), awaiting judgment */
+  private salvoActive = false;
+  /** something in the current volley touched a victim */
+  private salvoHit = false;
   private effectMeters!: Phaser.GameObjects.Graphics;
   private meterArcTex!: Phaser.Textures.CanvasTexture;
   private meterArcKey = '';
@@ -389,8 +396,62 @@ export class GameScene extends Phaser.Scene {
         this.comboTimer = 120;
       },
       musicFrantic: () => this.music.franticNow,
+      comboRank: () => this.rankTier,
       touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
+  }
+
+  /** restyle the HUD counter for a new rank tier */
+  private applyRank(rank: ComboRank): void {
+    const up = rank.tier > this.rankTier;
+    this.rankTier = rank.tier;
+
+    this.comboText.setFontSize(rank.fontSize).setColor(rank.color);
+    if (!rank.rainbow) this.comboText.clearTint();
+
+    if (up) {
+      this.tweens.killTweensOf(this.comboText);
+      this.comboText.setScale(1.45);
+      this.tweens.add({ targets: this.comboText, scale: 1, duration: 260, ease: 'Back.easeOut' });
+      if (rank.name) this.announceRank(rank);
+      if (rank.shakeOnEnter) this.cameras.main.shake(160, 0.003);
+    }
+  }
+
+  /** one-shot rank word: punch in, hold a beat, rise and fade */
+  private announceRank(rank: ComboRank): void {
+    const txt = this.add
+      .text(W / 2, 175, rank.name, {
+        fontFamily: 'Arial Black, sans-serif',
+        fontSize: '40px',
+        color: rank.color,
+        stroke: COLOR_INK,
+        strokeThickness: 7,
+      })
+      .setOrigin(0.5)
+      .setDepth(15)
+      .setAlpha(0.95)
+      .setScale(1.7);
+    this.tweens.add({ targets: txt, scale: 1, duration: 150, ease: 'Back.easeOut' });
+    if (rank.rainbow) {
+      // white fill × hue tint = full-color cycling for the word's whole lifetime
+      this.tweens.addCounter({
+        from: 0,
+        to: 3,
+        duration: 900,
+        onUpdate: (tw) =>
+          txt.setTint(Phaser.Display.Color.HSVToRGB((tw.getValue() ?? 0) % 1, 0.75, 1).color),
+      });
+    }
+    this.tweens.add({
+      targets: txt,
+      alpha: 0,
+      y: 145,
+      delay: 450,
+      duration: 450,
+      ease: 'Quad.easeIn',
+      onComplete: () => txt.destroy(),
+    });
   }
 
   private createHud(): void {
@@ -1102,6 +1163,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas'): void {
+    // even a cooldown-gated touch proves the volley connected
+    this.salvoHit = true;
     if (v.hitCooldown > 0) return;
     v.hitCooldown = 30;
 
@@ -1116,9 +1179,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.comboTimer = 120;
-    this.combo = Math.min(this.combo + 1, 8);
+    // the visible counter is uncapped (rank spectacle); scoring plateaus at x8
+    this.combo += 1;
     const base = v.kind === 'car' ? 25 : 10;
-    const pts = base * this.combo;
+    const pts = base * Math.min(this.combo, 8);
     this.score += pts;
 
     // Rainbow goo flips the mood. Gas stays disgusting but gets its own hit verb.
@@ -1240,6 +1304,18 @@ export class GameScene extends Phaser.Scene {
       if (this.meter <= 0) this.emptyLock = true;
     }
 
+    // A volley is judged once the last of it lands: if nothing fired since the
+    // stream opened ever touched a victim, that's a complete miss — the chain
+    // breaks immediately instead of coasting on the frozen combo clock.
+    const emitting = this.pooping || this.dumpKind !== 'none';
+    if (this.salvoActive && !emitting && this.guanoFx.airborneGooCount === 0) {
+      this.salvoActive = false;
+      if (!this.salvoHit && this.combo > 0) {
+        if (this.combo > 1) this.popup(this.pigeon.x, this.pigeonY - 52, 'MISS…', '#9aa0b0', 16);
+        this.combo = 0;
+      }
+    }
+
     this.guanoFx.update(
       f,
       [...this.victims.map((v) => v.collider), ...this.hydrants.map((h) => h.collider)],
@@ -1257,6 +1333,11 @@ export class GameScene extends Phaser.Scene {
   /** Supplies scene-owned state and the bird's current transform to the effect subsystem. */
   private emitStream(rate: number, wild: boolean): void {
     const rainbow = this.rainbowDebug || this.rainbowTimer > 0;
+    // gas clouds drift too loosely to judge as hit-or-miss, so they never arm a salvo
+    if (this.gasTimer <= 0 && !this.salvoActive) {
+      this.salvoActive = true;
+      this.salvoHit = false;
+    }
     this.guanoFx.emitStream({
       rate,
       wild,
@@ -1324,7 +1405,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud(f: number): void {
-    this.comboTimer -= f;
+    // The combo window measures time between HITS, but goo takes real time to
+    // fall — a drop led onto a road-level car can spend most of the window in
+    // the air, so the chain used to die mid-flight and the landing read as a
+    // reset. Freeze the countdown while a shot is still airborne (or leaving
+    // the pigeon); missed goo grounds within a second, so decay resumes fast.
+    if (!this.pooping && this.guanoFx.airborneGooCount === 0) this.comboTimer -= f;
     if (this.comboTimer <= 0) this.combo = 0;
     this.batteredTimer -= f;
     this.relievedTimer -= f;
@@ -1347,9 +1433,18 @@ export class GameScene extends Phaser.Scene {
     const puff = this.portraitKey === 'strain' || this.portraitKey === 'panic' ? 1.06 : 1;
     this.portrait.setScale((88 / this.portrait.width) * puff);
 
+    const rank = rankForCombo(this.combo);
+    if (rank.tier !== this.rankTier) this.applyRank(rank);
+
     this.scoreText.setText(String(this.score));
-    this.comboText.setText(this.combo > 1 ? `x${this.combo} COMBO` : '');
+    this.comboText.setText(this.combo > 1 ? `x${this.combo}` : '');
     this.music.setCombo(this.combo);
+
+    // SHITSTORM: tint-based hue cycle (setColor would re-rasterize every frame)
+    if (rank.rainbow && this.combo > 1) {
+      this.rankHue = (this.rankHue + 0.01 * f) % 1;
+      this.comboText.setTint(Phaser.Display.Color.HSVToRGB(this.rankHue, 0.75, 1).color);
+    }
     this.effectMeters.clear();
     let effectY = 118;
     if (this.rainbowTimer > 0) {
