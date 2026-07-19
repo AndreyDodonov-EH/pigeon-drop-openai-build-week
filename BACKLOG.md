@@ -71,6 +71,8 @@ this slot in alongside the normal flight frames.
   never breaks the chain (no salvo judgment) — low gas runs are strictly combo-friendly.
 
 **World & level design**
+- Day mechanic - this demo is day one, with different time of day (see other point) - at the end pigeon goes happily to sleep - flies away and goes to sleep on the roof. 
+  Then full-screen cozy art of pigeon going to sleep and text "see you in the morning!" or "see you next day!"
 - **Combo-rank world reactions** (user, 2026-07-19): convey the "heating up" phases
   through world behavior instead of screen effects (a mood vignette was tried and cut —
   read as a filter, see CHANGELOG). Escalating with rank tier: pedestrians become more
