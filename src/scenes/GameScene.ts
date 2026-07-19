@@ -50,6 +50,10 @@ const PEDESTRIAN_DEPTH = 5;
 // street furniture (lamps/trees/mailboxes/hydrants) stands at the curb edge,
 // closer to camera than the pedestrians walking against the buildings
 const STREET_PROP_DEPTH = 5.05;
+// minimum center-to-center spacing between pieces of street furniture at spawn
+// time; everything ground-scrolls at the same speed, so separation on spawn is
+// separation forever (widest pair — tree ~64px + hydrant ~48px — needs 56px)
+const STREET_PROP_GAP = 110;
 const CAR_DEPTH = 5.1; // the road lane is closer to camera than the pavement
 // Pedestrians walk on the sidewalk band against the buildings, not on the
 // curb: their ground line sits above GROUND_Y (the curb/road line).
@@ -721,25 +725,43 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** true when no street furniture (prop or hydrant) sits within the gap of x */
+  private streetClearAt(x: number): boolean {
+    return (
+      this.props.every((p) => Math.abs(p.img.x - x) >= STREET_PROP_GAP) &&
+      this.hydrants.every((h) => Math.abs(h.sprite.x - x) >= STREET_PROP_GAP)
+    );
+  }
+
+  private spawnProp(key: 'bg-lamp' | 'bg-tree' | 'bg-mailbox', x = W + 90): void {
+    const prop = this.add
+      .image(x, 0, key)
+      .setDepth(STREET_PROP_DEPTH)
+      .setScale(0.21 + Math.random() * 0.03);
+    if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
+    prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
+    // lamps carry their own after-dark glow + moths
+    this.props.push({ img: prop, fx: key === 'bg-lamp' ? new LampFx(this, prop) : undefined });
+  }
+
   /** sidewalk furniture scrolls with the ground, in front of the pedestrians */
   private updateProps(f: number, deltaMs: number): void {
     this.propTimer -= deltaMs;
     if (this.propTimer <= 0) {
-      const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
-      const key = kinds[(Math.random() * kinds.length) | 0];
-      const prop = this.add
-        .image(W + 90, 0, key)
-        .setDepth(STREET_PROP_DEPTH)
-        .setScale(0.21 + Math.random() * 0.03);
-      if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
-      prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
-      this.props.push(prop);
-      this.propTimer = 2400 + Math.random() * 3600;
+      if (this.streetClearAt(W + 90)) {
+        const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
+        this.spawnProp(kinds[(Math.random() * kinds.length) | 0]);
+        this.propTimer = 2400 + Math.random() * 3600;
+      } else {
+        // spawn slot occupied — wait for the blocker to scroll clear
+        this.propTimer = 250;
+      }
     }
     this.props = this.props.filter((p) => {
-      p.x -= SCROLL * f;
-      if (p.x < -140) {
-        p.destroy();
+      p.img.x -= SCROLL * f;
+      if (p.img.x < -140) {
+        p.fx?.destroy();
+        p.img.destroy();
         return false;
       }
       return true;
@@ -1023,8 +1045,13 @@ export class GameScene extends Phaser.Scene {
   private updateHydrants(f: number, deltaMs: number): void {
     this.hydrantTimer -= deltaMs;
     if (this.hydrantTimer <= 0) {
-      this.spawnHydrant();
-      this.hydrantTimer = 9000 + Math.random() * 8000;
+      if (this.streetClearAt(W + 40)) {
+        this.spawnHydrant();
+        this.hydrantTimer = 9000 + Math.random() * 8000;
+      } else {
+        // spawn slot occupied — wait for the blocker to scroll clear
+        this.hydrantTimer = 250;
+      }
     }
 
     for (const h of this.hydrants) {
@@ -1052,8 +1079,9 @@ export class GameScene extends Phaser.Scene {
         h.timer = 130;
         this.startHydrantJet(h);
         // always tall enough to reach the default cruise line (forces a climb
-        // to dodge) but never so tall the ceiling clamp can't out-climb it
-        h.jetMaxH = 280 + Math.random() * 70;
+        // to dodge; the hit check needs ≥ ~270px) but capped well under the
+        // ceiling so the column never looks like it spans the whole screen
+        h.jetMaxH = 280 + Math.random() * 50;
       } else if (h.state === 'burst' && h.timer <= 0) {
         h.state = 'idle';
         h.splashed = true; // burst spent — never re-arm
