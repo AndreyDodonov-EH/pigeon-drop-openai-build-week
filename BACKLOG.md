@@ -66,10 +66,8 @@ this slot in alongside the normal flight frames.
 **Sounds**
 - Sound for character interation (once done)
 - Sound for some of pedestrain and car reactions - should replace text pop-ups
-- Klezmer should play a little longer (not just fade off) - and probably be synchronized with different combo levels
 - Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
 - Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump, add one hungry one for telegraphing that we cant poop (or for that reuse from splash)
-- When testing from phone, I noticed that too pizzakato tracks play unusually well together (basically  increasing tempo, may be used in some phases)
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =

@@ -193,6 +193,15 @@ ends. The earlier harsh burst cue is no longer loaded. Both effects use the shar
 layer over 2.4 seconds while the sneaky layer returns on the original 0.9-second crossfade,
 giving the energetic track a smoother tail without delaying the base music.
 
+**Layered music phases (2026-07-19):** turned the unexpectedly good simultaneous phone
+playback into the intended arrangement — two *pizzicatos*, not pizzicato + klezmer. Combo
+0–1 keeps the sneaky pizzicato loop exposed; combo 2–3 layers the same pizzicato file over
+itself offset by an eighth note, so the interleaved plucks double the perceived tempo with
+no rate or pitch change; combo 4+ adds klezmer on top, swelling with the combo level (0.40
+at x4 up to 0.58 at the x8 cap, loudness-compensated for its 3.6 dB hotter source). When
+the combo breaks, klezmer no longer just fades off: it holds for two bars, then takes its
+long 2.4-second release. Silent layers resync to the audible clock before fading in.
+
 **Second pedestrian cast (2026-07-18):** added three new street victims: a tasteless
 fake-luxury influencer, a hopelessly lost tourist dad, and a skipped-leg-day gym bro. Each
 ships with walk, outraged splat, and delighted rainbow-reaction art plus character-specific

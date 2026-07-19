@@ -3,16 +3,23 @@
 ## public/assets/audio/music-sneaky.{ogg,mp3} — 2026-07-18
 
 - **Master:** `assets/audio-masters/music-sneaky.mp3` (60.03 s, shipped `--raw`)
-- **Role:** base gameplay loop; plays in lockstep with music-klezmer, combo < 4
+- **Role:** base gameplay loop; plays in lockstep with all layers at every combo phase.
+  It plays alone at combo 0–1; at combo 2–3 a second instance of this same file joins,
+  offset by an eighth note, so the interleaved plucks double the perceived tempo ("two
+  pizzicatos"); both stay beneath the klezmer topper at combo ≥ 4
   (see `src/audio/MusicManager.ts` — regenerations MUST keep 120 BPM / D minor / 60 s
-  or the synced crossfade breaks)
+  or the synchronized layered arrangement breaks)
 - **Prompt:** `sneaky pizzicato cartoon game background music, seamless loop: light bouncy plucked strings playing an evenly-paced tiptoeing melody, bassoon and muted trumpet comedy accents, mischievous stealthy mood like a cartoon villain sneaking, steady even pulse at exactly 120 BPM, D minor, constant energy throughout, no intro, no outro, no ending` (`--instrumental --len-ms 60000`)
 
 ## public/assets/audio/music-klezmer.{ogg,mp3} — 2026-07-18
 
 - **Master:** `assets/audio-masters/music-klezmer.mp3` (60.08 s, shipped `--raw`)
-- **Role:** frantic tier, combo ≥ 4; same grid as music-sneaky (tempo match verified
-  by onset autocorrelation — both lock to a ~1 s period, i.e. 120 BPM)
+- **Role:** high-combo topper; silent below combo 4, then swells with the combo level
+  (0.40 at x4 up to 0.58 at the x8 cap) over the two pizzicato layers. When the combo
+  breaks it holds for two bars before its long release instead of fading immediately.
+  Same grid as music-sneaky (tempo match verified by onset autocorrelation — both lock
+  to a ~1 s period, i.e. 120 BPM). Its measured average is 3.6 dB louder, so runtime mix
+  targets compensate and retain headroom (`src/audio/MusicManager.ts`).
 - **Prompt:** `frantic joyful klezmer cartoon game background music, seamless loop: wailing clarinet lead melody, accordion, brass section, driving drums, festive chaotic street-party mayhem, high energy celebration, exactly 120 BPM, D minor, constant energy throughout, no intro, no outro, no ending` (`--instrumental --len-ms 60000`)
 
 Reuse these exact prompts when regenerating or extending a set — consistency depends
