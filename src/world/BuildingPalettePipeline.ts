@@ -63,14 +63,15 @@ void main() {
   repaint = clamp(repaint + detail * 0.55, 0.0, 1.0);
   vec3 color = mix(texture.rgb, repaint, satMask * darkMask * 0.8);
 
-  // Uniform background grade: mildly desaturate and lift toward the warm
-  // horizon haze so the whole layer recedes and the pigeon/victims stay the
-  // most saturated things on screen.
+  // Uniform background grade: mildly desaturate and lift toward a pale,
+  // neutral stone haze so the whole layer recedes and the pigeon/victims stay
+  // the most saturated things on screen. Keep the target's channels close
+  // together: a stronger ochre target makes the whole street read greenish.
   // (texture rgb is premultiplied — scale the haze target by alpha so fully
   // transparent pixels stay black instead of glowing as pale rectangles)
   float gradeLum = dot(color, LUMA);
-  color = mix(color, vec3(gradeLum), 0.14);
-  color = mix(color, vec3(0.93, 0.87, 0.75) * texture.a, 0.12);
+  color = mix(color, vec3(gradeLum), 0.16);
+  color = mix(color, vec3(0.91, 0.89, 0.86) * texture.a, 0.08);
 
   // Phaser's sprite renderer uses premultiplied alpha.
   gl_FragColor = vec4(color * outTint.a, texture.a * outTint.a);
