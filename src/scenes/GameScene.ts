@@ -341,6 +341,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image('portrait-pleased', 'assets/portraits/pleased.png');
     this.load.image('portrait-panic', 'assets/portraits/panic.png');
     this.load.image('portrait-hungry', 'assets/portraits/hungry.png');
+    this.load.image('tap-hand', 'assets/ui/tap-hand.png');
+    this.load.image('drag-hand', 'assets/ui/drag-hand.png');
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');

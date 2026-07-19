@@ -19,22 +19,22 @@ export function shouldShowWizard(): boolean {
  */
 export class FirstRunWizard {
   private objs: Phaser.GameObjects.GameObject[] = [];
+  private dim: Phaser.GameObjects.Rectangle;
   private prompt!: Phaser.GameObjects.Text;
   private dismissed = false;
 
   constructor(private scene: Phaser.Scene) {
-    this.objs.push(scene.add.rectangle(W / 2, H / 2, W, H, 0x0a0b10, 0.72).setDepth(DEPTH));
+    this.dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x0a0b10, 0.72).setDepth(DEPTH);
+    this.objs.push(this.dim);
     this.text(W / 2, H * 0.14, t.howToPlay, 14, 0.7);
 
     if (isTouchDevice()) {
+      // no per-zone text: the tap-hand markers (TouchControls, depth 31,
+      // above our dim) say it all, and they outlast this overlay until
+      // each action is actually performed
       this.objs.push(
         scene.add.rectangle(W / 2, H * 0.42, 2, H * 0.5, 0xf3ead8, 0.25).setDepth(DEPTH),
       );
-      this.text(W * 0.25, H * 0.3, '▲', 44);
-      this.text(W * 0.25, H * 0.44, t.holdClimb, 20);
-      this.text(W * 0.25, H * 0.53, `${t.dragDive} ▼`, 15, 0.8);
-      this.text(W * 0.75, H * 0.3, '💩', 44);
-      this.text(W * 0.75, H * 0.44, t.holdRip, 20);
       this.prompt = this.text(W / 2, H * 0.78, t.tapStart, 16);
     } else {
       this.text(W / 2, H * 0.34, t.kbClimb, 20);
@@ -72,10 +72,19 @@ export class FirstRunWizard {
     this.scene.input.off('pointerdownoutside', this.dismiss, this);
     this.scene.input.keyboard?.off('keydown', this.dismiss, this);
     this.scene.tweens.killTweensOf(this.prompt);
+    // the dim and the now-stale "tap to start" prompt get out of the way
+    // fast, but the control instructions linger through the fullscreen +
+    // rotation shuffle this same tap just triggered, then fade gently
     this.scene.tweens.add({
-      targets: this.objs,
+      targets: [this.dim, this.prompt],
       alpha: 0,
-      duration: 350,
+      duration: 250,
+    });
+    this.scene.tweens.add({
+      targets: this.objs.filter((o) => o !== this.dim && o !== this.prompt),
+      alpha: 0,
+      delay: 1500,
+      duration: 800,
       onComplete: () => this.objs.forEach((o) => o.destroy()),
     });
   }
