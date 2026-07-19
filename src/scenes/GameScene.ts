@@ -23,7 +23,7 @@ import { DayNight, type DayLook } from '../world/DayNight';
 import { LampFx } from '../world/LampFx';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
-import { TouchControls, isTouchDevice } from '../input/TouchControls';
+import { TouchControls, DiveRatchet, isTouchDevice } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
 import { PauseMenu } from '../ui/PauseMenu';
 import { rankForCombo, type ComboRank } from '../ui/ranks';
@@ -308,7 +308,9 @@ export class GameScene extends Phaser.Scene {
 
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
   private pointerFly = false;
+  private pointerDive = false;
   private pointerPoop = false;
+  private mouseRatchet = new DiveRatchet();
   private touch!: TouchControls;
   private pauseMenu!: PauseMenu;
   private gamePaused = false;
@@ -649,6 +651,7 @@ export class GameScene extends Phaser.Scene {
     this.add.image(px, py, 'hud-meter-arc').setDepth(10).setDisplaySize(plateSize, plateSize);
     this.effectMeters = this.add.graphics().setDepth(12);
 
+    // right-aligned left of the pause button, which owns the true corner
     this.scoreText = this.add
       .text(W - 72, 18, '0', {
         fontFamily: 'Arial Black, sans-serif',
@@ -694,16 +697,31 @@ export class GameScene extends Phaser.Scene {
     };
     this.input.mouse?.disableContextMenu();
     this.touch = new TouchControls(this);
-    // mouse only — touch pointers are owned by TouchControls' split zones
+    // mouse only — touch pointers are owned by TouchControls' split zones.
+    // LMB mirrors the touch left zone: hold to climb, drag down while held to
+    // dive (same ratchet); RMB holds the rip. Per-button so LMB+RMB combine.
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (p.wasTouch || this.gamePaused) return;
-      if (p.rightButtonDown()) this.pointerPoop = true;
-      else this.pointerFly = true;
+      if (p.button === 2) this.pointerPoop = true;
+      else if (p.button === 0) {
+        this.pointerFly = true;
+        this.mouseRatchet.begin(p.y);
+      }
+    });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      // leftButtonDown gate also keeps debug SP.setFly() holds ratchet-free
+      if (p.wasTouch || !p.leftButtonDown() || !(this.pointerFly || this.pointerDive)) return;
+      this.mouseRatchet.move(p.y);
+      this.pointerDive = this.mouseRatchet.dive;
+      this.pointerFly = !this.pointerDive;
     });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
       if (p.wasTouch) return;
-      if (!p.rightButtonDown()) this.pointerFly = false;
-      this.pointerPoop = false;
+      if (p.button === 0) {
+        this.pointerFly = false;
+        this.pointerDive = false;
+      }
+      if (p.button === 2) this.pointerPoop = false;
     });
   }
 
@@ -715,6 +733,7 @@ export class GameScene extends Phaser.Scene {
     if (paused === this.gamePaused) return;
     this.gamePaused = paused;
     this.pointerFly = false;
+    this.pointerDive = false;
     this.pointerPoop = false;
     this.touch.releaseAll();
     this.pauseMenu.setPaused(paused);

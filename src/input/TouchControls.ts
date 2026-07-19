@@ -12,6 +12,37 @@ export const isTouchDevice = (): boolean =>
 const DIVE_ON = 36;
 const DIVE_OFF = 24;
 
+/** Hold-and-drag climb/dive state machine, shared by the touch left zone and
+ * the mouse LMB hold so both feel identical. Caller feeds pointer y while the
+ * hold lasts and reads `dive`; not diving while held means climbing. */
+export class DiveRatchet {
+  dive = false;
+  private anchorY = 0;
+
+  begin(y: number): void {
+    this.dive = false;
+    this.anchorY = y;
+  }
+
+  move(y: number): void {
+    if (!this.dive) {
+      // anchor rides the pointer's highest point, so only a fresh downward
+      // pull — not slow drift — crosses the threshold
+      this.anchorY = Math.min(this.anchorY, y);
+      if (y - this.anchorY > DIVE_ON) {
+        this.dive = true;
+        this.anchorY = y;
+      }
+    } else {
+      this.anchorY = Math.max(this.anchorY, y);
+      if (this.anchorY - y > DIVE_OFF) {
+        this.dive = false;
+        this.anchorY = y;
+      }
+    }
+  }
+}
+
 // cumulative hold per side before its hint/finger clears — a stray tap
 // (e.g. dismissing the wizard) shouldn't count as "learned the control"
 const HINT_HOLD_MS = 600;
@@ -35,7 +66,7 @@ export class TouchControls {
 
   private flyId = -1;
   private poopId = -1;
-  private anchorY = 0;
+  private ratchet = new DiveRatchet();
   private leftFinger?: Phaser.GameObjects.Image;
   private rightFinger?: Phaser.GameObjects.Image;
   private rightPoo?: Phaser.GameObjects.Text;
@@ -77,7 +108,7 @@ export class TouchControls {
         this.flyId = p.id;
         this.fly = true;
         this.dive = false;
-        this.anchorY = p.y;
+        this.ratchet.begin(p.y);
         this.beginHold('left');
       }
     } else if (this.poopId < 0) {
@@ -89,23 +120,9 @@ export class TouchControls {
 
   private onMove(p: Phaser.Input.Pointer): void {
     if (p.id !== this.flyId) return;
-    if (!this.dive) {
-      // anchor rides the thumb's highest point, so only a fresh downward
-      // pull — not slow drift — crosses the threshold
-      this.anchorY = Math.min(this.anchorY, p.y);
-      if (p.y - this.anchorY > DIVE_ON) {
-        this.dive = true;
-        this.fly = false;
-        this.anchorY = p.y;
-      }
-    } else {
-      this.anchorY = Math.max(this.anchorY, p.y);
-      if (this.anchorY - p.y > DIVE_OFF) {
-        this.dive = false;
-        this.fly = true;
-        this.anchorY = p.y;
-      }
-    }
+    this.ratchet.move(p.y);
+    this.dive = this.ratchet.dive;
+    this.fly = !this.dive;
   }
 
   private onUp(p: Phaser.Input.Pointer): void {
