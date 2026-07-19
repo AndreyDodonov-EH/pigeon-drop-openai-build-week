@@ -16,6 +16,8 @@ import {
 import { ensureBuildingPalettePipeline } from '../world/BuildingPalettePipeline';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
+import { TouchControls, isTouchDevice } from '../input/TouchControls';
+import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
 
 const SCROLL = 2.1; // world scroll, px/frame
 
@@ -227,6 +229,7 @@ export class GameScene extends Phaser.Scene {
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
   private pointerFly = false;
   private pointerPoop = false;
+  private touch!: TouchControls;
   /** debug override used by screenshot scripts; gameplay uses rainbowTimer */
   private rainbowDebug = false;
   private rainbowTimer = 0;
@@ -356,6 +359,7 @@ export class GameScene extends Phaser.Scene {
     this.createHud();
     this.createInput();
     this.createDebugMenu();
+    if (shouldShowWizard()) new FirstRunWizard(this);
     this.music = new MusicManager(this);
     this.music.start();
 
@@ -384,6 +388,7 @@ export class GameScene extends Phaser.Scene {
         this.comboTimer = 120;
       },
       musicFrantic: () => this.music.franticNow,
+      touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
   }
 
@@ -460,14 +465,17 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setDepth(10);
 
-    this.add
-      .text(16, H - 26, 'HOLD ↑ / SPACE / LMB — climb     HOLD ↓ — dive     HOLD S / RMB — let it rip', {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: COLOR_CREAM,
-      })
-      .setDepth(10)
-      .setAlpha(0.75);
+    // touch devices get zone hint labels from TouchControls instead
+    if (!isTouchDevice()) {
+      this.add
+        .text(16, H - 26, 'HOLD ↑ / SPACE / LMB — climb     HOLD ↓ — dive     HOLD S / RMB — let it rip', {
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          color: COLOR_CREAM,
+        })
+        .setDepth(10)
+        .setAlpha(0.75);
+    }
   }
 
   private createInput(): void {
@@ -480,11 +488,15 @@ export class GameScene extends Phaser.Scene {
       damage: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
     this.input.mouse?.disableContextMenu();
+    this.touch = new TouchControls(this);
+    // mouse only — touch pointers are owned by TouchControls' split zones
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.wasTouch) return;
       if (p.rightButtonDown()) this.pointerPoop = true;
       else this.pointerFly = true;
     });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.wasTouch) return;
       if (!p.rightButtonDown()) this.pointerFly = false;
       this.pointerPoop = false;
     });
@@ -492,6 +504,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Compact always-on development palette for testing scene objects on demand. */
   private createDebugMenu(): void {
+    // phones: it sits inside the right poop zone — hidden unless ?debug is set
+    if (isTouchDevice() && !new URLSearchParams(location.search).has('debug')) return;
     const x = W - 174;
     const y = 106;
     const buttonW = 48;
@@ -600,8 +614,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updatePigeon(f: number): void {
-    const up = this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly;
-    const down = this.keys.down.isDown;
+    const up = this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly || this.touch.fly;
+    const down = this.keys.down.isDown || this.touch.dive;
     // it's a bird, not a brick: velocity trims toward an input-chosen target,
     // so releasing everything levels off and holds the current altitude
     const targetVy = up ? -3.6 : down ? 4.2 : 0;
@@ -1203,7 +1217,7 @@ export class GameScene extends Phaser.Scene {
     this.pooping =
       this.dumpKind === 'none' &&
       !this.emptyLock &&
-      (this.keys.poop.isDown || this.pointerPoop) &&
+      (this.keys.poop.isDown || this.pointerPoop || this.touch.poop) &&
       this.meter > 0;
     if (wasPooping && !this.pooping) this.relievedTimer = 60;
     if (!this.pooping && this.dumpKind === 'none') this.guanoFx.stopGasStream();
