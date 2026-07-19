@@ -122,7 +122,8 @@ export class TouchControls {
     }
   }
 
-  private releaseAll(): void {
+  /** Clear every claimed pointer, including when gameplay opens a modal. */
+  releaseAll(): void {
     this.endHold('left');
     this.endHold('right');
     this.flyId = -1;

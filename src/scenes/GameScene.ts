@@ -25,6 +25,7 @@ import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, isTouchDevice } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
+import { PauseMenu } from '../ui/PauseMenu';
 import { rankForCombo, type ComboRank } from '../ui/ranks';
 import { t } from '../i18n';
 
@@ -299,6 +300,10 @@ export class GameScene extends Phaser.Scene {
   private pointerFly = false;
   private pointerPoop = false;
   private touch!: TouchControls;
+  private pauseMenu!: PauseMenu;
+  private gamePaused = false;
+  /** tweens frozen by the pause — resume only these, not ones paused by others */
+  private tweensFrozenByPause: Phaser.Tweens.Tween[] = [];
   /** debug override used by screenshot scripts; gameplay uses rainbowTimer */
   private rainbowDebug = false;
   private rainbowTimer = 0;
@@ -476,8 +481,14 @@ export class GameScene extends Phaser.Scene {
 
     this.createHud();
     this.createInput();
+    this.pauseMenu = new PauseMenu(this, () => this.togglePause());
     this.createDebugMenu();
-    if (shouldShowWizard()) new FirstRunWizard(this);
+    if (shouldShowWizard()) {
+      // pause controls hide behind the wizard so its dismissing tap/keypress
+      // can't double as a pause (P/ESC would start the game already paused)
+      this.pauseMenu.setEnabled(false);
+      new FirstRunWizard(this, () => this.pauseMenu.setEnabled(true));
+    }
     this.music = new MusicManager(this);
     this.music.start();
 
@@ -486,6 +497,8 @@ export class GameScene extends Phaser.Scene {
       scene: this,
       setFly: (v: boolean) => (this.pointerFly = v),
       setPoop: (v: boolean) => (this.pointerPoop = v),
+      setPaused: (v: boolean) => this.setPaused(v),
+      isPaused: () => this.gamePaused,
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
       particleCount: () => this.guanoFx.particleCount,
       gasParticleCount: () => this.guanoFx.gasParticleCount,
@@ -623,7 +636,7 @@ export class GameScene extends Phaser.Scene {
     this.effectMeters = this.add.graphics().setDepth(12);
 
     this.scoreText = this.add
-      .text(W - 24, 18, '0', {
+      .text(W - 72, 18, '0', {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '34px',
         color: COLOR_CREAM,
@@ -633,7 +646,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setDepth(10);
     this.comboText = this.add
-      .text(W - 24, 58, '', {
+      .text(W - 72, 58, '', {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '20px',
         color: COLOR_AMBER,
@@ -669,7 +682,7 @@ export class GameScene extends Phaser.Scene {
     this.touch = new TouchControls(this);
     // mouse only — touch pointers are owned by TouchControls' split zones
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (p.wasTouch) return;
+      if (p.wasTouch || this.gamePaused) return;
       if (p.rightButtonDown()) this.pointerPoop = true;
       else this.pointerFly = true;
     });
@@ -678,6 +691,32 @@ export class GameScene extends Phaser.Scene {
       if (!p.rightButtonDown()) this.pointerFly = false;
       this.pointerPoop = false;
     });
+  }
+
+  private togglePause(): void {
+    this.setPaused(!this.gamePaused);
+  }
+
+  private setPaused(paused: boolean): void {
+    if (paused === this.gamePaused) return;
+    this.gamePaused = paused;
+    this.pointerFly = false;
+    this.pointerPoop = false;
+    this.touch.releaseAll();
+    this.pauseMenu.setPaused(paused);
+
+    // The scene itself must keep stepping so its pause controls stay live.
+    // Freeze every other clocked subsystem explicitly instead.
+    this.time.paused = paused;
+    if (paused) {
+      this.tweensFrozenByPause = this.tweens.getTweens().filter((tw) => tw.isPlaying());
+      this.tweensFrozenByPause.forEach((tw) => tw.pause());
+      this.sound.pauseAll();
+    } else {
+      this.tweensFrozenByPause.forEach((tw) => tw.resume());
+      this.tweensFrozenByPause = [];
+      this.sound.resumeAll();
+    }
   }
 
   /** Development palette for testing scene objects on demand via ?debug. */
@@ -740,6 +779,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
+    if (this.gamePaused) return;
     // normalize to 60 Hz frame units used by the sim
     const f = Math.min(deltaMs / (1000 / 60), 2);
 

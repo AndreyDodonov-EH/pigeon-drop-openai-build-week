@@ -23,7 +23,10 @@ export class FirstRunWizard {
   private prompt!: Phaser.GameObjects.Text;
   private dismissed = false;
 
-  constructor(private scene: Phaser.Scene) {
+  constructor(
+    private scene: Phaser.Scene,
+    private onDismiss?: () => void,
+  ) {
     this.dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x0a0b10, 0.72).setDepth(DEPTH);
     this.objs.push(this.dim);
     this.text(W / 2, H * 0.14, t.howToPlay, 14, 0.7);
@@ -40,6 +43,8 @@ export class FirstRunWizard {
       this.text(W / 2, H * 0.34, t.kbClimb, 20);
       this.text(W / 2, H * 0.44, t.kbDive, 20);
       this.text(W / 2, H * 0.54, t.kbRip, 20);
+      // meta-control, so smaller and dimmer than the flight tips
+      this.text(W / 2, H * 0.63, t.kbPause, 16, 0.8);
       this.prompt = this.text(W / 2, H * 0.76, t.clickStart, 16);
     }
     scene.tweens.add({
@@ -68,6 +73,7 @@ export class FirstRunWizard {
   private dismiss(): void {
     if (this.dismissed) return;
     this.dismissed = true;
+    this.onDismiss?.();
     this.scene.input.off('pointerdown', this.dismiss, this);
     this.scene.input.off('pointerdownoutside', this.dismiss, this);
     this.scene.input.keyboard?.off('keydown', this.dismiss, this);

@@ -1,7 +1,7 @@
 /** Tiny dictionary i18n for the instructional UI text (wizard, control hints).
  * Language comes from the browser (`navigator.languages`), overridable with
  * `?lang=xx` for testing. Unsupported languages fall back to English.
- * Key tokens (SPACE, LMB/RMB, S) stay literal except where a language has an
+ * Key tokens (SPACE, LMB/RMB, S, P, ESC) stay literal except where a language has an
  * established gamer term (e.g. Russian ЛКМ/ПКМ). */
 
 const STRINGS = {
@@ -14,7 +14,11 @@ const STRINGS = {
     kbClimb: 'HOLD ↑ / SPACE / LMB — CLIMB',
     kbDive: 'HOLD ↓ — DIVE',
     kbRip: 'HOLD S / RMB — LET IT RIP',
+    kbPause: 'P / ESC — PAUSE',
     clickStart: 'CLICK OR PRESS ANY KEY TO START',
+    paused: 'PAUSED',
+    resume: 'RESUME',
+    pauseHint: 'P / ESC — RESUME',
   },
   es: {
     howToPlay: 'CÓMO JUGAR',
@@ -25,7 +29,11 @@ const STRINGS = {
     kbClimb: 'MANTÉN ↑ / ESPACIO / LMB — SUBIR',
     kbDive: 'MANTÉN ↓ — PICADO',
     kbRip: 'MANTÉN S / RMB — ¡SUÉLTALO!',
+    kbPause: 'P / ESC — PAUSA',
     clickStart: 'CLIC O CUALQUIER TECLA PARA EMPEZAR',
+    paused: 'EN PAUSA',
+    resume: 'CONTINUAR',
+    pauseHint: 'P / ESC — CONTINUAR',
   },
   fr: {
     howToPlay: 'COMMENT JOUER',
@@ -36,7 +44,11 @@ const STRINGS = {
     kbClimb: 'MAINTIENS ↑ / ESPACE / LMB — MONTER',
     kbDive: 'MAINTIENS ↓ — PIQUÉ',
     kbRip: 'MAINTIENS S / RMB — LÂCHE TOUT',
+    kbPause: 'P / ESC — PAUSE',
     clickStart: 'CLIQUE OU APPUIE SUR UNE TOUCHE',
+    paused: 'PAUSE',
+    resume: 'REPRENDRE',
+    pauseHint: 'P / ESC — REPRENDRE',
   },
   de: {
     howToPlay: 'SO WIRD GESPIELT',
@@ -47,7 +59,11 @@ const STRINGS = {
     kbClimb: 'HALTEN ↑ / SPACE / LMB — STEIGEN',
     kbDive: 'HALTEN ↓ — STURZFLUG',
     kbRip: 'HALTEN S / RMB — LASS ES RAUS',
+    kbPause: 'P / ESC — PAUSE',
     clickStart: 'KLICKEN ODER TASTE DRÜCKEN',
+    paused: 'PAUSE',
+    resume: 'WEITERSPIELEN',
+    pauseHint: 'P / ESC — WEITERSPIELEN',
   },
   it: {
     howToPlay: 'COME SI GIOCA',
@@ -58,7 +74,11 @@ const STRINGS = {
     kbClimb: 'TIENI ↑ / SPAZIO / LMB — SALI',
     kbDive: 'TIENI ↓ — PICCHIATA',
     kbRip: 'TIENI S / RMB — MOLLA TUTTO',
+    kbPause: 'P / ESC — PAUSA',
     clickStart: 'CLICCA O PREMI UN TASTO PER INIZIARE',
+    paused: 'IN PAUSA',
+    resume: 'RIPRENDI',
+    pauseHint: 'P / ESC — RIPRENDI',
   },
   pt: {
     howToPlay: 'COMO JOGAR',
@@ -69,7 +89,11 @@ const STRINGS = {
     kbClimb: 'SEGURE ↑ / ESPAÇO / LMB — SUBIR',
     kbDive: 'SEGURE ↓ — MERGULHO',
     kbRip: 'SEGURE S / RMB — MANDA VER',
+    kbPause: 'P / ESC — PAUSA',
     clickStart: 'CLIQUE OU APERTE UMA TECLA',
+    paused: 'PAUSADO',
+    resume: 'CONTINUAR',
+    pauseHint: 'P / ESC — CONTINUAR',
   },
   ru: {
     howToPlay: 'КАК ИГРАТЬ',
@@ -80,7 +104,11 @@ const STRINGS = {
     kbClimb: 'ДЕРЖИ ↑ / ПРОБЕЛ / ЛКМ — ВЗЛЁТ',
     kbDive: 'ДЕРЖИ ↓ — ПИКЕ',
     kbRip: 'ДЕРЖИ S / ПКМ — БОМБИ!',
+    kbPause: 'P / ESC — ПАУЗА',
     clickStart: 'КЛИКНИ ИЛИ НАЖМИ ЛЮБУЮ КЛАВИШУ',
+    paused: 'ПАУЗА',
+    resume: 'ПРОДОЛЖИТЬ',
+    pauseHint: 'P / ESC — ПРОДОЛЖИТЬ',
   },
   uk: {
     howToPlay: 'ЯК ГРАТИ',
@@ -91,7 +119,11 @@ const STRINGS = {
     kbClimb: 'ТРИМАЙ ↑ / ПРОБІЛ / ЛКМ — ЗЛІТ',
     kbDive: 'ТРИМАЙ ↓ — ПІКЕ',
     kbRip: 'ТРИМАЙ S / ПКМ — БОМБИ!',
+    kbPause: 'P / ESC — ПАУЗА',
     clickStart: 'КЛІКНИ АБО НАТИСНИ БУДЬ-ЯКУ КЛАВІШУ',
+    paused: 'ПАУЗА',
+    resume: 'ПРОДОВЖИТИ',
+    pauseHint: 'P / ESC — ПРОДОВЖИТИ',
   },
   ja: {
     howToPlay: 'あそびかた',
@@ -102,7 +134,11 @@ const STRINGS = {
     kbClimb: '↑ / スペース / 左クリック 長押し — 上昇',
     kbDive: '↓ 長押し — 急降下',
     kbRip: 'S / 右クリック 長押し — ぶちまけろ！',
+    kbPause: 'P / ESC — ポーズ',
     clickStart: 'クリックかキーでスタート',
+    paused: 'ポーズ',
+    resume: 'つづける',
+    pauseHint: 'P / ESC — つづける',
   },
   zh: {
     howToPlay: '玩法说明',
@@ -113,7 +149,11 @@ const STRINGS = {
     kbClimb: '按住 ↑ / 空格 / 左键 — 爬升',
     kbDive: '按住 ↓ — 俯冲',
     kbRip: '按住 S / 右键 — 开拉！',
+    kbPause: 'P / ESC — 暂停',
     clickStart: '点击或按任意键开始',
+    paused: '已暂停',
+    resume: '继续游戏',
+    pauseHint: 'P / ESC — 继续游戏',
   },
   ko: {
     howToPlay: '게임 방법',
@@ -124,7 +164,11 @@ const STRINGS = {
     kbClimb: '↑ / 스페이스 / 좌클릭 꾹 — 상승',
     kbDive: '↓ 꾹 — 급강하',
     kbRip: 'S / 우클릭 꾹 — 발사!',
+    kbPause: 'P / ESC — 일시 정지',
     clickStart: '클릭 또는 아무 키나 눌러 시작',
+    paused: '일시 정지',
+    resume: '계속하기',
+    pauseHint: 'P / ESC — 계속하기',
   },
 } as const;
 
