@@ -22,6 +22,9 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 
 **Pooping**
 - combine pooping (e.g. gas (pea pod) + rainbow = rainbow gas!) Make sure to keep the code ouf of GameScene file not too grow it even further - it's separate logic
+- pea pod + chilli - fiery explosion
+
+
 
 **Sounds**
 - Sound for character interation (once done)

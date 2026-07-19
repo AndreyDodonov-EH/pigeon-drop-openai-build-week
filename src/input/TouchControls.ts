@@ -41,6 +41,7 @@ export class TouchControls {
   private rightPoo?: Phaser.GameObjects.Text;
   private heldMs = { left: 0, right: 0 };
   private downAt = { left: 0, right: 0 };
+  private learned = { left: false, right: false };
   private clearTimer: {
     left?: Phaser.Time.TimerEvent;
     right?: Phaser.Time.TimerEvent;
@@ -180,6 +181,10 @@ export class TouchControls {
     const leftTex = this.scene.textures.exists('drag-hand') ? 'drag-hand' : 'tap-hand';
     this.leftFinger = make(W * 0.25, leftTex, false);
     this.rightFinger = make(W * 0.75, 'tap-hand', true);
+    // a side whose sprite failed to load can never be "learned" — count it
+    // as done so it doesn't hold the other hand on screen forever
+    this.learned.left = !this.leftFinger;
+    this.learned.right = !this.rightFinger;
 
     // subtle payload label over the right fingertip — the hands say "hold
     // here", this says what the right hold does
@@ -195,8 +200,9 @@ export class TouchControls {
 
   /** Arm the clear timer for a side: once cumulative hold time crosses
    * HINT_HOLD_MS the player has demonstrably performed the action and the
-   * hint + finger fade. Released early → endHold banks the partial time. */
+   * side counts as learned. Released early → endHold banks the partial time. */
   private beginHold(side: 'left' | 'right'): void {
+    if (this.learned[side]) return;
     const alive = side === 'left' ? this.leftFinger : this.rightFinger;
     if (!alive) return;
     this.downAt[side] = this.scene.time.now;
@@ -216,15 +222,16 @@ export class TouchControls {
 
   private clearHints(side: 'left' | 'right'): void {
     this.clearTimer[side] = undefined;
-    if (side === 'left') {
-      this.fadeHint(this.leftFinger);
-      this.leftFinger = undefined;
-    } else {
-      this.fadeHint(this.rightFinger);
-      this.fadeHint(this.rightPoo);
-      this.rightFinger = undefined;
-      this.rightPoo = undefined;
-    }
+    this.learned[side] = true;
+    // the hands leave together: a side learned early keeps its finger up
+    // until the other action has been demonstrated too, then both fade at once
+    if (!this.learned.left || !this.learned.right) return;
+    this.fadeHint(this.leftFinger);
+    this.fadeHint(this.rightFinger);
+    this.fadeHint(this.rightPoo);
+    this.leftFinger = undefined;
+    this.rightFinger = undefined;
+    this.rightPoo = undefined;
   }
 
   private fadeHint(hint?: Phaser.GameObjects.Text | Phaser.GameObjects.Image): void {
