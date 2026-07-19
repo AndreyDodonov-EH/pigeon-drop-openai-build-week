@@ -110,6 +110,13 @@ After keying:
 pngquant --force --skip-if-larger --output small.png 256 big.png
 ```
 
+Python 3 with Pillow (`PIL`) is installed alongside ImageMagick. Keep the established
+`convert` recipes for keying, erosion, and compositing; reach for a short Pillow script
+when the job needs per-pixel logic or exact measurement: counting stray semi-transparent
+pixels near edges or leftover near-magenta pixels, measuring content bounding boxes,
+comparing frames for anchor/ground-line drift, conditional palette-range recoloring, and
+spritesheet slicing/packing/padding with exact math.
+
 For scrolling/tiled textures, verify the required axis is genuinely seamless after all
 crops and resizing. A generator's claim of seamlessness is not sufficient.
 
