@@ -46,6 +46,8 @@ export interface Particle {
   surfaceVx: number;
   /** prevents a settled or bouncing drop from reporting the same street landing again */
   groundHit: boolean;
+  /** ever glued to or perched on a collider — marks later street landings as runoff, not a direct hit */
+  wasStuck: boolean;
   dead: boolean;
 }
 
@@ -176,6 +178,7 @@ export class GooSim {
       p.stickHold = 0;
       p.surfaceVx = 0;
       p.groundHit = false;
+      p.wasStuck = false;
       p.dead = false;
       this.particles.push(p);
     }
@@ -448,6 +451,7 @@ export class GooSim {
         const impact = Math.hypot(vRelX, vRelY);
         if (c.sticky && impact > P.stickSpeed) {
           p.state = PState.Stuck;
+          p.wasStuck = true;
           p.stickId = c.id;
           p.sx = c.mask ? dx : Phaser_clamp(dx, -c.hw, c.hw);
           p.sy = c.mask ? dy : Phaser_clamp(dy, -c.hh, c.hh);
@@ -459,6 +463,7 @@ export class GooSim {
         } else if (c.mask) {
           // slow contact: perch on the silhouette — back out to the first clear
           // texel above, then damp like a ground landing
+          p.wasStuck = true;
           const vyOld = vRelY + c.vy;
           const vxOld = vRelX + c.vx;
           let lift = 0;

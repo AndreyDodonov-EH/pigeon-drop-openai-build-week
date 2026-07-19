@@ -275,3 +275,50 @@ puppy-dog eyes, gaunt cheeks, wavy gurgle marks by the neck. Shown while poop is
 on an empty/locked tank (`squeezingEmpty` — the same signal that fires the rumble),
 slotted between `strain` and `pleased` in the portrait priority so it beats the
 post-dump relieved face but never masks real effort or damage states.
+
+## Victim voice reactions — grumbles and honks (shipped 2026-07-19)
+
+Hits on pedestrians and cars now sometimes get a voiced reaction on top of the splat:
+irritated (`ped-grumble` — syllabic angry gibberish; `car-honk-angry` — beep-BEEP double
+honk) or delighted when the goo is rainbow (`ped-delight` — rising woo-hoo cheer;
+`car-honk-happy` — four-note melodic honk phrase). All four generated, see AUDIO_LOG.
+
+Deliberately a garnish, not a soundtrack (backlog: "sound for *some* reactions"): only
+the loud personalities vocalize (`VOCAL_PED_VARIANTS` = suit guy, granddad, gym bro;
+`VOCAL_CAR_VARIANTS` = both sedans, the van keeps its "MY VAN!" text), a 55% chance roll
+thins them further, and a single shared 2.5 s cooldown (`nextVictimVoiceAt`) means a
+combo volley yields at most one voice. The voice trails the splat by 150 ms so it reads
+as a reaction to the impact, not part of it, with ±8% rate variance. Per the backlog
+intent, a voiced hit *replaces* that hit's text line popup (score popup stays); silent
+hits keep their text lines. Verified headless: all six gating cases (irritated/joyful ×
+ped/car, cooldown block, non-vocal variant) play the right key and suppress/show the
+right popup.
+
+**Per-character ped voices (same day):** one generic grumble/delight pair fit only the
+granddad, so each vocal ped got its own pair — `ped-{grumble,delight}-{0,2,5}`: prissy
+clipped yelp + posh "oooh" gasp (suit guy), gravelly mutter + wheezy hee-hee cackle
+(granddad — grumble is the original master, cut down), deep dudebro growl + stoked
+"yeah!" whoop (gym bro). All cut to ≤1.3 s so the shout still maps to a ped on screen,
+and played quieter than before (per-file `PED_GRUMBLE_VOLUME`/`PED_DELIGHT_VOLUME`
+tables — street voices are distant, and the tables also even out master loudness).
+Generic pair removed from `public/`; masters kept as spares (see AUDIO_LOG).
+
+**Audition round 2 (same day):** suit-guy delight sounded robotic and the bro whoop
+strange — both regenerated with "natural human voice actor / organic, not synthesized"
+prompt language and replaced. The influencer (ped 3, "NOT THE BAG!" / "CONTENT GOLD!")
+joined the vocal set with her own pair: a whiny "ughhh"-scoff grumble (0.69 s) and an
+"omg!"-style squeal delight (1.00 s). Vocal peds are now 4 of 6 (0/2/3/5); jogger and
+tourist stay text-only. Round 3: the replacement bro whoop read as a karate kiai and
+was regenerated once more into a laid-back "yeeeah brooo" flex cheer (1.45 s).
+
+## Silent runoff — victim drips no longer click on the street (shipped 2026-07-19)
+
+Goo that stuck to (or perched on) a pedestrian, car, or the hydrant and then dripped
+down to the asphalt was re-triggering `sfx-splat-asphalt` on every landing — a heavy
+hit shed dozens of trickling drops, i.e. a burst of clicks seconds after the actual
+impact. Particles now carry a persistent `wasStuck` flag (set on glue *and* on
+slow-contact perch, surviving unstick), and `onAsphaltSplat` ignores flagged particles:
+the hit that put the goo there already made its noise, runoff lands silently. Direct
+pigeon→street misses still click, unchanged (threshold + 420 ms cooldown). Verified
+headless: a burst dumped on a ped produced runoff landings with zero asphalt plays,
+while a straight street drop still played.

@@ -147,6 +147,21 @@ const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
 const REACT_FRAMES = 90;
 
+// Voiced hit reactions stay a garnish, not a soundtrack: only the loud personalities
+// vocalize (suit guy, granddad, influencer, gym bro; the van keeps its text line), a coin flip
+// thins them further, and one shared cooldown keeps a combo from becoming a chorus.
+const VOCAL_PED_VARIANTS = new Set([0, 2, 3, 5]);
+const VOCAL_CAR_VARIANTS = new Set([0, 1]);
+const VICTIM_VOICE_CHANCE = 0.55;
+const VICTIM_VOICE_COOLDOWN_MS = 2500;
+/** voice trails the splat so it reads as a reaction, not part of the impact */
+const VICTIM_VOICE_DELAY_MS = 150;
+// Each vocal ped has its own voice pair (suit guy 0, granddad 2, influencer 3,
+// gym bro 5). Street-level voices sit under the splat — they come from far below the
+// pigeon — and the per-file scalars also even out loudness differences between masters.
+const PED_GRUMBLE_VOLUME: Record<number, number> = { 0: 0.35, 2: 0.45, 3: 0.42, 5: 0.42 };
+const PED_DELIGHT_VOLUME: Record<number, number> = { 0: 0.22, 2: 0.32, 3: 0.25, 5: 0.23 };
+
 /** cruise line the pigeon starts on (also the altitude it holds hands-off) */
 const START_Y = 150;
 
@@ -249,6 +264,7 @@ export class GameScene extends Phaser.Scene {
   private rainbowDebug = false;
   private rainbowTimer = 0;
   private nextAsphaltSplatAt = 0;
+  private nextVictimVoiceAt = 0;
   private music!: MusicManager;
 
   constructor() {
@@ -284,6 +300,24 @@ export class GameScene extends Phaser.Scene {
     this.load.audio('sfx-belly-rumble', [
       'assets/audio/belly-rumble.ogg',
       'assets/audio/belly-rumble.mp3',
+    ]);
+    for (const i of VOCAL_PED_VARIANTS) {
+      this.load.audio(`sfx-ped-grumble-${i}`, [
+        `assets/audio/ped-grumble-${i}.ogg`,
+        `assets/audio/ped-grumble-${i}.mp3`,
+      ]);
+      this.load.audio(`sfx-ped-delight-${i}`, [
+        `assets/audio/ped-delight-${i}.ogg`,
+        `assets/audio/ped-delight-${i}.mp3`,
+      ]);
+    }
+    this.load.audio('sfx-car-honk-angry', [
+      'assets/audio/car-honk-angry.ogg',
+      'assets/audio/car-honk-angry.mp3',
+    ]);
+    this.load.audio('sfx-car-honk-happy', [
+      'assets/audio/car-honk-happy.ogg',
+      'assets/audio/car-honk-happy.mp3',
     ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
@@ -370,7 +404,7 @@ export class GameScene extends Phaser.Scene {
       gooDepth: 6,
       fireDepth: 6.5,
       gasDepth: 6.6,
-      onGroundHit: (_particle, impact) => this.onAsphaltSplat(impact),
+      onGroundHit: (particle, impact) => this.onAsphaltSplat(particle, impact),
     });
 
     this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
@@ -1212,6 +1246,30 @@ export class GameScene extends Phaser.Scene {
     v.sprite.setTexture(`${v.kind}-${v.variant}${joyful ? '-rainbow' : '-r'}`);
     v.reactTimer = REACT_FRAMES;
 
+    // A voiced reaction replaces this hit's text line (backlog: sound over pop-ups);
+    // gating constants are defined next to the line tables.
+    const voiced =
+      (v.kind === 'ped' ? VOCAL_PED_VARIANTS : VOCAL_CAR_VARIANTS).has(v.variant) &&
+      this.time.now >= this.nextVictimVoiceAt &&
+      Math.random() < VICTIM_VOICE_CHANCE;
+    if (voiced) {
+      this.nextVictimVoiceAt = this.time.now + VICTIM_VOICE_COOLDOWN_MS;
+      const [key, vol] =
+        v.kind === 'car'
+          ? joyful
+            ? (['sfx-car-honk-happy', 0.42] as const)
+            : (['sfx-car-honk-angry', 0.45] as const)
+          : joyful
+            ? ([`sfx-ped-delight-${v.variant}`, PED_DELIGHT_VOLUME[v.variant]] as const)
+            : ([`sfx-ped-grumble-${v.variant}`, PED_GRUMBLE_VOLUME[v.variant]] as const);
+      this.time.delayedCall(VICTIM_VOICE_DELAY_MS, () =>
+        this.sound.play(key, {
+          volume: vol * SFX_VOLUME,
+          rate: Phaser.Math.FloatBetween(0.92, 1.08),
+        }),
+      );
+    }
+
     if (v.kind === 'ped') {
       // The jogger and map-covered tourist shudder; broader poses shake harder.
       // y is owned by the bob update, so do not tween it here.
@@ -1224,8 +1282,10 @@ export class GameScene extends Phaser.Scene {
         repeat: 3,
         onComplete: () => v.sprite.setAngle(0),
       });
-      const line = joyful ? PED_LINES_RAINBOW[v.variant] : PED_LINES[v.variant];
-      this.popup(v.sprite.x + 18, v.sprite.y - 70, line, joyful ? COLOR_JOY_GREEN : COLOR_ORANGE, 15);
+      if (!voiced) {
+        const line = joyful ? PED_LINES_RAINBOW[v.variant] : PED_LINES[v.variant];
+        this.popup(v.sprite.x + 18, v.sprite.y - 70, line, joyful ? COLOR_JOY_GREEN : COLOR_ORANGE, 15);
+      }
     } else {
       // suspension dip; the van wobbles twice (a happy car bounces once more)
       this.tweens.add({
@@ -1235,12 +1295,17 @@ export class GameScene extends Phaser.Scene {
         yoyo: true,
         repeat: (v.variant === 2 ? 2 : 0) + (joyful ? 1 : 0),
       });
-      const line = joyful ? CAR_LINES_RAINBOW[v.variant] : CAR_LINES[v.variant];
-      this.popup(v.sprite.x - 30, v.sprite.y - 40, line, joyful ? COLOR_JOY_GREEN : COLOR_AMBER, 15);
+      if (!voiced) {
+        const line = joyful ? CAR_LINES_RAINBOW[v.variant] : CAR_LINES[v.variant];
+        this.popup(v.sprite.x - 30, v.sprite.y - 40, line, joyful ? COLOR_JOY_GREEN : COLOR_AMBER, 15);
+      }
     }
   }
 
-  private onAsphaltSplat(impact: number): void {
+  private onAsphaltSplat(p: Particle, impact: number): void {
+    // Runoff dripping off a victim or the hydrant lands silently — the hit that put
+    // it there already made its noise, and dozens of trickling drops read as clicks.
+    if (p.wasStuck) return;
     if (impact < 2.2 || this.time.now < this.nextAsphaltSplatAt) return;
     this.nextAsphaltSplatAt = this.time.now + ASPHALT_SPLAT_COOLDOWN_MS;
     this.sound.play('sfx-splat-asphalt', {

@@ -41,6 +41,7 @@ this slot in alongside the normal flight frames.
 ## Idea dump (user, 2026-07-17)
 
 **Targets & scoring**
+- Go to pleased portrait only after a longer dump - also dont go to pleased if we went to hungry
 - Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
 - Higher-value fast targets: quick rollerblader/skater — harder lead, bigger reward.
@@ -52,23 +53,29 @@ this slot in alongside the normal flight frames.
   out-flex each other; two granddads lean on their canes and gossip. Also use sound for the gossip. Use proximity plus a
   per-character cooldown so interactions stay surprising and do not jam pedestrian flow.
 
+**Pooping**
+- combine pooping (e.g. gas (pea pod) + rainbow = rainbow gas!) Make sure to keep the code ouf of GameScene file not too grow it even further - it's separate logic
+
 **Sounds**
 - Sound for character interation (once done)
-- Sound for some of pedestrain and car reactions - should replace text pop-ups
+- ~~Sound for some of pedestrain and car reactions - should replace text pop-ups~~
+  (shipped 2026-07-19 — grumble/delight for peds, angry/happy honks for cars, gated by
+  variant + chance + shared cooldown; see CHANGELOG)
 - Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
+  (partial 2026-07-19: runoff dripping off victims/hydrant now lands silently — see
+  CHANGELOG. Still open: the *direct* asphalt splat's clicky timbre itself.)
 - Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump. (The empty-tank telegraph got a generated belly-rumble SFX instead of a hungry koo — see CHANGELOG 2026-07-19.)
 - Slighly crackling sound when we poo in chilli mode
 
 **Pickups**
-- Special pickup effects (assets, spawning and collection are shipped): coffee =
-  accelerated meter and frightened pea pod = gas replacement mode are shipped; chilli =
-  explosive burning/fire poo remains. Rainbow behavior is already shipped.
 - **Pea-pod gas targeting — keep as is (resolved 2026-07-19):** the buoyant cloud that
   rises before reaching pedestrians turned out to be the mechanic, not a flaw: gas
   scores fine if you fly low, so it trades the safe high bombing line for risky
   head-height crop-dusting (closer to cars and hydrant jets). The earlier downward-jet
   redesign idea is dropped. Note: gas hits build combo/rank normally but a missed cloud
   never breaks the chain (no salvo judgment) — low gas runs are strictly combo-friendly.
+- Add sound to pick-ups (some are already present in the repository, just not wired)
+- Kebab/bread can effect how liquid goo is - kebab should make it more liquid, bread - a little denser. May be with timer, but no explicit one. It just should feel naturally as part of the game, more    diegetic.
 
 **World & level design**
 - Day mechanic - this demo is day one, with different time of day (see other point) - at the end pigeon goes happily to sleep - flies away and goes to sleep on the roof. 
