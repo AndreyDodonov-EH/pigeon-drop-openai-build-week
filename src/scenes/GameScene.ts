@@ -178,6 +178,13 @@ const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
 const REACT_FRAMES = 90;
 
+// Post-hit conspiratorial glance: the pigeon turns to face the camera for a beat
+// after a juicy hit ("you saw that, right?"). Reserved for rainbow hits, combos,
+// and blowout connects — plus a cooldown — so it stays a punchline, not a tic.
+const GLANCE_FRAMES = 75;
+const GLANCE_COOLDOWN_MS = 6000;
+const GLANCE_MIN_COMBO = 3;
+
 // Voiced hit reactions stay a garnish, not a soundtrack: only the loud personalities
 // vocalize (suit guy, granddad, influencer, gym bro; the van keeps its text line), a coin flip
 // thins them further, and one shared cooldown keeps a combo from becoming a chorus.
@@ -232,6 +239,9 @@ export class GameScene extends Phaser.Scene {
   private pigeonY = START_Y;
   private pigeonVy = 0;
   private flapPhase = 0;
+  /** frames left of the post-hit look-at-camera glance */
+  private glanceFrames = 0;
+  private nextGlanceAt = 0;
 
   private bgFar!: Phaser.GameObjects.TileSprite;
   /** lit-windows overlay over bgFar, faded in after dark */
@@ -374,6 +384,9 @@ export class GameScene extends Phaser.Scene {
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
+    this.load.image('pigeon-look-f0', 'assets/sprites/pigeon-look-f0.png');
+    this.load.image('pigeon-look-f1', 'assets/sprites/pigeon-look-f1.png');
+    this.load.image('pigeon-look-f2', 'assets/sprites/pigeon-look-f2.png');
     this.load.image('car-0', 'assets/sprites/car-0.png');
     this.load.image('car-1', 'assets/sprites/car-1.png');
     this.load.image('car-2', 'assets/sprites/car-2.png');
@@ -518,6 +531,7 @@ export class GameScene extends Phaser.Scene {
         this.combo = v;
         this.comboTimer = 120;
       },
+      glance: (frames = GLANCE_FRAMES) => (this.glanceFrames = frames),
       musicFrantic: () => this.music.franticNow,
       comboRank: () => this.rankTier,
       setTimeOfDay: (look: DayLook) => this.dayNight.jump(look),
@@ -889,7 +903,7 @@ export class GameScene extends Phaser.Scene {
 
   private updatePigeon(f: number): void {
     const up = this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly || this.touch.fly;
-    const down = this.keys.down.isDown || this.touch.dive;
+    const down = this.keys.down.isDown || this.pointerDive || this.touch.dive;
     // it's a bird, not a brick: velocity trims toward an input-chosen target,
     // so releasing everything levels off and holds the current altitude
     const targetVy = up ? -3.6 : down ? 4.2 : 0;
@@ -900,7 +914,12 @@ export class GameScene extends Phaser.Scene {
     // wing flap: fast while climbing, steady hover beat, lazy dive glide
     this.flapPhase += (up ? 0.22 : down ? 0.05 : 0.11) * f;
     const flapSeq = [0, 1, 2, 1];
-    this.pigeonImg.setTexture(`pigeon-f${flapSeq[Math.floor(this.flapPhase) % 4]}`);
+    // post-hit glance at the camera; any steering input snaps the head back —
+    // eye contact must never read as "nothing is happening" mid-maneuver
+    if (up || down) this.glanceFrames = 0;
+    else this.glanceFrames = Math.max(0, this.glanceFrames - f);
+    const head = this.glanceFrames > 0 ? 'pigeon-look-f' : 'pigeon-f';
+    this.pigeonImg.setTexture(`${head}${flapSeq[Math.floor(this.flapPhase) % 4]}`);
 
     // blowout telegraph: wobbly flight ramping up as the meter tops out
     const wobbleAmp =
@@ -1449,6 +1468,14 @@ export class GameScene extends Phaser.Scene {
     // reaction frame (outraged or delighted), reverted by updateVictims after REACT_FRAMES
     v.sprite.setTexture(`${v.kind}-${v.variant}${joyful ? '-rainbow' : '-r'}`);
     v.reactTimer = REACT_FRAMES;
+
+    // the conspiratorial glance: only the juicy connects earn eye contact
+    const juicy =
+      joyful || this.combo >= GLANCE_MIN_COMBO || this.dumpKind === 'blowout';
+    if (juicy && this.time.now >= this.nextGlanceAt) {
+      this.glanceFrames = GLANCE_FRAMES;
+      this.nextGlanceAt = this.time.now + GLANCE_COOLDOWN_MS;
+    }
 
     // A voiced reaction replaces this hit's text line (backlog: sound over pop-ups);
     // gating constants are defined next to the line tables.

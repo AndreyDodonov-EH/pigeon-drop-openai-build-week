@@ -36,6 +36,46 @@ extending a set — consistency depends on it.
   >
   > (For future variants — e.g. the turbo/rocket pose set — keep this exact three-panel layout and wording, changing only the pose description.)
 
+## assets/masters/pigeon-look-sheet.png → public/assets/sprites/pigeon-look-f{0,1,2}.png — 2026-07-19
+
+- **State:** post-direct-hit conspiratorial glance; runtime swaps to these textures for about one second while retaining the normal f0/f1/f2 flap sequence.
+- **Tool:** Codex built-in `imagegen` image edit/generation; model identifier was not exposed. One accepted render.
+- **References viewed:** `images/normal.png`, `images/pleased.png`, `assets/masters/pigeon-flight-sheet.png`, `public/assets/sprites/pigeon-f0.png`, `public/assets/sprites/pigeon-f1.png`, `public/assets/sprites/pigeon-f2.png`.
+- **References attached to generation:** `assets/masters/pigeon-flight-sheet.png` (strict panel/body/wing geometry), `images/normal.png` and `images/pleased.png` (identity and frontal face), `public/assets/sprites/pigeon-f0.png` and `public/assets/sprites/pigeon-f2.png` (runtime silhouette extremes). `pigeon-f1.png` was inspected but not attached because the generation tool accepts at most five paths; its geometry is represented by the master sheet's middle panel.
+- **Master:** untouched generated source at `assets/masters/pigeon-look-sheet.png`, 1774×887. The generator added one extra background-only column versus the requested 1773×887; processing used three exact 591×887 crops at x=0, 591, and 1182, omitting only x=1773.
+- **Shipped outputs:** `public/assets/sprites/pigeon-look-f0.png`, `public/assets/sprites/pigeon-look-f1.png`, `public/assets/sprites/pigeon-look-f2.png`; 296×444 indexed RGBA PNGs; f0 = wings up, f1 = wings mid, f2 = wings down.
+- **QA composites:** `assets/masters/pigeon-look-f0-qa.png`, `assets/masters/pigeon-look-f1-qa.png`, `assets/masters/pigeon-look-f2-qa.png`, each composited over `#3a405a`.
+- **Post-processing commands:**
+  ```bash
+  convert assets/masters/pigeon-look-sheet.png -crop '591x887+<x>+0' +repage <panel>.png
+  convert <panel>.png -fuzz 12% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel -resize 296x444 <processed>.png
+  pngquant --force --skip-if-larger --output public/assets/sprites/pigeon-look-f<n>.png 256 <processed>.png
+  convert -size 296x444 xc:'#3a405a' public/assets/sprites/pigeon-look-f<n>.png -compose over -composite assets/masters/pigeon-look-f<n>-qa.png
+  ```
+- **Pixel QA:** `tools/qa_pigeon_look.py`. Corner alpha in TL/TR/BL/BR order is `[0,0,0,0]` for every frame. Near-magenta (`R>=224, G<=40, B>=224`) pixels with nonzero alpha: f0 = 46, f1 = 0, f2 = 44; all counted pixels in f0/f2 have alpha 1/255 and are visually imperceptible on the slate composites.
+- **Opaque-content alignment versus normal frames:** bbox values are `(left, top, right, bottom)` and offsets are look minus normal per edge. f0: look `(24,63,270,328)`, normal `(24,65,281,328)`, offset `(0,-2,-11,0)`; f1: look `(7,141,262,328)`, normal `(7,143,277,327)`, offset `(0,-2,-15,+1)`; f2: look `(4,141,272,364)`, normal `(4,149,272,363)`, offset `(0,-8,0,+1)`. Corresponding bbox-center offsets are f0 `(-5.5,-1.0)`, f1 `(-7.5,-0.5)`, f2 `(0,-3.5)`. The narrower front-facing beak accounts for the reduced right edge in f0/f1; the left/body anchors remain exact and vertical offsets stay within 8 px.
+- **Runtime QA:** source inspection confirms `GameScene.ts` preloads `pigeon-look-f0/f1/f2` and selects the look prefix while `glanceFrames > 0`. Headless runtime screenshotting was blocked in this sandbox because Vite could not bind `:::5199` (`EPERM`). Static master, all shipped frames, and all slate composites were visually inspected.
+- **Exact generation prompt:**
+  > REFERENCES AND ROLES — Inspect every attached image before rendering:
+  > - assets/masters/pigeon-flight-sheet.png is the strict geometry and animation reference. Match it panel-for-panel: same 1773×887 wide landscape canvas, exactly three equal 591×887 side-by-side panels, same pigeon body position, size, silhouette, plump proportions, fanned tail, dangling feet, and the exact wing pose in each corresponding panel. Preserve the body-facing-right flight pose and gameplay anchor geometry. Change only the head orientation and expression.
+  > - public/assets/sprites/pigeon-f0.png and pigeon-f2.png are shipped runtime counterparts and reinforce the exact silhouette, scale, placement, and up/down wing extremes. The middle panel of the master is the strict mid-flap reference corresponding to the inspected shipped pigeon-f1.png.
+  > - images/normal.png and images/pleased.png define the same character's identity and frontal facial construction: slate-blue pigeon, orange eyes, purple eye patches, scruffy black brows, broad gray beak, iridescent green-to-purple neck feathers, thick clean dark outlines, painterly cel shading, raunchy comic personality.
+  >
+  > SUBJECT AND STATE — Generate a CONSPIRATORIAL GLANCE FLIGHT ANIMATION SPRITE SHEET of this SAME full-body pigeon. The body remains in right-facing side-view flight, but in every panel the HEAD is TURNED fully toward the camera so the face looks DIRECTLY AT THE VIEWER, straight out of the image. The face is fully front-on and BOTH orange eyes are clearly visible. Give it a smug, conspiratorial, naughty expression: both eyes half-lidded, a sly knowing grin in the beak, and one scruffy black brow slightly raised, as if it just scored a direct hit and wants the viewer to acknowledge it. Keep the recognizable purple patches beneath/around both eyes.
+  >
+  > COMPOSITION — Wide landscape sheet divided into exactly THREE equal side-by-side panels with no divider lines. One full-body flying pigeon per panel, evenly spaced, never touching an image edge. Preserve the original master sheet's body pose, scale, placement, tail, feet, and anchor in each corresponding panel. The body, head scale, and body-facing-right orientation are consistent across all three; ONLY the wing pose follows the animation:
+  > - Panel 1, left: wings raised high above the back, top of upstroke, matching original panel 1.
+  > - Panel 2, middle: wings level and straight out to the side, mid-flap, matching original panel 2.
+  > - Panel 3, right: wings swept fully downward below the body, bottom of downstroke, matching original panel 3.
+  >
+  > PALETTE AND RENDERING — Cartoon game art with thick clean dark outlines and painterly cel shading. Preserve the exact established palette: slate-blue body, darker blue flight feathers, vivid orange irises, purple eye patches, scruffy black brows, gray beak, pink dangling feet, and iridescent green-to-purple neck feathers. Keep the rendering as close as possible to assets/masters/pigeon-flight-sheet.png and the portrait facial identity.
+  >
+  > INVARIANTS — Do not redesign or reposition the body, wings, feet, or tail. Do not change frame order, body proportions, overall scale, panel spacing, or flight line. Do not add extra limbs, motion trails, props, text, panel borders, separators, scenery, medallions, portrait circles, or shadows. The only substantive change from the flight master is the front-facing head turn and conspiratorial facial expression.
+  >
+  > BACKGROUND — The entire background must be one solid, flat, exact pure magenta #ff00ff field: no gradients, texture, shadows, halos, panel divider lines, or non-magenta corners. No pigeon outline may touch any image edge.
+  >
+  > OUTPUT — One coherent three-panel master sheet intended for assets/masters/pigeon-look-sheet.png. The three equal panels will ship as public/assets/sprites/pigeon-look-f0.png (wings up), pigeon-look-f1.png (mid), and pigeon-look-f2.png (down), each at 296×444 after the established chroma-key pipeline.
+
 ## assets/masters/pedestrians-sheet.png → public/assets/sprites/ped-{0,1,2}.png — 2026-07-13
 
 - **References attached:** `images/normal.png`, `images/pleased.png` (style only — no pigeon in the render)
