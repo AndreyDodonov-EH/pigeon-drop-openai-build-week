@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { W, H } from '../world/textures';
 import { isTouchDevice } from '../input/TouchControls';
+import { t } from '../i18n';
 
 const SEEN_KEY = 'sp-wizard-seen';
 const CREAM = '#f3ead8';
@@ -29,23 +30,23 @@ export class FirstRunWizard {
 
   constructor(private scene: Phaser.Scene) {
     this.objs.push(scene.add.rectangle(W / 2, H / 2, W, H, 0x0a0b10, 0.72).setDepth(DEPTH));
-    this.text(W / 2, H * 0.14, 'HOW TO PLAY', 14, 0.7);
+    this.text(W / 2, H * 0.14, t.howToPlay, 14, 0.7);
 
     if (isTouchDevice()) {
       this.objs.push(
         scene.add.rectangle(W / 2, H * 0.42, 2, H * 0.5, 0xf3ead8, 0.25).setDepth(DEPTH),
       );
       this.text(W * 0.25, H * 0.3, '▲', 44);
-      this.text(W * 0.25, H * 0.44, 'HOLD — CLIMB', 20);
-      this.text(W * 0.25, H * 0.53, 'DRAG DOWN — DIVE ▼', 15, 0.8);
+      this.text(W * 0.25, H * 0.44, t.holdClimb, 20);
+      this.text(W * 0.25, H * 0.53, `${t.dragDive} ▼`, 15, 0.8);
       this.text(W * 0.75, H * 0.3, '💩', 44);
-      this.text(W * 0.75, H * 0.44, 'HOLD — LET IT RIP', 20);
-      this.prompt = this.text(W / 2, H * 0.78, 'TAP ANYWHERE TO START', 16);
+      this.text(W * 0.75, H * 0.44, t.holdRip, 20);
+      this.prompt = this.text(W / 2, H * 0.78, t.tapStart, 16);
     } else {
-      this.text(W / 2, H * 0.34, 'HOLD ↑ / SPACE / LMB — CLIMB', 20);
-      this.text(W / 2, H * 0.44, 'HOLD ↓ — DIVE', 20);
-      this.text(W / 2, H * 0.54, 'HOLD S / RMB — LET IT RIP', 20);
-      this.prompt = this.text(W / 2, H * 0.76, 'CLICK OR PRESS ANY KEY TO START', 16);
+      this.text(W / 2, H * 0.34, t.kbClimb, 20);
+      this.text(W / 2, H * 0.44, t.kbDive, 20);
+      this.text(W / 2, H * 0.54, t.kbRip, 20);
+      this.prompt = this.text(W / 2, H * 0.76, t.clickStart, 16);
     }
     scene.tweens.add({
       targets: this.prompt,

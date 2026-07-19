@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { W, H } from '../world/textures';
+import { t } from '../i18n';
 
 /** Coarse-pointer check for cosmetic gating (hints, debug menu). Gameplay
  * reacts to actual touch events via `pointer.wasTouch`, never this. */
@@ -127,12 +128,12 @@ export class TouchControls {
 
   private createHints(): void {
     this.leftHint = this.scene.add
-      .text(W * 0.25, H - 60, 'HOLD — CLIMB   ·   DRAG DOWN — DIVE', HINT_STYLE)
+      .text(W * 0.25, H - 60, `${t.holdClimb}   ·   ${t.dragDive}`, HINT_STYLE)
       .setOrigin(0.5)
       .setDepth(10)
       .setAlpha(0.55);
     this.rightHint = this.scene.add
-      .text(W * 0.75, H - 60, 'HOLD — LET IT RIP', HINT_STYLE)
+      .text(W * 0.75, H - 60, t.holdRip, HINT_STYLE)
       .setOrigin(0.5)
       .setDepth(10)
       .setAlpha(0.55);

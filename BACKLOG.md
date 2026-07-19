@@ -66,6 +66,7 @@ this slot in alongside the normal flight frames.
 - Sound for character interation (once done)
 - Sound for some of pedestrain and car reactions - should replace text pop-ups
 - Klezmer should play a little longer (not just fade off) - and probably be synchronized with different combo levels
+- Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =

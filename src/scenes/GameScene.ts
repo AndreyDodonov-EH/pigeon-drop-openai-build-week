@@ -18,6 +18,7 @@ import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, isTouchDevice } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
+import { t } from '../i18n';
 
 const SCROLL = 2.1; // world scroll, px/frame
 
@@ -468,7 +469,7 @@ export class GameScene extends Phaser.Scene {
     // touch devices get zone hint labels from TouchControls instead
     if (!isTouchDevice()) {
       this.add
-        .text(16, H - 26, 'HOLD ↑ / SPACE / LMB — climb     HOLD ↓ — dive     HOLD S / RMB — let it rip', {
+        .text(16, H - 26, `${t.kbClimb}     ${t.kbDive}     ${t.kbRip}`, {
           fontFamily: 'monospace',
           fontSize: '13px',
           color: COLOR_CREAM,
