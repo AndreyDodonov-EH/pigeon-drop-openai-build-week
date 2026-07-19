@@ -1,28 +1,55 @@
 import Phaser from 'phaser';
 import { MUSIC_VOLUME } from './mix';
 
-// Two 60 s loops generated on the same 120 BPM / D-minor grid. Both play from
-// t=0 in lockstep and never stop; combo tier only moves their volumes, so the
-// sneaky→klezmer handoff lands on the shared beat grid instead of restarting.
+// Three synchronized layers on one 120 BPM / D-minor grid, all playing from
+// t=0 in lockstep and never stopping; combo only moves volumes.
+//  - sneaky: base pizzicato loop, always audible.
+//  - echo: the SAME pizzicato file offset by an eighth note. The interleaved
+//    plucks double the perceived pulse — the "tempo goes up" feel — without
+//    touching playback rate, so no pitch shift and no leaving the beat grid.
+//  - klezmer: street-party topper for combo >= 4, swelling as the combo grows.
 const FADE_MS = 900;
 const KLEZMER_FADE_OUT_MS = 2400;
+// After the combo breaks the party doesn't stop on a dime: klezmer holds for
+// two bars, then takes its long release.
+const KLEZMER_HOLD_MS = 4000;
+const ECHO_OFFSET_S = 60 / 120 / 2; // eighth note at 120 BPM
+const ECHO_AT_COMBO = 2;
 const KLEZMER_AT_COMBO = 4;
-// relative balance within the music bus — klezmer is mixed denser/louder at
-// the source, so it gets less headroom
-const VOL = { sneaky: 1 * MUSIC_VOLUME, klezmer: 0.82 * MUSIC_VOLUME };
+const KLEZMER_MAX_COMBO = 8;
+
+type MixTarget = { sneaky: number; echo: number; klezmer: number };
+
+// Klezmer's measured average is 3.6 dB louder than sneaky's. These targets
+// compensate for that density and leave headroom when all layers are audible.
+function mixForCombo(combo: number): MixTarget {
+  if (combo >= KLEZMER_AT_COMBO) {
+    // klezmer swells with the combo: 0.40 at x4 up to 0.58 at the x8 cap
+    const t = Math.min((combo - KLEZMER_AT_COMBO) / (KLEZMER_MAX_COMBO - KLEZMER_AT_COMBO), 1);
+    return { sneaky: 0.82, echo: 0.6, klezmer: 0.4 + 0.18 * t };
+  }
+  if (combo >= ECHO_AT_COMBO) return { sneaky: 1, echo: 0.75, klezmer: 0 };
+  return { sneaky: 1, echo: 0, klezmer: 0 };
+}
 
 export class MusicManager {
   private scene: Phaser.Scene;
   private sneaky: Phaser.Sound.WebAudioSound;
+  private echo: Phaser.Sound.WebAudioSound;
   private klezmer: Phaser.Sound.WebAudioSound;
-  private frantic = false;
+  private mix: MixTarget = mixForCombo(0);
+  private klezmerHold?: Phaser.Time.TimerEvent;
   private started = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.sneaky = scene.sound.add('music-sneaky', {
       loop: true,
-      volume: VOL.sneaky,
+      volume: this.mix.sneaky * MUSIC_VOLUME,
+    }) as Phaser.Sound.WebAudioSound;
+    this.echo = scene.sound.add('music-sneaky', {
+      loop: true,
+      volume: 0,
     }) as Phaser.Sound.WebAudioSound;
     this.klezmer = scene.sound.add('music-klezmer', {
       loop: true,
@@ -31,6 +58,7 @@ export class MusicManager {
     // sounds live on the global sound manager, not the scene
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.sneaky.destroy();
+      this.echo.destroy();
       this.klezmer.destroy();
     });
   }
@@ -40,6 +68,7 @@ export class MusicManager {
     this.started = true;
     const go = () => {
       this.sneaky.play();
+      this.echo.play();
       this.klezmer.play();
     };
     if (this.scene.sound.locked) this.scene.sound.once(Phaser.Sound.Events.UNLOCKED, go);
@@ -47,32 +76,50 @@ export class MusicManager {
   }
 
   get franticNow(): boolean {
-    return this.frantic;
+    return this.mix.klezmer > 0;
   }
 
   setCombo(combo: number): void {
-    const frantic = combo >= KLEZMER_AT_COMBO;
-    if (frantic === this.frantic) return;
-    this.frantic = frantic;
-    const fadeIn = frantic ? this.klezmer : this.sneaky;
-    const fadeOut = frantic ? this.sneaky : this.klezmer;
-    // The two files differ by ~50 ms per loop pass, so a layer that has sat
-    // silent for a while drifts off the audible track's clock — snap it back
-    // before it becomes audible again.
-    if (fadeIn.volume < 0.01 && fadeOut.isPlaying) {
-      fadeIn.setSeek(fadeOut.seek % fadeIn.duration);
+    const next = mixForCombo(combo);
+    const prev = this.mix;
+    if (next.sneaky === prev.sneaky && next.echo === prev.echo && next.klezmer === prev.klezmer) {
+      return;
     }
-    this.scene.tweens.killTweensOf([fadeIn, fadeOut]);
+    this.mix = next;
+
+    // A layer that has sat silent drifts off the audible track's clock (the
+    // klezmer file differs by ~50 ms per loop pass, and mobile audio suspends
+    // can desync anything) — snap it into place before it becomes audible.
+    if (this.sneaky.isPlaying) {
+      if (this.echo.volume < 0.01 && next.echo > 0) {
+        this.echo.setSeek((this.sneaky.seek + ECHO_OFFSET_S) % this.echo.duration);
+      }
+      if (this.klezmer.volume < 0.01 && next.klezmer > 0) {
+        this.klezmer.setSeek(this.sneaky.seek % this.klezmer.duration);
+      }
+    }
+
+    this.fadeTo(this.sneaky, next.sneaky * MUSIC_VOLUME, FADE_MS);
+    this.fadeTo(this.echo, next.echo * MUSIC_VOLUME, FADE_MS);
+
+    this.klezmerHold?.remove();
+    this.klezmerHold = undefined;
+    const kTarget = next.klezmer * MUSIC_VOLUME;
+    if (kTarget >= this.klezmer.volume) {
+      this.fadeTo(this.klezmer, kTarget, FADE_MS);
+    } else {
+      this.klezmerHold = this.scene.time.delayedCall(KLEZMER_HOLD_MS, () => {
+        this.fadeTo(this.klezmer, kTarget, KLEZMER_FADE_OUT_MS);
+      });
+    }
+  }
+
+  private fadeTo(sound: Phaser.Sound.WebAudioSound, volume: number, duration: number): void {
+    this.scene.tweens.killTweensOf(sound);
     this.scene.tweens.add({
-      targets: fadeIn,
-      volume: frantic ? VOL.klezmer : VOL.sneaky,
-      duration: FADE_MS,
-      ease: 'Sine.easeInOut',
-    });
-    this.scene.tweens.add({
-      targets: fadeOut,
-      volume: 0,
-      duration: frantic ? FADE_MS : KLEZMER_FADE_OUT_MS,
+      targets: sound,
+      volume,
+      duration,
       ease: 'Sine.easeInOut',
     });
   }

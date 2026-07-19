@@ -193,6 +193,15 @@ ends. The earlier harsh burst cue is no longer loaded. Both effects use the shar
 layer over 2.4 seconds while the sneaky layer returns on the original 0.9-second crossfade,
 giving the energetic track a smoother tail without delaying the base music.
 
+**Layered music phases (2026-07-19):** turned the unexpectedly good simultaneous phone
+playback into the intended arrangement — two *pizzicatos*, not pizzicato + klezmer. Combo
+0–1 keeps the sneaky pizzicato loop exposed; combo 2–3 layers the same pizzicato file over
+itself offset by an eighth note, so the interleaved plucks double the perceived tempo with
+no rate or pitch change; combo 4+ adds klezmer on top, swelling with the combo level (0.40
+at x4 up to 0.58 at the x8 cap, loudness-compensated for its 3.6 dB hotter source). When
+the combo breaks, klezmer no longer just fades off: it holds for two bars, then takes its
+long 2.4-second release. Silent layers resync to the audible clock before fading in.
+
 **Second pedestrian cast (2026-07-18):** added three new street victims: a tasteless
 fake-luxury influencer, a hopelessly lost tourist dad, and a skipped-leg-day gym bro. Each
 ships with walk, outraged splat, and delighted rainbow-reaction art plus character-specific
@@ -200,3 +209,116 @@ reaction lines. Pedestrian spawning now samples all six characters. The shared v
 palette control expanded from three to six source IDs, with isolated primary-garment masks
 for the influencer's velour tracksuit, tourist's vacation shirt, and gym bro's tank/shorts;
 existing pedestrians and the three car paint mappings remain in the same batched shader.
+
+## Combo ranks — visual phase system (shipped 2026-07-19)
+
+The visual half of the phase system the layered music started. The combo counter is
+uncapped (score multiplier still plateaus at x8 behind the scenes); rank tiers derive
+from the count in `src/ui/ranks.ts` with thresholds deliberately mirroring the music
+layers — SPLAT! at x2 (echo pizzicato enters), DIRTY! at x4 (klezmer enters),
+CRAPTACULAR! at x8 (klezmer max), SHITSTORM!! at x13 (prestige tier beyond the music) —
+so every rank-up lands on an audible change. Conveyed almost entirely visually: the HUD
+counter (now just `x12`, the word COMBO dropped) grows and recolors per tier
+(amber → orange → red → hue-cycling rainbow) with a scale-punch on rank-up; the rank
+name flashes once as a centered one-shot word and disappears; SHITSTORM enters with a
+camera shake. Rank loss (2 s decay or hydrant scare-poop) takes the same diff path in
+`updateHud`: the counter just reverts — the existing scare shake/damage portrait carry
+the drama. Pure spectacle: no difficulty coupling. Debug: `SP.comboRank()` alongside
+the existing `SP.setCombo`.
+
+**Combo no longer dies mid-flight (2026-07-19):** the 2 s combo window measured time
+between *hits*, but goo takes ~0.9 s to fall from cruise to road level — so leading a
+car (the lowest target) routinely spent the whole window airborne and the landing read
+as "hitting a car reset my combo" (a long-standing perception, not a rank-system bug;
+verified: nothing car-specific ever zeroed the combo). Fix: the countdown freezes while
+the stream is firing or any goo is still airborne (`GooSim.airborneCount`: free and not
+yet grounded; exposed as `GuanoEffects.airborneGooCount`). Missed goo grounds within a
+second, so decay resumes almost immediately — a dribble can stall the clock but costs
+pressure, never builds rank.
+
+**Complete miss breaks the chain (2026-07-19):** the airborne-freeze made whiffing free —
+a missed volley just stalled the clock. Now goo volleys are judged as salvos: emission
+arms one (`salvoActive`/`salvoHit` in GameScene), any victim contact — even during a
+per-victim hit cooldown — marks it connected, and when the last particle resolves (stuck
+or grounded, `airborneGooCount === 0` with emission stopped) a virgin salvo zeroes the
+combo with a small grey "MISS…" popup (shown only when combo ≥ 2). Gas clouds drift too
+loosely to judge and never arm a salvo. Side effect by design: an involuntary blowout
+that hits nobody also wipes the chain — wasted pressure now has a score consequence.
+
+**Mood vignette dropped (2026-07-19):** the initial release also tinted the screen edges
+warmer per tier (radial-gradient overlay, pulsing at SHITSTORM). Cut same day: a reddish
+filter over the scene read as a filter, not as the street heating up. The right way to
+convey escalation is world *behavior*, not a screen effect — see the combo-rank world
+reactions idea in `BACKLOG.md`. Text (counter + one-shot rank word) and the music layers
+carry the phase for now.
+
+## Empty-tank feedback — short lock + hungry-coo telegraph (shipped 2026-07-19)
+
+Running the meter dry engaged a silent ~4 s lockout (`emptyLock` released only at
+meter ≥ 8): holding poop did nothing and the only cue was the "pleased" portrait, which
+read as "can't poop, no idea why". Fixed from both ends of the backlog's either/or:
+the release threshold dropped to 3 (`EMPTY_LOCK_RELEASE`, ~1.3 s — still enough to stop
+dribble-firing off a refilling tank), and squeezing an empty tank now telegraphs why,
+throttled by `bellyRumbleCooldown` so a held button triggers it at most once per lock.
+Side effect by design: holding poop on an empty tank now yields a tiny toot every
+~1.4 s instead of ~4 s of dead input.
+
+**Telegraph is sound-only (same day):** the first cut showed a grey "grumble…" popup
+plus the irritated coo pitched up as a hungry stand-in. Both replaced within hours by a
+dedicated generated SFX: `belly-rumble.{ogg,mp3}` (1.72 s empty-stomach gurgle, see
+AUDIO_LOG), played at 0.55 × SFX bus with ±6% rate variance, cooldown 130 frames so it
+never overlaps itself. Diegetic beats text — the belly complains, no popup needed.
+
+**Hungry portrait (same day):** the telegraph also got a face. New `hungry` portrait
+state (`public/assets/portraits/hungry.png`, Codex-generated, see ART_LOG): pleading
+puppy-dog eyes, gaunt cheeks, wavy gurgle marks by the neck. Shown while poop is held
+on an empty/locked tank (`squeezingEmpty` — the same signal that fires the rumble),
+slotted between `strain` and `pleased` in the portrait priority so it beats the
+post-dump relieved face but never masks real effort or damage states.
+
+## Victim voice reactions — grumbles and honks (shipped 2026-07-19)
+
+Hits on pedestrians and cars now sometimes get a voiced reaction on top of the splat:
+irritated (`ped-grumble` — syllabic angry gibberish; `car-honk-angry` — beep-BEEP double
+honk) or delighted when the goo is rainbow (`ped-delight` — rising woo-hoo cheer;
+`car-honk-happy` — four-note melodic honk phrase). All four generated, see AUDIO_LOG.
+
+Deliberately a garnish, not a soundtrack (backlog: "sound for *some* reactions"): only
+the loud personalities vocalize (`VOCAL_PED_VARIANTS` = suit guy, granddad, gym bro;
+`VOCAL_CAR_VARIANTS` = both sedans, the van keeps its "MY VAN!" text), a 55% chance roll
+thins them further, and a single shared 2.5 s cooldown (`nextVictimVoiceAt`) means a
+combo volley yields at most one voice. The voice trails the splat by 150 ms so it reads
+as a reaction to the impact, not part of it, with ±8% rate variance. Per the backlog
+intent, a voiced hit *replaces* that hit's text line popup (score popup stays); silent
+hits keep their text lines. Verified headless: all six gating cases (irritated/joyful ×
+ped/car, cooldown block, non-vocal variant) play the right key and suppress/show the
+right popup.
+
+**Per-character ped voices (same day):** one generic grumble/delight pair fit only the
+granddad, so each vocal ped got its own pair — `ped-{grumble,delight}-{0,2,5}`: prissy
+clipped yelp + posh "oooh" gasp (suit guy), gravelly mutter + wheezy hee-hee cackle
+(granddad — grumble is the original master, cut down), deep dudebro growl + stoked
+"yeah!" whoop (gym bro). All cut to ≤1.3 s so the shout still maps to a ped on screen,
+and played quieter than before (per-file `PED_GRUMBLE_VOLUME`/`PED_DELIGHT_VOLUME`
+tables — street voices are distant, and the tables also even out master loudness).
+Generic pair removed from `public/`; masters kept as spares (see AUDIO_LOG).
+
+**Audition round 2 (same day):** suit-guy delight sounded robotic and the bro whoop
+strange — both regenerated with "natural human voice actor / organic, not synthesized"
+prompt language and replaced. The influencer (ped 3, "NOT THE BAG!" / "CONTENT GOLD!")
+joined the vocal set with her own pair: a whiny "ughhh"-scoff grumble (0.69 s) and an
+"omg!"-style squeal delight (1.00 s). Vocal peds are now 4 of 6 (0/2/3/5); jogger and
+tourist stay text-only. Round 3: the replacement bro whoop read as a karate kiai and
+was regenerated once more into a laid-back "yeeeah brooo" flex cheer (1.45 s).
+
+## Silent runoff — victim drips no longer click on the street (shipped 2026-07-19)
+
+Goo that stuck to (or perched on) a pedestrian, car, or the hydrant and then dripped
+down to the asphalt was re-triggering `sfx-splat-asphalt` on every landing — a heavy
+hit shed dozens of trickling drops, i.e. a burst of clicks seconds after the actual
+impact. Particles now carry a persistent `wasStuck` flag (set on glue *and* on
+slow-contact perch, surviving unstick), and `onAsphaltSplat` ignores flagged particles:
+the hit that put the goo there already made its noise, runoff lands silently. Direct
+pigeon→street misses still click, unchanged (threshold + 420 ms cooldown). Verified
+headless: a burst dumped on a ped produced runoff landings with zero asphalt plays,
+while a straight street drop still played.

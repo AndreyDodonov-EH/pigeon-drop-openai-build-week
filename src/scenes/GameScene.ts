@@ -18,6 +18,7 @@ import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, isTouchDevice } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
+import { rankForCombo, type ComboRank } from '../ui/ranks';
 import { t } from '../i18n';
 
 const SCROLL = 2.1; // world scroll, px/frame
@@ -64,6 +65,9 @@ const ITEM_PICKUP_MIN_MS = 5000;
 const ITEM_PICKUP_MAX_MS = 9000;
 const PEA_LOOK_FRAME_FRAMES = 18;
 const PASSIVE_DIGESTION_PER_FRAME = 0.035;
+// Ran-dry lockout releases once this much pressure rebuilds. Kept very short
+// (~1.3s) — just enough to stop dribble-firing off a refilling tank.
+const EMPTY_LOCK_RELEASE = 3;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
@@ -143,6 +147,21 @@ const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
 const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
 const REACT_FRAMES = 90;
 
+// Voiced hit reactions stay a garnish, not a soundtrack: only the loud personalities
+// vocalize (suit guy, granddad, influencer, gym bro; the van keeps its text line), a coin flip
+// thins them further, and one shared cooldown keeps a combo from becoming a chorus.
+const VOCAL_PED_VARIANTS = new Set([0, 2, 3, 5]);
+const VOCAL_CAR_VARIANTS = new Set([0, 1]);
+const VICTIM_VOICE_CHANCE = 0.55;
+const VICTIM_VOICE_COOLDOWN_MS = 2500;
+/** voice trails the splat so it reads as a reaction, not part of the impact */
+const VICTIM_VOICE_DELAY_MS = 150;
+// Each vocal ped has its own voice pair (suit guy 0, granddad 2, influencer 3,
+// gym bro 5). Street-level voices sit under the splat — they come from far below the
+// pigeon — and the per-file scalars also even out loudness differences between masters.
+const PED_GRUMBLE_VOLUME: Record<number, number> = { 0: 0.35, 2: 0.45, 3: 0.42, 5: 0.42 };
+const PED_DELIGHT_VOLUME: Record<number, number> = { 0: 0.22, 2: 0.32, 3: 0.25, 5: 0.23 };
+
 /** cruise line the pigeon starts on (also the altitude it holds hands-off) */
 const START_Y = 150;
 
@@ -171,7 +190,7 @@ interface Pickup {
 /** Phaser's manager returns a WebAudio/HTML5 sound with mutable volume at runtime. */
 type AdjustableSound = Phaser.Sound.BaseSound & { volume: number; rate: number };
 
-type PortraitKey = 'ready' | 'pleased' | 'strain' | 'panic' | 'damage';
+type PortraitKey = 'ready' | 'pleased' | 'hungry' | 'strain' | 'panic' | 'damage';
 
 export class GameScene extends Phaser.Scene {
   private guanoFx!: GuanoEffects;
@@ -209,6 +228,12 @@ export class GameScene extends Phaser.Scene {
   private comboTimer = 0;
   private scoreText!: Phaser.GameObjects.Text;
   private comboText!: Phaser.GameObjects.Text;
+  private rankTier = 0;
+  private rankHue = 0;
+  /** a goo volley is in the world (firing or still falling), awaiting judgment */
+  private salvoActive = false;
+  /** something in the current volley touched a victim */
+  private salvoHit = false;
   private effectMeters!: Phaser.GameObjects.Graphics;
   private meterArcTex!: Phaser.Textures.CanvasTexture;
   private meterArcKey = '';
@@ -225,6 +250,10 @@ export class GameScene extends Phaser.Scene {
   private dumpKind: 'none' | 'blowout' | 'scare' = 'none';
   /** ran dry — no firing until digestion rebuilds a little pressure */
   private emptyLock = false;
+  /** throttles the empty-belly-rumble telegraph while poop is held on an empty tank */
+  private bellyRumbleCooldown = 0;
+  /** poop held but the tank is empty/locked — drives the hungry portrait */
+  private squeezingEmpty = false;
   private wobbleT = 0;
 
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
@@ -235,6 +264,7 @@ export class GameScene extends Phaser.Scene {
   private rainbowDebug = false;
   private rainbowTimer = 0;
   private nextAsphaltSplatAt = 0;
+  private nextVictimVoiceAt = 0;
   private music!: MusicManager;
 
   constructor() {
@@ -267,11 +297,34 @@ export class GameScene extends Phaser.Scene {
       'assets/audio/koo-irritated.ogg',
       'assets/audio/koo-irritated.mp3',
     ]);
+    this.load.audio('sfx-belly-rumble', [
+      'assets/audio/belly-rumble.ogg',
+      'assets/audio/belly-rumble.mp3',
+    ]);
+    for (const i of VOCAL_PED_VARIANTS) {
+      this.load.audio(`sfx-ped-grumble-${i}`, [
+        `assets/audio/ped-grumble-${i}.ogg`,
+        `assets/audio/ped-grumble-${i}.mp3`,
+      ]);
+      this.load.audio(`sfx-ped-delight-${i}`, [
+        `assets/audio/ped-delight-${i}.ogg`,
+        `assets/audio/ped-delight-${i}.mp3`,
+      ]);
+    }
+    this.load.audio('sfx-car-honk-angry', [
+      'assets/audio/car-honk-angry.ogg',
+      'assets/audio/car-honk-angry.mp3',
+    ]);
+    this.load.audio('sfx-car-honk-happy', [
+      'assets/audio/car-honk-happy.ogg',
+      'assets/audio/car-honk-happy.mp3',
+    ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
     this.load.image('portrait-pleased', 'assets/portraits/pleased.png');
     this.load.image('portrait-panic', 'assets/portraits/panic.png');
+    this.load.image('portrait-hungry', 'assets/portraits/hungry.png');
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
@@ -351,7 +404,7 @@ export class GameScene extends Phaser.Scene {
       gooDepth: 6,
       fireDepth: 6.5,
       gasDepth: 6.6,
-      onGroundHit: (_particle, impact) => this.onAsphaltSplat(impact),
+      onGroundHit: (particle, impact) => this.onAsphaltSplat(particle, impact),
     });
 
     this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
@@ -389,8 +442,62 @@ export class GameScene extends Phaser.Scene {
         this.comboTimer = 120;
       },
       musicFrantic: () => this.music.franticNow,
+      comboRank: () => this.rankTier,
       touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
+  }
+
+  /** restyle the HUD counter for a new rank tier */
+  private applyRank(rank: ComboRank): void {
+    const up = rank.tier > this.rankTier;
+    this.rankTier = rank.tier;
+
+    this.comboText.setFontSize(rank.fontSize).setColor(rank.color);
+    if (!rank.rainbow) this.comboText.clearTint();
+
+    if (up) {
+      this.tweens.killTweensOf(this.comboText);
+      this.comboText.setScale(1.45);
+      this.tweens.add({ targets: this.comboText, scale: 1, duration: 260, ease: 'Back.easeOut' });
+      if (rank.name) this.announceRank(rank);
+      if (rank.shakeOnEnter) this.cameras.main.shake(160, 0.003);
+    }
+  }
+
+  /** one-shot rank word: punch in, hold a beat, rise and fade */
+  private announceRank(rank: ComboRank): void {
+    const txt = this.add
+      .text(W / 2, 175, rank.name, {
+        fontFamily: 'Arial Black, sans-serif',
+        fontSize: '40px',
+        color: rank.color,
+        stroke: COLOR_INK,
+        strokeThickness: 7,
+      })
+      .setOrigin(0.5)
+      .setDepth(15)
+      .setAlpha(0.95)
+      .setScale(1.7);
+    this.tweens.add({ targets: txt, scale: 1, duration: 150, ease: 'Back.easeOut' });
+    if (rank.rainbow) {
+      // white fill × hue tint = full-color cycling for the word's whole lifetime
+      this.tweens.addCounter({
+        from: 0,
+        to: 3,
+        duration: 900,
+        onUpdate: (tw) =>
+          txt.setTint(Phaser.Display.Color.HSVToRGB((tw.getValue() ?? 0) % 1, 0.75, 1).color),
+      });
+    }
+    this.tweens.add({
+      targets: txt,
+      alpha: 0,
+      y: 145,
+      delay: 450,
+      duration: 450,
+      ease: 'Quad.easeIn',
+      onComplete: () => txt.destroy(),
+    });
   }
 
   private createHud(): void {
@@ -422,7 +529,7 @@ export class GameScene extends Phaser.Scene {
     // portraits get their circular crop baked into canvas textures so the
     // edge is antialiased (a geometry mask would give a hard stencil edge)
     const portraitSize = 88 * SS;
-    for (const key of ['ready', 'pleased', 'strain', 'panic', 'damage'] as PortraitKey[]) {
+    for (const key of ['ready', 'pleased', 'hungry', 'strain', 'panic', 'damage'] as PortraitKey[]) {
       const tex = this.textures.createCanvas(`portrait-round-${key}`, portraitSize, portraitSize)!;
       const ctx = tex.context;
       ctx.save();
@@ -1102,6 +1209,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onVictimHit(v: Victim, joyful: boolean, source: 'goo' | 'gas'): void {
+    // even a cooldown-gated touch proves the volley connected
+    this.salvoHit = true;
     if (v.hitCooldown > 0) return;
     v.hitCooldown = 30;
 
@@ -1116,9 +1225,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.comboTimer = 120;
-    this.combo = Math.min(this.combo + 1, 8);
+    // the visible counter is uncapped (rank spectacle); scoring plateaus at x8
+    this.combo += 1;
     const base = v.kind === 'car' ? 25 : 10;
-    const pts = base * this.combo;
+    const pts = base * Math.min(this.combo, 8);
     this.score += pts;
 
     // Rainbow goo flips the mood. Gas stays disgusting but gets its own hit verb.
@@ -1136,6 +1246,30 @@ export class GameScene extends Phaser.Scene {
     v.sprite.setTexture(`${v.kind}-${v.variant}${joyful ? '-rainbow' : '-r'}`);
     v.reactTimer = REACT_FRAMES;
 
+    // A voiced reaction replaces this hit's text line (backlog: sound over pop-ups);
+    // gating constants are defined next to the line tables.
+    const voiced =
+      (v.kind === 'ped' ? VOCAL_PED_VARIANTS : VOCAL_CAR_VARIANTS).has(v.variant) &&
+      this.time.now >= this.nextVictimVoiceAt &&
+      Math.random() < VICTIM_VOICE_CHANCE;
+    if (voiced) {
+      this.nextVictimVoiceAt = this.time.now + VICTIM_VOICE_COOLDOWN_MS;
+      const [key, vol] =
+        v.kind === 'car'
+          ? joyful
+            ? (['sfx-car-honk-happy', 0.42] as const)
+            : (['sfx-car-honk-angry', 0.45] as const)
+          : joyful
+            ? ([`sfx-ped-delight-${v.variant}`, PED_DELIGHT_VOLUME[v.variant]] as const)
+            : ([`sfx-ped-grumble-${v.variant}`, PED_GRUMBLE_VOLUME[v.variant]] as const);
+      this.time.delayedCall(VICTIM_VOICE_DELAY_MS, () =>
+        this.sound.play(key, {
+          volume: vol * SFX_VOLUME,
+          rate: Phaser.Math.FloatBetween(0.92, 1.08),
+        }),
+      );
+    }
+
     if (v.kind === 'ped') {
       // The jogger and map-covered tourist shudder; broader poses shake harder.
       // y is owned by the bob update, so do not tween it here.
@@ -1148,8 +1282,10 @@ export class GameScene extends Phaser.Scene {
         repeat: 3,
         onComplete: () => v.sprite.setAngle(0),
       });
-      const line = joyful ? PED_LINES_RAINBOW[v.variant] : PED_LINES[v.variant];
-      this.popup(v.sprite.x + 18, v.sprite.y - 70, line, joyful ? COLOR_JOY_GREEN : COLOR_ORANGE, 15);
+      if (!voiced) {
+        const line = joyful ? PED_LINES_RAINBOW[v.variant] : PED_LINES[v.variant];
+        this.popup(v.sprite.x + 18, v.sprite.y - 70, line, joyful ? COLOR_JOY_GREEN : COLOR_ORANGE, 15);
+      }
     } else {
       // suspension dip; the van wobbles twice (a happy car bounces once more)
       this.tweens.add({
@@ -1159,12 +1295,17 @@ export class GameScene extends Phaser.Scene {
         yoyo: true,
         repeat: (v.variant === 2 ? 2 : 0) + (joyful ? 1 : 0),
       });
-      const line = joyful ? CAR_LINES_RAINBOW[v.variant] : CAR_LINES[v.variant];
-      this.popup(v.sprite.x - 30, v.sprite.y - 40, line, joyful ? COLOR_JOY_GREEN : COLOR_AMBER, 15);
+      if (!voiced) {
+        const line = joyful ? CAR_LINES_RAINBOW[v.variant] : CAR_LINES[v.variant];
+        this.popup(v.sprite.x - 30, v.sprite.y - 40, line, joyful ? COLOR_JOY_GREEN : COLOR_AMBER, 15);
+      }
     }
   }
 
-  private onAsphaltSplat(impact: number): void {
+  private onAsphaltSplat(p: Particle, impact: number): void {
+    // Runoff dripping off a victim or the hydrant lands silently — the hit that put
+    // it there already made its noise, and dozens of trickling drops read as clicks.
+    if (p.wasStuck) return;
     if (impact < 2.2 || this.time.now < this.nextAsphaltSplatAt) return;
     this.nextAsphaltSplatAt = this.time.now + ASPHALT_SPLAT_COOLDOWN_MS;
     this.sound.play('sfx-splat-asphalt', {
@@ -1205,7 +1346,7 @@ export class GameScene extends Phaser.Scene {
     const digestionRate =
       PASSIVE_DIGESTION_PER_FRAME * (this.coffeeTimer > 0 ? COFFEE_FILL_MULTIPLIER : 1);
     this.meter = Math.min(100, this.meter + digestionRate * f);
-    if (this.meter >= 8) this.emptyLock = false;
+    if (this.meter >= EMPTY_LOCK_RELEASE) this.emptyLock = false;
 
     // full = involuntary blowout: one huge uncontrolled blast until empty
     if (this.meter >= 100 && this.dumpKind === 'none') {
@@ -1214,13 +1355,22 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.shake(160, 0.003);
     }
 
+    const wantsPoop = this.keys.poop.isDown || this.pointerPoop || this.touch.poop;
     const wasPooping = this.pooping;
-    this.pooping =
-      this.dumpKind === 'none' &&
-      !this.emptyLock &&
-      (this.keys.poop.isDown || this.pointerPoop || this.touch.poop) &&
-      this.meter > 0;
+    this.pooping = this.dumpKind === 'none' && !this.emptyLock && wantsPoop && this.meter > 0;
     if (wasPooping && !this.pooping) this.relievedTimer = 60;
+
+    // squeezing an empty tank: telegraph WHY nothing comes out — an empty-belly
+    // rumble and a hungry face instead of silently eating the input
+    this.squeezingEmpty = wantsPoop && !this.pooping && this.dumpKind === 'none';
+    this.bellyRumbleCooldown = Math.max(0, this.bellyRumbleCooldown - f);
+    if (this.squeezingEmpty && this.bellyRumbleCooldown <= 0) {
+      this.bellyRumbleCooldown = 130; // sound runs ~1.7s — don't let it overlap itself
+      this.sound.play('sfx-belly-rumble', {
+        volume: 0.55 * SFX_VOLUME,
+        rate: Phaser.Math.FloatBetween(0.94, 1.06),
+      });
+    }
     if (!this.pooping && this.dumpKind === 'none') this.guanoFx.stopGasStream();
 
     if (this.dumpKind !== 'none') {
@@ -1240,6 +1390,18 @@ export class GameScene extends Phaser.Scene {
       if (this.meter <= 0) this.emptyLock = true;
     }
 
+    // A volley is judged once the last of it lands: if nothing fired since the
+    // stream opened ever touched a victim, that's a complete miss — the chain
+    // breaks immediately instead of coasting on the frozen combo clock.
+    const emitting = this.pooping || this.dumpKind !== 'none';
+    if (this.salvoActive && !emitting && this.guanoFx.airborneGooCount === 0) {
+      this.salvoActive = false;
+      if (!this.salvoHit && this.combo > 0) {
+        if (this.combo > 1) this.popup(this.pigeon.x, this.pigeonY - 52, 'MISS…', '#9aa0b0', 16);
+        this.combo = 0;
+      }
+    }
+
     this.guanoFx.update(
       f,
       [...this.victims.map((v) => v.collider), ...this.hydrants.map((h) => h.collider)],
@@ -1257,6 +1419,11 @@ export class GameScene extends Phaser.Scene {
   /** Supplies scene-owned state and the bird's current transform to the effect subsystem. */
   private emitStream(rate: number, wild: boolean): void {
     const rainbow = this.rainbowDebug || this.rainbowTimer > 0;
+    // gas clouds drift too loosely to judge as hit-or-miss, so they never arm a salvo
+    if (this.gasTimer <= 0 && !this.salvoActive) {
+      this.salvoActive = true;
+      this.salvoHit = false;
+    }
     this.guanoFx.emitStream({
       rate,
       wild,
@@ -1283,13 +1450,15 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Portrait is a pure function of state, strict priority battered → panic →
-   * strain → pleased → ready. Escalations switch instantly; de-escalations
-   * wait out a minimum hold so competing states can't flicker frame-by-frame.
+   * strain → hungry → pleased → ready. Escalations switch instantly;
+   * de-escalations wait out a minimum hold so competing states can't flicker
+   * frame-by-frame.
    */
   private desiredPortrait(): PortraitKey {
     if (this.batteredTimer > 0) return 'damage';
     if (this.dumpKind === 'blowout' || this.meter >= 92) return 'panic';
     if (this.pooping || this.dumpKind === 'scare' || this.meter > 85) return 'strain';
+    if (this.squeezingEmpty) return 'hungry';
     if (this.relievedTimer > 0 || this.emptyLock) return 'pleased';
     return 'ready';
   }
@@ -1324,7 +1493,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud(f: number): void {
-    this.comboTimer -= f;
+    // The combo window measures time between HITS, but goo takes real time to
+    // fall — a drop led onto a road-level car can spend most of the window in
+    // the air, so the chain used to die mid-flight and the landing read as a
+    // reset. Freeze the countdown while a shot is still airborne (or leaving
+    // the pigeon); missed goo grounds within a second, so decay resumes fast.
+    if (!this.pooping && this.guanoFx.airborneGooCount === 0) this.comboTimer -= f;
     if (this.comboTimer <= 0) this.combo = 0;
     this.batteredTimer -= f;
     this.relievedTimer -= f;
@@ -1333,9 +1507,10 @@ export class GameScene extends Phaser.Scene {
     const RANK: Record<PortraitKey, number> = {
       ready: 0,
       pleased: 1,
-      strain: 2,
-      panic: 3,
-      damage: 4,
+      hungry: 2,
+      strain: 3,
+      panic: 4,
+      damage: 5,
     };
     const want = this.desiredPortrait();
     if (want !== this.portraitKey && (RANK[want] > RANK[this.portraitKey] || this.portraitHold <= 0)) {
@@ -1347,9 +1522,18 @@ export class GameScene extends Phaser.Scene {
     const puff = this.portraitKey === 'strain' || this.portraitKey === 'panic' ? 1.06 : 1;
     this.portrait.setScale((88 / this.portrait.width) * puff);
 
+    const rank = rankForCombo(this.combo);
+    if (rank.tier !== this.rankTier) this.applyRank(rank);
+
     this.scoreText.setText(String(this.score));
-    this.comboText.setText(this.combo > 1 ? `x${this.combo} COMBO` : '');
+    this.comboText.setText(this.combo > 1 ? `x${this.combo}` : '');
     this.music.setCombo(this.combo);
+
+    // SHITSTORM: tint-based hue cycle (setColor would re-rasterize every frame)
+    if (rank.rainbow && this.combo > 1) {
+      this.rankHue = (this.rankHue + 0.01 * f) % 1;
+      this.comboText.setTint(Phaser.Display.Color.HSVToRGB(this.rankHue, 0.75, 1).color);
+    }
     this.effectMeters.clear();
     let effectY = 118;
     if (this.rainbowTimer > 0) {

@@ -9,13 +9,7 @@ CHANGELOG). The remaining engagement gap is score-chain spectacle and higher-ski
 variety. The hydrant already covers the dodge verb; a second hazard adds threat variety but
 no new decisions. Ordered by payoff-per-effort:
 
-1. **Combo ranks** (zero assets, pure code): uncap the x8 combo counter in `onSplat()`;
-   keep the score multiplier plateauing at x8 behind the scenes. Rank thresholds on
-   combo count (e.g. 3/6/10/15) show Splat! → Dirty! → Craptacular! → SHITSTORM in the
-   HUD with escalating style (size/color, scale-punch on rank-up, small shake at
-   SHITSTORM). Scare-poop already zeroes the combo — wiping a high rank makes the
-   hydrant retroactively matter.
-2. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
+1. **Skater** (high-value fast target, skill ceiling for aiming): ped variant 3 with own
    vx ~2.5–3.5 (vs 0.3–0.8 walkers), either direction, base score 40; extend
    `PED_LINES` / `PED_LINES_RAINBOW`; verify `VictimPalettePipeline` variant packing
    handles a 4th ped. Will require two sprites to show that it's moving legs, left in front, then right in front, will give speed feeling.
@@ -47,15 +41,11 @@ this slot in alongside the normal flight frames.
 ## Idea dump (user, 2026-07-17)
 
 **Targets & scoring**
-- Currently with the low bar we cant poop; we should either still be able to poop (make no-poop range very loww) or should telegraph it visually and by sound (e.g. hungry or impatient pigeon and koo)
+- Go to pleased portrait only after a longer dump - also dont go to pleased if we went to hungry
 - Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
 - Higher-value fast targets: quick rollerblader/skater — harder lead, bigger reward.
 - Higher-altitude targets: rooftop party.
-- Combo ranks instead of the x8 cap (too boring): let the combo climb and show DMC-style
-  rank names as it grows — our shitting ones, e.g. Splat! → Dirty! → Craptacular! →
-  SHITSTORM. Ranks are the reward/spectacle; multiplier can keep scaling or plateau
-  behind the scenes.
 - Chain reactions to create chaos? (one splat triggers the next — startled ped stumbles
   into a car, honk scares more peds…)
 - **Character interactions:** matching or compatible pedestrians occasionally pause when
@@ -63,25 +53,40 @@ this slot in alongside the normal flight frames.
   out-flex each other; two granddads lean on their canes and gossip. Also use sound for the gossip. Use proximity plus a
   per-character cooldown so interactions stay surprising and do not jam pedestrian flow.
 
+**Pooping**
+- combine pooping (e.g. gas (pea pod) + rainbow = rainbow gas!) Make sure to keep the code ouf of GameScene file not too grow it even further - it's separate logic
+
 **Sounds**
 - Sound for character interation (once done)
-- Sound for some of pedestrain and car reactions - should replace text pop-ups
-- Klezmer should play a little longer (not just fade off) - and probably be synchronized with different combo levels
+- ~~Sound for some of pedestrain and car reactions - should replace text pop-ups~~
+  (shipped 2026-07-19 — grumble/delight for peds, angry/happy honks for cars, gated by
+  variant + chance + shared cooldown; see CHANGELOG)
 - Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
-- Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump, add one hungry one for telegraphing that we cant poop (or for that reuse from splash)
-- When testing from phone, I noticed that too pizzakato tracks play unusually well together (basically  increasing tempo, may be used in some phases)
+  (partial 2026-07-19: runoff dripping off victims/hydrant now lands silently — see
+  CHANGELOG. Still open: the *direct* asphalt splat's clicky timbre itself.)
+- Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump. (The empty-tank telegraph got a generated belly-rumble SFX instead of a hungry koo — see CHANGELOG 2026-07-19.)
+- Slighly crackling sound when we poo in chilli mode
 
 **Pickups**
-- Special pickup effects (assets, spawning and collection are shipped): coffee =
-  accelerated meter and frightened pea pod = gas replacement mode are shipped; chilli =
-  explosive burning/fire poo remains. Rainbow behavior is already shipped.
-- **Reconsider pea-pod gas targeting:** the current buoyant cloud looks good but rises
-  before it can reliably reach pedestrians. Possible later redesign: emit a forceful
-  downward turbo jet of gas that remains concentrated until it hits the ground, then
-  disperses and rises using the current cloud physics. Decide whether that added ground
-  targeting and propulsion is preferable to keeping gas as an intentionally aerial effect.
+- **Pea-pod gas targeting — keep as is (resolved 2026-07-19):** the buoyant cloud that
+  rises before reaching pedestrians turned out to be the mechanic, not a flaw: gas
+  scores fine if you fly low, so it trades the safe high bombing line for risky
+  head-height crop-dusting (closer to cars and hydrant jets). The earlier downward-jet
+  redesign idea is dropped. Note: gas hits build combo/rank normally but a missed cloud
+  never breaks the chain (no salvo judgment) — low gas runs are strictly combo-friendly.
+- Add sound to pick-ups (some are already present in the repository, just not wired)
+- Kebab/bread can effect how liquid goo is - kebab should make it more liquid, bread - a little denser. May be with timer, but no explicit one. It just should feel naturally as part of the game, more    diegetic.
 
 **World & level design**
+- Day mechanic - this demo is day one, with different time of day (see other point) - at the end pigeon goes happily to sleep - flies away and goes to sleep on the roof. 
+  Then full-screen cozy art of pigeon going to sleep and text "see you in the morning!" or "see you next day!"
+- **Combo-rank world reactions** (user, 2026-07-19): convey the "heating up" phases
+  through world behavior instead of screen effects (a mood vignette was tried and cut —
+  read as a filter, see CHANGELOG). Escalating with rank tier: pedestrians become more
+  nervous/twitchy, cars start maneuvering/swerving, and at the top end even the sun/moon
+  looks at you in awe/fear. Needs more sprites/animation states; rank tier is already
+  available via `rankForCombo` in `src/ui/ranks.ts`.
+- slight particles or sprite-specific-shaders: for lantern definitely, may be for caffee (especially if added day/night phases)
 - Natural habitat points - e.g. extra building "gym" plus then a lot of bodybuilders near it
 - stationary victims, e.g. people sitting in from of the caffe (caffe building exists already)
 - Higher platforms / screen layers — e.g. flying at balcony level, vertical screen
@@ -91,6 +96,11 @@ this slot in alongside the normal flight frames.
 - Drones (airborne hazard or target at flight altitude).
 - Sunrise/day/sunset/night change - also effects characters (e.g. adding stationary hooker near a lamp at midnight, robberer etc.),
 and some pick-up are effected (e.g. no rainbow at night). Also shaders of course should be affected, as well as background naturally.
+
+**Webpage**
+- Add icon (favicon)
+- Suggest to make webpage installable (pwa) so that it can then work online (and add bigger icon for it, so that it then looks nice on the phone)
+- Loading screen? Progress bar + splash Art - probably use gemini for inspiration too, but it should match our style more, not so pencil/comic art it does by default
 
 
 ## Other candidates
