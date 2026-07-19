@@ -1,9 +1,7 @@
 import Phaser from 'phaser';
-import { GooSim, type Collider, type Particle } from '../goo/GooSim';
-import { GooLayer } from '../goo/GooLayer';
-import { GasSim } from '../gas/GasSim';
-import { GasLayer } from '../gas/GasLayer';
+import type { Collider, Particle } from '../goo/GooSim';
 import { getAlphaMask } from '../goo/alphaMask';
+import { GuanoEffects, preloadGuanoEffects } from '../effects/GuanoEffects';
 import {
   ensureVictimPalettePipeline,
   victimPaletteTint,
@@ -18,9 +16,11 @@ import {
 import { ensureBuildingPalettePipeline } from '../world/BuildingPalettePipeline';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
+import { TouchControls, isTouchDevice } from '../input/TouchControls';
+import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
+import { t } from '../i18n';
 
 const SCROLL = 2.1; // world scroll, px/frame
-const GUANO_TINT = 0xf2ecd4;
 
 // ---- UI palette (string form for text, hex for graphics) ----
 const COLOR_CREAM = '#f3ead8';
@@ -68,8 +68,6 @@ const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
 const CHILLI_DURATION = 60 * 8;
-/** extra downward speed while the chilli fire jet is active — reads as thrust, not drip */
-const CHILLI_JET_BOOST = 2.6;
 const GAS_COLORS = [0x2d7d36, 0x55ad3d, 0x91d852, 0xd5ee83];
 // A continuous goo stream lands as one shifting puddle, not a machine-gun row
 // of discrete drops. Keep street impacts far enough apart that the short sample
@@ -176,10 +174,7 @@ type AdjustableSound = Phaser.Sound.BaseSound & { volume: number; rate: number }
 type PortraitKey = 'ready' | 'pleased' | 'strain' | 'panic' | 'damage';
 
 export class GameScene extends Phaser.Scene {
-  private sim!: GooSim;
-  private gooLayer!: GooLayer;
-  private gasSim!: GasSim;
-  private gasLayer!: GasLayer;
+  private guanoFx!: GuanoEffects;
 
   private pigeon!: Phaser.GameObjects.Container;
   private pigeonImg!: Phaser.GameObjects.Image;
@@ -215,7 +210,8 @@ export class GameScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private comboText!: Phaser.GameObjects.Text;
   private effectMeters!: Phaser.GameObjects.Graphics;
-  private meterFill!: Phaser.GameObjects.Graphics;
+  private meterArcTex!: Phaser.Textures.CanvasTexture;
+  private meterArcKey = '';
   private portrait!: Phaser.GameObjects.Image;
   private portraitKey: PortraitKey = 'ready';
   private portraitHold = 0;
@@ -223,13 +219,7 @@ export class GameScene extends Phaser.Scene {
   private relievedTimer = 0;
   private coffeeTimer = 0;
   private chilliTimer = 0;
-  private fireEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
-  private sparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private gasTimer = 0;
-  private gasEmitCarry = 0;
-  private gasHeave?: AdjustableSound;
-  private gasHeavePlayedThisPress = false;
-  private gasLoop?: AdjustableSound;
   private pooping = false;
   /** involuntary dump in progress (runs until the meter empties) */
   private dumpKind: 'none' | 'blowout' | 'scare' = 'none';
@@ -240,11 +230,10 @@ export class GameScene extends Phaser.Scene {
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
   private pointerFly = false;
   private pointerPoop = false;
+  private touch!: TouchControls;
   /** debug override used by screenshot scripts; gameplay uses rainbowTimer */
   private rainbowDebug = false;
   private rainbowTimer = 0;
-  private rainbowHue = 0;
-  private emitCarry = 0;
   private nextAsphaltSplatAt = 0;
   private music!: MusicManager;
 
@@ -253,6 +242,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
+    preloadGuanoEffects(this);
     this.load.audio('music-sneaky', ['assets/audio/music-sneaky.ogg', 'assets/audio/music-sneaky.mp3']);
     this.load.audio('music-klezmer', ['assets/audio/music-klezmer.ogg', 'assets/audio/music-klezmer.mp3']);
     this.load.audio('sfx-splat-ped', ['assets/audio/splat.ogg', 'assets/audio/splat.mp3']);
@@ -261,8 +251,6 @@ export class GameScene extends Phaser.Scene {
       'assets/audio/splat-asphalt.ogg',
       'assets/audio/splat-asphalt.mp3',
     ]);
-    this.load.audio('sfx-gas-whoosh', ['assets/audio/gas-whoosh.ogg', 'assets/audio/gas-whoosh.mp3']);
-    this.load.audio('sfx-gas-loop', ['assets/audio/gas-loop.ogg', 'assets/audio/gas-loop.mp3']);
     this.load.audio('sfx-hydrant-clank', [
       'assets/audio/hydrant-clank.ogg',
       'assets/audio/hydrant-clank.mp3',
@@ -353,56 +341,18 @@ export class GameScene extends Phaser.Scene {
 
     this.pigeonShadow = this.add.image(240, GROUND_Y - 6, 'shadow').setDepth(4);
 
-    // pedestrians/road traffic live at depth 5/5.1, goo at 6, pigeon 7, HUD 10+
-    this.sim = new GooSim();
-    this.sim.groundY = GROUND_Y;
-    this.sim.boundsW = W;
-    this.sim.worldVx = SCROLL;
-    this.sim.onGroundHit = (_p, impact) => this.onAsphaltSplat(impact);
-    this.gooLayer = new GooLayer(this, W, H, 6);
-    this.gasSim = new GasSim();
-    this.gasSim.boundsW = W;
-    this.gasSim.worldVx = SCROLL;
-    this.gasLayer = new GasLayer(this, W, H, 6.6);
-
-    // soft radial dot for the chilli flames — concentric fills fake the falloff
-    const flameG = this.make.graphics({ x: 0, y: 0 }, false);
-    for (let r = 8; r > 0; r--) flameG.fillStyle(0xffffff, 0.14).fillCircle(8, 8, r);
-    flameG.generateTexture('flame-dot', 16, 16);
-    flameG.destroy();
-    // flames lick upward off fire goo: fast, additive, dying to nothing
-    this.fireEmitter = this.add
-      .particles(0, 0, 'flame-dot', {
-        speedX: { min: -20, max: 20 },
-        speedY: { min: -110, max: -30 },
-        scale: { start: 1.8, end: 0.2 },
-        alpha: { start: 0.95, end: 0 },
-        lifespan: { min: 250, max: 600 },
-        // born white-hot, cooling through orange to ember red as they rise
-        color: [0xfff7cf, 0xffce42, 0xff7a24, 0xb91f24],
-        colorEase: 'quad.out',
-        quantity: 0,
-        emitting: false,
-        maxAliveParticles: 300,
-        blendMode: Phaser.BlendModes.ADD,
-      })
-      .setDepth(6.5);
-    // hot sparks thrown clear of the jet, falling under gravity as they die
-    this.sparkEmitter = this.add
-      .particles(0, 0, 'flame-dot', {
-        speedX: { min: -70, max: 70 },
-        speedY: { min: -140, max: 10 },
-        gravityY: 280,
-        scale: { start: 0.4, end: 0 },
-        alpha: { start: 1, end: 0.2 },
-        lifespan: { min: 300, max: 750 },
-        tint: [0xfff2b0, 0xffce42, 0xff7a24],
-        quantity: 0,
-        emitting: false,
-        maxAliveParticles: 140,
-        blendMode: Phaser.BlendModes.ADD,
-      })
-      .setDepth(6.5);
+    // The scene chooses world placement/depth and handles gameplay outcomes;
+    // the subsystem owns simulation, rendering, emission, and effect audio.
+    this.guanoFx = new GuanoEffects(this, {
+      boundsW: W,
+      boundsH: H,
+      groundY: GROUND_Y,
+      worldVx: SCROLL,
+      gooDepth: 6,
+      fireDepth: 6.5,
+      gasDepth: 6.6,
+      onGroundHit: (_particle, impact) => this.onAsphaltSplat(impact),
+    });
 
     this.pigeonImg = this.add.image(0, 0, 'pigeon-f1').setScale(PIGEON_SCALE);
     this.pigeon = this.add.container(240, this.pigeonY, [this.pigeonImg]).setDepth(7);
@@ -410,6 +360,7 @@ export class GameScene extends Phaser.Scene {
     this.createHud();
     this.createInput();
     this.createDebugMenu();
+    if (shouldShowWizard()) new FirstRunWizard(this);
     this.music = new MusicManager(this);
     this.music.start();
 
@@ -419,8 +370,8 @@ export class GameScene extends Phaser.Scene {
       setFly: (v: boolean) => (this.pointerFly = v),
       setPoop: (v: boolean) => (this.pointerPoop = v),
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
-      particleCount: () => this.sim.particles.length,
-      gasParticleCount: () => this.gasSim.particles.length,
+      particleCount: () => this.guanoFx.particleCount,
+      gasParticleCount: () => this.guanoFx.gasParticleCount,
       spawnHydrant: () => this.spawnHydrant(),
       spawnRainbowPickup: (x = W + 60, y = this.pigeonY) => this.spawnPickup('rainbow', x, y),
       spawnItemPickup: (
@@ -438,21 +389,60 @@ export class GameScene extends Phaser.Scene {
         this.comboTimer = 120;
       },
       musicFrantic: () => this.music.franticNow,
+      touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
   }
 
   private createHud(): void {
     const px = 64;
     const py = 64;
-    this.add.circle(px, py, 46, 0x1d1f2a).setDepth(10).setStrokeStyle(3, 0x0e0f16);
-    this.portrait = this.add.image(px, py, 'portrait-ready').setDepth(11).setDisplaySize(88, 88);
-    const maskShape = this.make.graphics({}, false);
-    maskShape.fillCircle(px, py, 43);
-    this.portrait.setMask(maskShape.createGeometryMask());
+    // WebGL circles/geometry masks alias badly at 960x540, so all the round
+    // HUD pieces are drawn into 2x-supersampled canvas textures instead
+    const SS = 2;
+    const plateSize = 120;
+    const c = (plateSize / 2) * SS;
+    const plate = this.textures.createCanvas('hud-plate', plateSize * SS, plateSize * SS)!;
+    const pctx = plate.context;
+    pctx.strokeStyle = '#0e0f16';
+    pctx.lineWidth = 9 * SS;
+    pctx.beginPath();
+    pctx.arc(c, c, 53 * SS, 0, Math.PI * 2);
+    pctx.stroke();
+    pctx.fillStyle = '#1d1f2a';
+    pctx.beginPath();
+    pctx.arc(c, c, 46 * SS, 0, Math.PI * 2);
+    pctx.fill();
+    pctx.lineWidth = 3 * SS;
+    pctx.beginPath();
+    pctx.arc(c, c, 46 * SS, 0, Math.PI * 2);
+    pctx.stroke();
+    plate.refresh();
+    this.add.image(px, py, 'hud-plate').setDepth(10).setDisplaySize(plateSize, plateSize);
+
+    // portraits get their circular crop baked into canvas textures so the
+    // edge is antialiased (a geometry mask would give a hard stencil edge)
+    const portraitSize = 88 * SS;
+    for (const key of ['ready', 'pleased', 'strain', 'panic', 'damage'] as PortraitKey[]) {
+      const tex = this.textures.createCanvas(`portrait-round-${key}`, portraitSize, portraitSize)!;
+      const ctx = tex.context;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(portraitSize / 2, portraitSize / 2, 43 * SS, 0, Math.PI * 2);
+      ctx.clip();
+      const src = this.textures.get(`portrait-${key}`).getSourceImage();
+      ctx.drawImage(src as CanvasImageSource, 0, 0, portraitSize, portraitSize);
+      ctx.restore();
+      tex.refresh();
+    }
+    this.portrait = this.add
+      .image(px, py, 'portrait-round-ready')
+      .setDepth(11)
+      .setDisplaySize(88, 88);
 
     // pressure gauge: a ring around the portrait that fills clockwise from the
     // top as digestion builds — the face literally sits inside its own meter
-    this.meterFill = this.add.graphics().setDepth(10);
+    this.meterArcTex = this.textures.createCanvas('hud-meter-arc', plateSize * SS, plateSize * SS)!;
+    this.add.image(px, py, 'hud-meter-arc').setDepth(10).setDisplaySize(plateSize, plateSize);
     this.effectMeters = this.add.graphics().setDepth(12);
 
     this.scoreText = this.add
@@ -476,14 +466,17 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setDepth(10);
 
-    this.add
-      .text(16, H - 26, 'HOLD ↑ / SPACE / LMB — climb     HOLD ↓ — dive     HOLD S / RMB — let it rip', {
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        color: COLOR_CREAM,
-      })
-      .setDepth(10)
-      .setAlpha(0.75);
+    // touch devices get zone hint labels from TouchControls instead
+    if (!isTouchDevice()) {
+      this.add
+        .text(16, H - 26, `${t.kbClimb}     ${t.kbDive}     ${t.kbRip}`, {
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          color: COLOR_CREAM,
+        })
+        .setDepth(10)
+        .setAlpha(0.75);
+    }
   }
 
   private createInput(): void {
@@ -496,11 +489,15 @@ export class GameScene extends Phaser.Scene {
       damage: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
     this.input.mouse?.disableContextMenu();
+    this.touch = new TouchControls(this);
+    // mouse only — touch pointers are owned by TouchControls' split zones
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (p.wasTouch) return;
       if (p.rightButtonDown()) this.pointerPoop = true;
       else this.pointerFly = true;
     });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.wasTouch) return;
       if (!p.rightButtonDown()) this.pointerFly = false;
       this.pointerPoop = false;
     });
@@ -508,6 +505,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Compact always-on development palette for testing scene objects on demand. */
   private createDebugMenu(): void {
+    // phones: it sits inside the right poop zone — hidden unless ?debug is set
+    if (isTouchDevice() && !new URLSearchParams(location.search).has('debug')) return;
     const x = W - 174;
     const y = 106;
     const buttonW = 48;
@@ -616,8 +615,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updatePigeon(f: number): void {
-    const up = this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly;
-    const down = this.keys.down.isDown;
+    const up = this.keys.up.isDown || this.keys.up2.isDown || this.pointerFly || this.touch.fly;
+    const down = this.keys.down.isDown || this.touch.dive;
     // it's a bird, not a brick: velocity trims toward an input-chosen target,
     // so releasing everything levels off and holds the current altitude
     const targetVy = up ? -3.6 : down ? 4.2 : 0;
@@ -715,7 +714,7 @@ export class GameScene extends Phaser.Scene {
   private collectPickup(kind: PickupKind, x: number, y: number): void {
     if (kind === 'rainbow') {
       this.rainbowTimer = RAINBOW_DURATION;
-      this.rainbowHue = 0;
+      this.guanoFx.resetRainbowHue();
       this.pickupBurst(x, y, RAINBOW_COLORS);
       return;
     }
@@ -735,8 +734,7 @@ export class GameScene extends Phaser.Scene {
 
   private activateGas(): void {
     this.gasTimer = GAS_DURATION;
-    // A fresh pod re-arms the opening heave even mid-hold.
-    this.gasHeavePlayedThisPress = false;
+    this.guanoFx.rearmGasHeave();
   }
 
   private pickupBurst(x: number, y: number, colors: number[]): void {
@@ -1201,7 +1199,7 @@ export class GameScene extends Phaser.Scene {
     this.coffeeTimer = Math.max(0, this.coffeeTimer - f);
     this.chilliTimer = Math.max(0, this.chilliTimer - f);
     this.gasTimer = Math.max(0, this.gasTimer - f);
-    if (this.gasTimer <= 0) this.stopGasStream();
+    if (this.gasTimer <= 0) this.guanoFx.stopGasStream();
     if (Phaser.Input.Keyboard.JustDown(this.keys.damage)) this.scarePoop();
 
     const digestionRate =
@@ -1220,10 +1218,10 @@ export class GameScene extends Phaser.Scene {
     this.pooping =
       this.dumpKind === 'none' &&
       !this.emptyLock &&
-      (this.keys.poop.isDown || this.pointerPoop) &&
+      (this.keys.poop.isDown || this.pointerPoop || this.touch.poop) &&
       this.meter > 0;
     if (wasPooping && !this.pooping) this.relievedTimer = 60;
-    if (!this.pooping && this.dumpKind === 'none') this.stopGasStream();
+    if (!this.pooping && this.dumpKind === 'none') this.guanoFx.stopGasStream();
 
     if (this.dumpKind !== 'none') {
       this.meter = Math.max(0, this.meter - 2.4 * f);
@@ -1242,14 +1240,9 @@ export class GameScene extends Phaser.Scene {
       if (this.meter <= 0) this.emptyLock = true;
     }
 
-    this.sim.step([
-      ...this.victims.map((v) => v.collider),
-      ...this.hydrants.map((h) => h.collider),
-    ]);
-    this.gooLayer.render(this.sim.particles);
-    this.updateFireFx();
-    this.gasSim.step(
+    this.guanoFx.update(
       f,
+      [...this.victims.map((v) => v.collider), ...this.hydrants.map((h) => h.collider)],
       this.victims.map((v) => ({
         id: v.collider.id,
         x: v.collider.x,
@@ -1259,120 +1252,20 @@ export class GameScene extends Phaser.Scene {
         onHit: () => this.onVictimHit(v, false, 'gas'),
       })),
     );
-    this.gasLayer.render(this.gasSim.particles);
   }
 
-  /** Emit `rate` drops this frame; `wild` sprays uncontrolled instead of streaming. */
+  /** Supplies scene-owned state and the bird's current transform to the effect subsystem. */
   private emitStream(rate: number, wild: boolean): void {
-    this.emitCarry += rate;
-    const n = Math.floor(this.emitCarry);
-    this.emitCarry -= n;
-    if (n <= 0) return;
     const rainbow = this.rainbowDebug || this.rainbowTimer > 0;
-    // emit from under the tail, inheriting a bit of the pigeon's motion
-    const tailX = this.pigeon.x - 42;
-    const tailY = this.pigeonY + 24;
-    if (this.gasTimer > 0) {
-      // Gas replaces liquid output rather than decorating it. Fewer expanding
-      // parcels produce a coherent cloud at a fraction of the goo particle count.
-      this.startGasStream();
-      this.gasEmitCarry += n * 0.32;
-      const gasCount = Math.floor(this.gasEmitCarry);
-      this.gasEmitCarry -= gasCount;
-      if (gasCount > 0) this.gasSim.emit(tailX, tailY, wild, gasCount);
-      return;
-    }
-    const fire = !rainbow && this.chilliTimer > 0;
-    if (fire) {
-      // spawn above the emit point: big rising flames should lick up past the
-      // tail, never hang below the pigeon
-      this.fireEmitter.emitParticleAt(tailX, tailY - 16, 3);
-      this.sparkEmitter.emitParticleAt(tailX, tailY - 10, 1);
-    }
-    for (let i = 0; i < n; i++) {
-      let tint = GUANO_TINT;
-      if (rainbow) {
-        // advance per drop, not per frame, so even a short burst spans the spectrum
-        this.rainbowHue = (this.rainbowHue + 0.035) % 1;
-        tint = Phaser.Display.Color.HSVToRGB(this.rainbowHue, 0.75, 1).color;
-      } else if (fire) {
-        // narrow red→yellow band; per-drop jitter is the flame's flicker,
-        // with the odd washed-out drop reading as molten white-hot
-        const whiteHot = Math.random() < 0.25;
-        tint = Phaser.Display.Color.HSVToRGB(
-          0.01 + Math.random() * 0.11,
-          whiteHot ? 0.35 : 0.92,
-          1,
-        ).color;
-      }
-      const vx = wild ? -0.4 + (Math.random() - 0.5) * 4.5 : -0.4;
-      let vy = wild ? 2.5 + Math.random() * 3.5 : this.pigeonVy * 0.35 + 4.2;
-      if (fire) vy += CHILLI_JET_BOOST;
-      this.sim.emit(tailX, tailY, vx, vy, tint, 1, rainbow, rainbow || fire, fire);
-    }
-  }
-
-  /**
-   * Dress live fire goo with flames so the jet and its puddles read as burning.
-   * Random draws, not a scan: emission stays bounded and unbiased however many
-   * fire drops are in flight.
-   */
-  private updateFireFx(): void {
-    const ps = this.sim.particles;
-    if (ps.length === 0) return;
-    for (let i = 0; i < 24; i++) {
-      const p = ps[(Math.random() * ps.length) | 0];
-      if (!p.fire || p.dead) continue;
-      if (Math.random() < 0.7) {
-        this.fireEmitter.emitParticleAt(p.x + (Math.random() - 0.5) * 6, p.y - 3);
-      }
-      if (Math.random() < 0.12) this.sparkEmitter.emitParticleAt(p.x, p.y - 2);
-    }
-  }
-
-  /** Idempotent per frame: opens with one heave, then sustains the sputter bed. */
-  private startGasStream(): void {
-    if (!this.gasLoop) {
-      const loop = this.sound.add('sfx-gas-loop', { loop: true, volume: 0 }) as AdjustableSound;
-      loop.play();
-      this.gasLoop = loop;
-      this.tweens.add({
-        targets: loop,
-        volume: 0.22 * SFX_VOLUME,
-        duration: 130,
-        ease: 'Quad.easeIn',
-      });
-    }
-    if (!this.gasHeavePlayedThisPress) {
-      // One heave per press; a re-press while the last one still rings joins the
-      // loop bed silently instead of stacking another retch on top.
-      if (!this.gasHeave?.isPlaying) {
-        this.gasHeave?.destroy();
-        const volume = 0.38 * SFX_VOLUME;
-        this.gasHeave = this.sound.add('sfx-gas-whoosh') as AdjustableSound;
-        this.gasHeave.play({ volume, rate: Phaser.Math.FloatBetween(0.94, 1.05) });
-        // BaseSound resets its config when play begins; set the live gain after it starts.
-        this.gasHeave.volume = volume;
-      }
-      this.gasHeavePlayedThisPress = true;
-    }
-  }
-
-  private stopGasStream(): void {
-    this.gasHeavePlayedThisPress = false;
-    const loop = this.gasLoop;
-    if (!loop) return;
-    this.gasLoop = undefined;
-    this.tweens.killTweensOf(loop);
-    this.tweens.add({
-      targets: loop,
-      volume: 0,
-      duration: 200,
-      ease: 'Quad.easeOut',
-      onComplete: () => {
-        loop.stop();
-        loop.destroy();
-      },
+    this.guanoFx.emitStream({
+      rate,
+      wild,
+      x: this.pigeon.x - 42,
+      y: this.pigeonY + 24,
+      sourceVy: this.pigeonVy,
+      rainbow,
+      fire: !rainbow && this.chilliTimer > 0,
+      gas: this.gasTimer > 0,
     });
   }
 
@@ -1448,7 +1341,7 @@ export class GameScene extends Phaser.Scene {
     if (want !== this.portraitKey && (RANK[want] > RANK[this.portraitKey] || this.portraitHold <= 0)) {
       this.portraitKey = want;
       this.portraitHold = 18;
-      this.portrait.setTexture(`portrait-${want}`).setDisplaySize(88, 88);
+      this.portrait.setTexture(`portrait-round-${want}`).setDisplaySize(88, 88);
     }
     // effort states puff the face slightly
     const puff = this.portraitKey === 'strain' || this.portraitKey === 'panic' ? 1.06 : 1;
@@ -1477,34 +1370,47 @@ export class GameScene extends Phaser.Scene {
       );
       effectY += 13;
     }
+    if (this.chilliTimer > 0) {
+      this.drawEffectMeter(
+        this.effectMeters,
+        effectY,
+        this.chilliTimer / CHILLI_DURATION,
+        ITEM_PICKUP_EFFECTS.chilli.burstColors,
+      );
+      effectY += 13;
+    }
     if (this.gasTimer > 0) {
       this.drawEffectMeter(this.effectMeters, effectY, this.gasTimer / GAS_DURATION, GAS_COLORS);
     }
 
     // pressure ring: fills clockwise from 12 o'clock, goes amber then pulsing
     // red as the blowout approaches
-    const g = this.meterFill;
-    g.clear();
-    g.lineStyle(9, 0x0e0f16, 1);
-    g.beginPath();
-    g.arc(64, 64, 53, 0, Math.PI * 2);
-    g.strokePath();
     const frac = this.meter / 100;
-    if (frac > 0.01) {
-      let color = 0xf2ecd4;
-      if (frac >= 0.88) {
-        // pulse between orange and red
-        const pulse = 0.5 + 0.5 * Math.sin(this.time.now * 0.02);
-        const gc = Math.round(0x8a + (0x4d - 0x8a) * pulse);
-        const bc = Math.round(0x5c + (0x4d - 0x5c) * pulse);
-        color = (0xff << 16) | (gc << 8) | bc;
-      } else if (frac >= 0.7) {
-        color = 0xffd34e;
+    let color = 0xf2ecd4;
+    if (frac >= 0.88) {
+      // pulse between orange and red
+      const pulse = 0.5 + 0.5 * Math.sin(this.time.now * 0.02);
+      const gc = Math.round(0x8a + (0x4d - 0x8a) * pulse);
+      const bc = Math.round(0x5c + (0x4d - 0x5c) * pulse);
+      color = (0xff << 16) | (gc << 8) | bc;
+    } else if (frac >= 0.7) {
+      color = 0xffd34e;
+    }
+    // only re-rasterise + re-upload the arc texture when it visibly changes
+    const arcKey = frac > 0.01 ? `${Math.ceil(frac * 400)}:${color}` : '';
+    if (arcKey !== this.meterArcKey) {
+      this.meterArcKey = arcKey;
+      const ctx = this.meterArcTex.context;
+      const size = this.meterArcTex.width;
+      ctx.clearRect(0, 0, size, size);
+      if (frac > 0.01) {
+        ctx.strokeStyle = `#${color.toString(16).padStart(6, '0')}`;
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, 106, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+        ctx.stroke();
       }
-      g.lineStyle(6, color, 1);
-      g.beginPath();
-      g.arc(64, 64, 53, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-      g.strokePath();
+      this.meterArcTex.refresh();
     }
   }
 }

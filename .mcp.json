@@ -11,6 +11,12 @@
         "model_reasoning_effort=\"high\""
       ],
       "env": {}
+    },
+    "agy": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["scripts/agy-mcp.mjs"],
+      "env": {}
     }
   }
 }

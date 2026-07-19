@@ -1,69 +1,36 @@
 ---
 name: subagent-delegate
-description: Delegate well-specified work to a cold-start subagent when the user explicitly asks to use a subagent, delegate, parallelize with agents, or names an available agent type. Use model overrides and self-contained briefs deliberately; the active session remains responsible for integration and verification. Image work follows `game-art`.
+description: Delegate independent, bounded work to Codex subagents when parallel exploration, review, testing, or summarization will improve speed or keep noisy detail out of the main thread.
 ---
 
-# Delegating to subagents
+# Delegate to Codex subagents
 
-Two execution paths exist: **the active session**, which has the conversation and project
-context, and a **cold-start subagent**, which receives only the brief you provide. Use a
-subagent only when the user explicitly asks for delegation or subagents; do not spawn one
-merely because a task has multiple parts.
+Use Codex subagents for independent, well-specified read-heavy work: codebase mapping,
+test/log analysis, focused reviews, documentation checks, or repeated triage.
 
-|                          | Active session | Subagent |
-|--------------------------|----------------|----------|
-| Conversation context     | yes            | no — provide a self-contained brief |
-| Best for                 | architecture, ambiguous requirements, tuned-by-eye constants, integration | user-requested parallel work, broad exploration, isolated implementation, context-heavy reads |
-| Main cost                | consumes this thread's context | cold start and duplicated context derivation |
-| Accountability           | owns final result | reports findings/changes; active session reviews |
+Keep architectural decisions, ambiguous requirements, tightly coupled edits, and final
+integration in the main session. Avoid concurrent write-heavy tasks unless files are
+clearly disjoint.
 
-Image generation and editing are not a reason to delegate by themselves. Follow
-`game-art` and use the active session's image capability directly unless the user asks for
-an agent-based split.
+Ask Codex directly to delegate, stating:
 
-## Choosing an agent and model
+- one bounded task per agent;
+- whether to wait for all results;
+- the required summary format and file references.
 
-Pick the most specific available agent type for the job. Use a general-purpose agent only
-when no specialist fits.
+Example: "Spawn three subagents: security review, test-gap review, and code-path mapping.
+Wait for all, then summarize verified findings by category with file references."
 
-- **`sonnet`** — default override for implementation, codebase research, and work needing
-  competent engineering judgment from a clear brief.
-- **`haiku`** — mechanical, high-volume, low-judgment work: identical edits, extraction,
-  renames, or bulk summarization.
-- **`opus` / `fable`** — reserve for a user-requested subtask that genuinely needs deeper
-  reasoning and does not depend on unexternalized context from this conversation.
+Built-in subagent types are `default`, `worker`, and `explorer`. For recurring roles,
+define a named custom agent in `.codex/agents/*.toml` — set `model`,
+`model_reasoning_effort`, and `sandbox_mode` there, not in SKILL.md (Codex ignores
+`model:`/`allowed-tools:` skill frontmatter; those fields are for Claude Code). Use a
+lower-cost/read-only agent for exploration; reserve stronger agents for ambiguous review.
 
-If the result blocks current work, run it in the foreground. Otherwise, background is
-appropriate when the user asked for parallel work. Continue an existing relevant agent
-with `SendMessage`; do not start a fresh one and discard its context.
+Inspect running or completed agents with `/agent` in the Codex CLI. Treat each result as
+input, not proof: read cited files, inspect diffs, resolve conflicts, and run the
+relevant checks yourself.
 
-## The brief is the contract
-
-Brief the subagent like a colleague joining cold. Every implementation brief includes:
-
-1. **Goal** — one-sentence outcome followed by necessary detail.
-2. **Context** — repository root, relevant files/symbols, established decisions, and the
-   commands or runtime surface involved.
-3. **Constraints** — exact scope, files it may touch, conventions to match, dependencies it
-   may add, and explicit non-goals. Forbid drive-by refactors and broad reformatting.
-4. **Acceptance checks** — concrete commands or observable behavior; require the agent to
-   run them and fix failures before reporting.
-5. **Deliverable** — concise summary, every file changed, checks run with outcomes, and any
-   unresolved issue or assumption.
-
-For read-only exploration, state the search breadth and ask for conclusions with file paths
-and line references rather than large file dumps.
-
-## Review and integration
-
-A subagent's report describes intent; it is not proof.
-
-1. Read every changed file and compare it with the approved scope and surrounding idiom.
-2. Check naming, duplication, abstraction level, and whether tuned constants or unrelated
-   behavior moved.
-3. Re-run acceptance checks in the active session.
-4. Verify runtime-visible changes end to end; use `run-game` for Phaser visuals.
-5. Send specific feedback to the same agent when revisions are needed. Apply a direct patch
-   only when it is genuinely smaller and clearer than another delegation round.
-6. Report failures, skipped checks, or partial work plainly; do not mark the task complete
-   until verification succeeds.
+Do not use parallel agents to edit overlapping files. A separate `codex exec` subprocess
+is not a coordinated subagent; use it only when independent process-level work is
+intentionally desired.
