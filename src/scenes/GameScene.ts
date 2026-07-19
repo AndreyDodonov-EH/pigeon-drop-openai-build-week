@@ -65,6 +65,9 @@ const ITEM_PICKUP_MIN_MS = 5000;
 const ITEM_PICKUP_MAX_MS = 9000;
 const PEA_LOOK_FRAME_FRAMES = 18;
 const PASSIVE_DIGESTION_PER_FRAME = 0.035;
+// Ran-dry lockout releases once this much pressure rebuilds. Kept very short
+// (~1.3s) — just enough to stop dribble-firing off a refilling tank.
+const EMPTY_LOCK_RELEASE = 3;
 const COFFEE_DURATION = 60 * 8;
 const COFFEE_FILL_MULTIPLIER = 3;
 const GAS_DURATION = 60 * 8;
@@ -172,7 +175,7 @@ interface Pickup {
 /** Phaser's manager returns a WebAudio/HTML5 sound with mutable volume at runtime. */
 type AdjustableSound = Phaser.Sound.BaseSound & { volume: number; rate: number };
 
-type PortraitKey = 'ready' | 'pleased' | 'strain' | 'panic' | 'damage';
+type PortraitKey = 'ready' | 'pleased' | 'hungry' | 'strain' | 'panic' | 'damage';
 
 export class GameScene extends Phaser.Scene {
   private guanoFx!: GuanoEffects;
@@ -232,6 +235,10 @@ export class GameScene extends Phaser.Scene {
   private dumpKind: 'none' | 'blowout' | 'scare' = 'none';
   /** ran dry — no firing until digestion rebuilds a little pressure */
   private emptyLock = false;
+  /** throttles the empty-belly-rumble telegraph while poop is held on an empty tank */
+  private bellyRumbleCooldown = 0;
+  /** poop held but the tank is empty/locked — drives the hungry portrait */
+  private squeezingEmpty = false;
   private wobbleT = 0;
 
   private keys!: Record<'up' | 'up2' | 'down' | 'poop' | 'damage', Phaser.Input.Keyboard.Key>;
@@ -274,11 +281,16 @@ export class GameScene extends Phaser.Scene {
       'assets/audio/koo-irritated.ogg',
       'assets/audio/koo-irritated.mp3',
     ]);
+    this.load.audio('sfx-belly-rumble', [
+      'assets/audio/belly-rumble.ogg',
+      'assets/audio/belly-rumble.mp3',
+    ]);
     this.load.image('portrait-ready', 'assets/portraits/ready.png');
     this.load.image('portrait-damage', 'assets/portraits/damage.png');
     this.load.image('portrait-strain', 'assets/portraits/strain.png');
     this.load.image('portrait-pleased', 'assets/portraits/pleased.png');
     this.load.image('portrait-panic', 'assets/portraits/panic.png');
+    this.load.image('portrait-hungry', 'assets/portraits/hungry.png');
     this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
     this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
     this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
@@ -483,7 +495,7 @@ export class GameScene extends Phaser.Scene {
     // portraits get their circular crop baked into canvas textures so the
     // edge is antialiased (a geometry mask would give a hard stencil edge)
     const portraitSize = 88 * SS;
-    for (const key of ['ready', 'pleased', 'strain', 'panic', 'damage'] as PortraitKey[]) {
+    for (const key of ['ready', 'pleased', 'hungry', 'strain', 'panic', 'damage'] as PortraitKey[]) {
       const tex = this.textures.createCanvas(`portrait-round-${key}`, portraitSize, portraitSize)!;
       const ctx = tex.context;
       ctx.save();
@@ -1269,7 +1281,7 @@ export class GameScene extends Phaser.Scene {
     const digestionRate =
       PASSIVE_DIGESTION_PER_FRAME * (this.coffeeTimer > 0 ? COFFEE_FILL_MULTIPLIER : 1);
     this.meter = Math.min(100, this.meter + digestionRate * f);
-    if (this.meter >= 8) this.emptyLock = false;
+    if (this.meter >= EMPTY_LOCK_RELEASE) this.emptyLock = false;
 
     // full = involuntary blowout: one huge uncontrolled blast until empty
     if (this.meter >= 100 && this.dumpKind === 'none') {
@@ -1278,13 +1290,22 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.shake(160, 0.003);
     }
 
+    const wantsPoop = this.keys.poop.isDown || this.pointerPoop || this.touch.poop;
     const wasPooping = this.pooping;
-    this.pooping =
-      this.dumpKind === 'none' &&
-      !this.emptyLock &&
-      (this.keys.poop.isDown || this.pointerPoop || this.touch.poop) &&
-      this.meter > 0;
+    this.pooping = this.dumpKind === 'none' && !this.emptyLock && wantsPoop && this.meter > 0;
     if (wasPooping && !this.pooping) this.relievedTimer = 60;
+
+    // squeezing an empty tank: telegraph WHY nothing comes out — an empty-belly
+    // rumble and a hungry face instead of silently eating the input
+    this.squeezingEmpty = wantsPoop && !this.pooping && this.dumpKind === 'none';
+    this.bellyRumbleCooldown = Math.max(0, this.bellyRumbleCooldown - f);
+    if (this.squeezingEmpty && this.bellyRumbleCooldown <= 0) {
+      this.bellyRumbleCooldown = 130; // sound runs ~1.7s — don't let it overlap itself
+      this.sound.play('sfx-belly-rumble', {
+        volume: 0.55 * SFX_VOLUME,
+        rate: Phaser.Math.FloatBetween(0.94, 1.06),
+      });
+    }
     if (!this.pooping && this.dumpKind === 'none') this.guanoFx.stopGasStream();
 
     if (this.dumpKind !== 'none') {
@@ -1364,13 +1385,15 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Portrait is a pure function of state, strict priority battered → panic →
-   * strain → pleased → ready. Escalations switch instantly; de-escalations
-   * wait out a minimum hold so competing states can't flicker frame-by-frame.
+   * strain → hungry → pleased → ready. Escalations switch instantly;
+   * de-escalations wait out a minimum hold so competing states can't flicker
+   * frame-by-frame.
    */
   private desiredPortrait(): PortraitKey {
     if (this.batteredTimer > 0) return 'damage';
     if (this.dumpKind === 'blowout' || this.meter >= 92) return 'panic';
     if (this.pooping || this.dumpKind === 'scare' || this.meter > 85) return 'strain';
+    if (this.squeezingEmpty) return 'hungry';
     if (this.relievedTimer > 0 || this.emptyLock) return 'pleased';
     return 'ready';
   }
@@ -1419,9 +1442,10 @@ export class GameScene extends Phaser.Scene {
     const RANK: Record<PortraitKey, number> = {
       ready: 0,
       pleased: 1,
-      strain: 2,
-      panic: 3,
-      damage: 4,
+      hungry: 2,
+      strain: 3,
+      panic: 4,
+      damage: 5,
     };
     const want = this.desiredPortrait();
     if (want !== this.portraitKey && (RANK[want] > RANK[this.portraitKey] || this.portraitHold <= 0)) {

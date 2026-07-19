@@ -251,3 +251,27 @@ filter over the scene read as a filter, not as the street heating up. The right 
 convey escalation is world *behavior*, not a screen effect — see the combo-rank world
 reactions idea in `BACKLOG.md`. Text (counter + one-shot rank word) and the music layers
 carry the phase for now.
+
+## Empty-tank feedback — short lock + hungry-coo telegraph (shipped 2026-07-19)
+
+Running the meter dry engaged a silent ~4 s lockout (`emptyLock` released only at
+meter ≥ 8): holding poop did nothing and the only cue was the "pleased" portrait, which
+read as "can't poop, no idea why". Fixed from both ends of the backlog's either/or:
+the release threshold dropped to 3 (`EMPTY_LOCK_RELEASE`, ~1.3 s — still enough to stop
+dribble-firing off a refilling tank), and squeezing an empty tank now telegraphs why,
+throttled by `bellyRumbleCooldown` so a held button triggers it at most once per lock.
+Side effect by design: holding poop on an empty tank now yields a tiny toot every
+~1.4 s instead of ~4 s of dead input.
+
+**Telegraph is sound-only (same day):** the first cut showed a grey "grumble…" popup
+plus the irritated coo pitched up as a hungry stand-in. Both replaced within hours by a
+dedicated generated SFX: `belly-rumble.{ogg,mp3}` (1.72 s empty-stomach gurgle, see
+AUDIO_LOG), played at 0.55 × SFX bus with ±6% rate variance, cooldown 130 frames so it
+never overlaps itself. Diegetic beats text — the belly complains, no popup needed.
+
+**Hungry portrait (same day):** the telegraph also got a face. New `hungry` portrait
+state (`public/assets/portraits/hungry.png`, Codex-generated, see ART_LOG): pleading
+puppy-dog eyes, gaunt cheeks, wavy gurgle marks by the neck. Shown while poop is held
+on an empty/locked tank (`squeezingEmpty` — the same signal that fires the rumble),
+slotted between `strain` and `pleased` in the portrait priority so it beats the
+post-dump relieved face but never masks real effort or damage states.

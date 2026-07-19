@@ -7,10 +7,14 @@ const SEEN_KEY = 'sp-wizard-seen';
 const CREAM = '#f3ead8';
 const DEPTH = 30; // above HUD (10-12) and debug menu (20-21)
 
-/** First-run only, unless forced with ?wizard. If localStorage is blocked we
- * just show it every visit — it's one tap to dismiss. */
+/** First-run only, unless forced with ?wizard (or suppressed with ?nowizard —
+ * headless test drivers get fresh localStorage every launch and would otherwise
+ * always see it). If localStorage is blocked we just show it every visit —
+ * it's one tap to dismiss. */
 export function shouldShowWizard(): boolean {
-  if (new URLSearchParams(location.search).has('wizard')) return true;
+  const params = new URLSearchParams(location.search);
+  if (params.has('nowizard')) return false;
+  if (params.has('wizard')) return true;
   try {
     return localStorage.getItem(SEEN_KEY) === null;
   } catch {

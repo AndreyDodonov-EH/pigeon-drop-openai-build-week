@@ -41,7 +41,6 @@ this slot in alongside the normal flight frames.
 ## Idea dump (user, 2026-07-17)
 
 **Targets & scoring**
-- Currently with the low bar we cant poop; we should either still be able to poop (make no-poop range very loww) or should telegraph it visually and by sound (e.g. hungry or impatient pigeon and koo)
 - Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
 - Higher-value fast targets: quick rollerblader/skater — harder lead, bigger reward.
@@ -57,7 +56,8 @@ this slot in alongside the normal flight frames.
 - Sound for character interation (once done)
 - Sound for some of pedestrain and car reactions - should replace text pop-ups
 - Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
-- Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump, add one hungry one for telegraphing that we cant poop (or for that reuse from splash)
+- Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump. (The empty-tank telegraph got a generated belly-rumble SFX instead of a hungry koo — see CHANGELOG 2026-07-19.)
+- Slighly crackling sound when we poo in chilli mode
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =

@@ -6,7 +6,9 @@
 import { chromium } from '/home/aadod/_PROJECTS/pigeon_drop/node_modules/playwright/index.mjs';
 
 const OUT = process.argv[2] || 'shot.png';
-const URL = process.env.GAME_URL || 'http://localhost:5199/';
+// ?nowizard: headless pages get fresh localStorage, so without it every run
+// would sit behind the first-run "how to play" overlay
+const URL = process.env.GAME_URL || 'http://localhost:5199/?nowizard';
 
 // Runs in the page. Default: park a hydrant on-screen in a full burst.
 function setup() {

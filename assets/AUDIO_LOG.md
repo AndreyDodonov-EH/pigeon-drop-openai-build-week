@@ -155,3 +155,14 @@ natural length and `ship` trims silence + normalizes peak to −1 dB.
 - **Master:** `assets/audio-masters/pickup-coffee-v0.mp3` (v1 rejected: double event with gap)
 - **Prompt:** `cartoon videogame pickup sound: a quick comedic coffee slurp and satisfied gulp followed by a perky energetic sparkle, caffeinated excitement, short and snappy`
 - **Shipped:** 1.00 s
+
+## public/assets/audio/belly-rumble.{ogg,mp3} — 2026-07-19
+
+- **Master:** `assets/audio-masters/belly-rumble2-v0.mp3` (belly-rumble-v0 rejected:
+  broadband click at t=0; belly-rumble-v1 rejected: two grumble phrases with a mid-file
+  gap; belly-rumble2-v1 usable but denser/less expressive — kept as spare)
+- **Prompt:** `cartoon videogame sound: single short hungry stomach growl, deep empty
+  belly gurgle, comedic, one continuous rumble, short and snappy`
+- **Shipped:** 1.72 s. Plays when poop is held on an empty/locked tank (the empty-tank
+  telegraph, cooldown 130 frames so it never overlaps itself) — replaced the earlier
+  "grumble…" text popup and pitched-up koo-irritated placeholder same day.
