@@ -7,9 +7,24 @@ import Phaser from 'phaser';
  * portrait references — slate blue bird, purple accents, warm tan backdrop.
  */
 
-export const W = 960;
 export const H = 540;
 export const GROUND_Y = 484;
+
+/** Fixed build width for the periodic ground textures (sidewalk slabs every
+ * 60px, lane dashes every 80px — both divide 960). The tileSprites repeat
+ * this tile, so they stay seamless whatever W ends up being. */
+const TILE_W = 960;
+
+/** Design height is fixed at 540 — all vertical gameplay is tuned to it. On
+ * phones (coarse pointer) the width stretches to the device's aspect ratio so
+ * the playfield fills the screen edge-to-edge instead of pillarboxing;
+ * desktop keeps the calibrated 960×540. Capped at ~21:9. */
+export const W = (() => {
+  if (!window.matchMedia('(pointer: coarse)').matches) return 960;
+  const long = Math.max(screen.width, screen.height);
+  const short = Math.min(screen.width, screen.height);
+  return Math.round(H * Math.min(Math.max(long / short, 960 / 540), 1280 / 540));
+})();
 
 export function buildTextures(scene: Phaser.Scene): void {
   sky(scene);
@@ -165,13 +180,13 @@ function shade(hex: string, amt: number): string {
 // under the stoops. Deep enough that facades whose wall base sits above the
 // stoop's bottom step (bg-building-0) still meet pavement, not sky.
 function sidewalk(scene: Phaser.Scene): void {
-  const c = scene.textures.createCanvas('sidewalk', W, SIDEWALK_H)!;
+  const c = scene.textures.createCanvas('sidewalk', TILE_W, SIDEWALK_H)!;
   const ctx = c.getContext();
 
-  // slabs with joints and per-slab tone shifts (60 divides W: seamless)
+  // slabs with joints and per-slab tone shifts (60 divides TILE_W: seamless)
   ctx.fillStyle = '#a9a294';
-  ctx.fillRect(0, 0, W, SIDEWALK_H);
-  for (let sx = 0; sx < W; sx += 60) {
+  ctx.fillRect(0, 0, TILE_W, SIDEWALK_H);
+  for (let sx = 0; sx < TILE_W; sx += 60) {
     if ((sx / 60) % 2 === 0) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.fillRect(sx, 0, 60, SIDEWALK_H);
@@ -180,8 +195,8 @@ function sidewalk(scene: Phaser.Scene): void {
     ctx.fillRect(sx, 0, 1, SIDEWALK_H);
   }
   ctx.fillStyle = 'rgba(143, 136, 122, 0.5)';
-  ctx.fillRect(0, 8, W, 1);
-  ctx.fillRect(0, 16, W, 1);
+  ctx.fillRect(0, 8, TILE_W, 1);
+  ctx.fillRect(0, 16, TILE_W, 1);
 
   c.refresh();
 }
@@ -190,25 +205,25 @@ function sidewalk(scene: Phaser.Scene): void {
 // buildings; starts right where the sidewalk band ends.
 function street(scene: Phaser.Scene): void {
   const h = H - GROUND_Y + 6;
-  const c = scene.textures.createCanvas('street', W, h)!;
+  const c = scene.textures.createCanvas('street', TILE_W, h)!;
   const ctx = c.getContext();
 
   // curb: sunlit lip over a shaded face, then the gutter shadow line
   ctx.fillStyle = '#bcb5a5';
-  ctx.fillRect(0, 0, W, 2);
+  ctx.fillRect(0, 0, TILE_W, 2);
   ctx.fillStyle = '#7c7568';
-  ctx.fillRect(0, 2, W, 5);
+  ctx.fillRect(0, 2, TILE_W, 5);
   ctx.fillStyle = '#3e3c44';
-  ctx.fillRect(0, 7, W, 4);
+  ctx.fillRect(0, 7, TILE_W, 4);
 
   // asphalt with tonal patches, speckle grain and tar cracks
   ctx.fillStyle = '#4c4a52';
-  ctx.fillRect(0, 11, W, h - 11);
+  ctx.fillRect(0, 11, TILE_W, h - 11);
   for (let i = 0; i < 6; i++) {
     ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.07)';
     ctx.beginPath();
     ctx.ellipse(
-      80 + ((i * 173.7) % (W - 160)),
+      80 + ((i * 173.7) % (TILE_W - 160)),
       18 + ((i * 31) % (h - 30)),
       55 + (i % 3) * 30,
       9 + (i % 2) * 5,
@@ -220,7 +235,7 @@ function street(scene: Phaser.Scene): void {
   }
   for (let i = 0; i < 260; i++) {
     // deterministic scatter keeps the speckle off the tile seam
-    const sx = 4 + ((i * 37.37) % (W - 8));
+    const sx = 4 + ((i * 37.37) % (TILE_W - 8));
     const sy = 13 + ((i * 17.93) % (h - 16));
     ctx.fillStyle = i % 3 === 0 ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.14)';
     ctx.fillRect(sx, sy, i % 5 === 0 ? 2 : 1, 1);
@@ -235,7 +250,7 @@ function street(scene: Phaser.Scene): void {
     for (let s = 0; s < 6; s++) {
       cx += 8 + Math.random() * 14;
       cy += (Math.random() - 0.5) * 12;
-      ctx.lineTo(Math.min(cx, W - 10), Math.max(14, Math.min(h - 4, cy)));
+      ctx.lineTo(Math.min(cx, TILE_W - 10), Math.max(14, Math.min(h - 4, cy)));
     }
     ctx.stroke();
   }
@@ -254,8 +269,8 @@ function street(scene: Phaser.Scene): void {
   ctx.ellipse(mx, my, 12, 4, 0, 0, Math.PI * 2);
   ctx.stroke();
 
-  // lane dashes, slightly worn (80 divides W: seamless)
-  for (let x = 0; x < W; x += 80) {
+  // lane dashes, slightly worn (80 divides TILE_W: seamless)
+  for (let x = 0; x < TILE_W; x += 80) {
     ctx.fillStyle = 'rgba(216, 210, 192, 0.8)';
     ctx.fillRect(x, h - 18, 42, 5);
     ctx.fillStyle = 'rgba(76, 74, 82, 0.35)';
