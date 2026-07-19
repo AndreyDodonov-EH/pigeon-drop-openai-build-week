@@ -20,10 +20,11 @@ const TILE_W = 960;
  * screen edge-to-edge instead of pillarboxing: phones (coarse pointer) use the
  * device screen (landscape long/short, since play is landscape), desktop uses
  * the browser window at load. Clamped between 16:9 (960) and ~21:9. */
+export const MOBILE = window.matchMedia('(pointer: coarse)').matches;
+
 export const W = (() => {
-  const mobile = window.matchMedia('(pointer: coarse)').matches;
-  const long = mobile ? Math.max(screen.width, screen.height) : window.innerWidth;
-  const short = mobile ? Math.min(screen.width, screen.height) : window.innerHeight;
+  const long = MOBILE ? Math.max(screen.width, screen.height) : window.innerWidth;
+  const short = MOBILE ? Math.min(screen.width, screen.height) : window.innerHeight;
   return Math.round(H * Math.min(Math.max(long / short, 960 / 540), 1280 / 540));
 })();
 

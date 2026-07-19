@@ -8,7 +8,7 @@ import {
   VictimPalettePipeline,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
-import { buildTextures, W, H, GROUND_Y, SIDEWALK_H } from '../world/textures';
+import { buildTextures, W, H, GROUND_Y, SIDEWALK_H, MOBILE } from '../world/textures';
 import {
   NearBuildingsLayer,
   BUILDING_SPRITES,
@@ -41,9 +41,16 @@ const COLOR_WATER = '#a8dcf2';
 const RAINBOW_COLORS = [0xff5b57, 0xff9d3e, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8];
 
 // ---- sprite scales ----
+// Phones squeeze the fixed 540px design height onto a palm-sized screen and
+// the street read like a miniature there, so every street-level model gets
+// one shared bump on coarse-pointer devices. Applied uniformly (victims,
+// hydrants, props) so their relative proportions match desktop.
+const MOBILE_MODEL_BUMP = MOBILE ? 1.4 : 1;
 const PIGEON_SCALE = 0.38;
-const VICTIM_SCALE = 0.58; // pedestrians and cars
-const HYDRANT_SCALE = 0.5;
+const VICTIM_SCALE = 0.58 * MOBILE_MODEL_BUMP; // pedestrians and cars
+const HYDRANT_SCALE = 0.5 * MOBILE_MODEL_BUMP;
+/** texture px from the hydrant's base to its open neck (the jet's origin) */
+const HYDRANT_CAP_H = 92;
 const PICKUP_SCALE = 0.34;
 const PED_VARIANT_COUNT = 7;
 // The inline skater outruns the world scroll: high-value, high-lead target.
@@ -809,7 +816,7 @@ export class GameScene extends Phaser.Scene {
     const prop = this.add
       .image(x, 0, key)
       .setDepth(STREET_PROP_DEPTH)
-      .setScale(0.21 + Math.random() * 0.03);
+      .setScale((0.21 + Math.random() * 0.03) * MOBILE_MODEL_BUMP);
     if (key === 'bg-tree' && Math.random() < 0.5) prop.setFlipX(true);
     prop.setY(GROUND_Y - prop.displayHeight / 2 + 2);
     // lamps carry their own after-dark glow + moths
@@ -1135,7 +1142,7 @@ export class GameScene extends Phaser.Scene {
       h.sprite.x -= SCROLL * f;
       // hydrants sit on the ground; the open neck is a fixed height above it
       // (both textures share one padded canvas, so a swap never shifts the base)
-      const capY = GROUND_Y - 46;
+      const capY = GROUND_Y - HYDRANT_CAP_H * HYDRANT_SCALE;
 
       h.timer -= f;
       // guaranteed threat: instead of a random idle cycle (which let hydrants
