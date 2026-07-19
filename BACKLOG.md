@@ -47,6 +47,7 @@ this slot in alongside the normal flight frames.
 ## Idea dump (user, 2026-07-17)
 
 **Targets & scoring**
+- Currently with the low bar we cant poop; we should either still be able to poop (make no-poop range very loww) or should telegraph it visually and by sound (e.g. hungry or impatient pigeon and koo)
 - Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
 - Higher-value fast targets: quick rollerblader/skater — harder lead, bigger reward.
@@ -67,6 +68,8 @@ this slot in alongside the normal flight frames.
 - Sound for some of pedestrain and car reactions - should replace text pop-ups
 - Klezmer should play a little longer (not just fade off) - and probably be synchronized with different combo levels
 - Goo drop is too much of a clickign sound (especially on asphalt - car is good, pedestrains is acceptable)
+- Different Koos! We have one irritated for hydrant collision -add super relaxed one after very long successful dump, add one hungry one for telegraphing that we cant poop (or for that reuse from splash)
+- When testing from phone, I noticed that too pizzakato tracks play unusually well together (basically  increasing tempo, may be used in some phases)
 
 **Pickups**
 - Special pickup effects (assets, spawning and collection are shipped): coffee =
@@ -79,6 +82,8 @@ this slot in alongside the normal flight frames.
   targeting and propulsion is preferable to keeping gas as an intentionally aerial effect.
 
 **World & level design**
+- Natural habitat points - e.g. extra building "gym" plus then a lot of bodybuilders near it
+- stationary victims, e.g. people sitting in from of the caffe (caffe building exists already)
 - Higher platforms / screen layers — e.g. flying at balcony level, vertical screen
   transgressions beyond the single street lane.
 - Occasional events, e.g. a Politiker motorcade (or different levels/themes entirely).
