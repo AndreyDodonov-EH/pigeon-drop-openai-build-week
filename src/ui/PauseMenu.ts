@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { t } from '../i18n';
 import { isTouchDevice } from '../input/TouchControls';
-import { W, H } from '../world/textures';
+import { W, H, RES } from '../world/textures';
 
 const BUTTON_DEPTH = 25; // above debug menu (20-21), below the first-run wizard (30)
 const MODAL_DEPTH = 40; // above everything, incl. the touch hint markers (31)
@@ -102,6 +102,7 @@ export class PauseMenu {
         color: CREAM,
         stroke: '#1d1f2a',
         strokeThickness: 7,
+        resolution: RES,
       })
       .setOrigin(0.5);
 
@@ -114,6 +115,7 @@ export class PauseMenu {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '24px',
         color: '#1d1f2a',
+        resolution: RES,
       })
       .setOrigin(0.5);
 
@@ -130,6 +132,7 @@ export class PauseMenu {
           fontFamily: 'monospace',
           fontSize: '14px',
           color: CREAM,
+          resolution: RES,
         })
         .setOrigin(0.5)
         .setAlpha(0.72);

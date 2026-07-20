@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { W, H } from '../world/textures';
+import { W, H, RES } from '../world/textures';
 import { requestFullscreen, lockLandscapeOnFullscreen } from './fullscreen';
 
 /** Coarse-pointer check for cosmetic gating (hints, debug menu). Gameplay
@@ -52,6 +52,7 @@ const HINT_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
   fontFamily: 'monospace',
   fontSize: '14px',
   color: '#f3ead8',
+  resolution: RES,
 };
 
 /**
@@ -103,12 +104,14 @@ export class TouchControls {
   private onDown(p: Phaser.Input.Pointer): void {
     if (!p.wasTouch) return;
     requestFullscreen(this.scene);
-    if (p.x < W / 2) {
+    // pointer coords are canvas pixels (RES× design space) — the ratchet
+    // thresholds and the half-screen split are tuned in 960×540 space
+    if (p.x / RES < W / 2) {
       if (this.flyId < 0) {
         this.flyId = p.id;
         this.fly = true;
         this.dive = false;
-        this.ratchet.begin(p.y);
+        this.ratchet.begin(p.y / RES);
         this.beginHold('left');
       }
     } else if (this.poopId < 0) {
@@ -120,7 +123,7 @@ export class TouchControls {
 
   private onMove(p: Phaser.Input.Pointer): void {
     if (p.id !== this.flyId) return;
-    this.ratchet.move(p.y);
+    this.ratchet.move(p.y / RES);
     this.dive = this.ratchet.dive;
     this.fly = !this.dive;
   }

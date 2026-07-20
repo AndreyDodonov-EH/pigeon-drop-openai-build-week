@@ -28,6 +28,24 @@ export const W = (() => {
   return Math.round(H * Math.min(Math.max(long / short, 960 / 540), 1280 / 540));
 })();
 
+/** Supersampling factor. Layout stays in W×540 design space, but the canvas
+ * backing buffer is RES× larger and each scene's camera zooms by RES to match
+ * — otherwise the 540-tall buffer gets CSS-upscaled and every asset blurs, no
+ * matter how sharp the source PNG. Desktop sizes it to the screen's physical
+ * height (the fullscreen worst case), capped at 3× to bound fill-rate.
+ * Phones stay at 1×: the goo/gas PostFX shaders run full-canvas passes every
+ * frame, and at 2×+ their fragment cost visibly tanked phone framerates.
+ * `?res=N` overrides for experiments on any device. Pointer coordinates
+ * (pointer.x/y) arrive in canvas pixels, so divide by RES before comparing
+ * against design-space values. */
+export const RES = (() => {
+  const override = Number(new URLSearchParams(location.search).get('res'));
+  if (override >= 1 && override <= 4) return override;
+  if (MOBILE) return 1;
+  const dpr = window.devicePixelRatio || 1;
+  return Math.min(Math.max((screen.height * dpr) / H, 1), 3);
+})();
+
 export function buildTextures(scene: Phaser.Scene): void {
   sky(scene);
   skyDusk(scene);
