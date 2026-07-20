@@ -4,19 +4,24 @@ import Phaser from 'phaser';
  * Request fullscreen from within a user-gesture handler (pointerdown only —
  * browsers reject it outside a real gesture). Safe to call repeatedly: no-op
  * if already fullscreen or unsupported (iOS Safari has no fullscreen API).
+ * Returns whether a real request was actually issued, so callers who need
+ * to react to an upcoming fullscreen transition don't have to re-derive the
+ * same guards themselves (and risk disagreeing with this function's own).
  */
-export function requestFullscreen(scene: Phaser.Scene): void {
+export function requestFullscreen(scene: Phaser.Scene): boolean {
   const scale = scene.scale;
-  if (!scale.fullscreen.available) return; // iOS Safari: unavailable, no-op
+  if (!scale.fullscreen.available) return false; // iOS Safari: unavailable, no-op
   // rotation can drop browser fullscreen behind Phaser's back — trust the
   // DOM, and resync Phaser's flag if it went stale, so this tap re-enters
   const fsEl = document.fullscreenElement ?? (document as any).webkitFullscreenElement;
-  if (fsEl) return;
+  if (fsEl) return false;
   try {
     if (scale.isFullscreen) scale.stopFullscreen();
     scale.startFullscreen();
+    return true;
   } catch {
     /* user gesture expired or browser refused — try again next tap */
+    return false;
   }
 }
 

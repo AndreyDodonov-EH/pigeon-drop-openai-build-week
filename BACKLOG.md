@@ -64,9 +64,11 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
   no-rainbow-at-night pickup rule already does. Car headlights at night would also sell it.
 
 **Webpage**
-- Add icon (favicon)
-- Suggest to make webpage installable (pwa) so that it can then work online (and add bigger icon for it, so that it then looks nice on the phone)
-- Loading screen? Progress bar + splash Art - probably use gemini for inspiration too, but it should match our style more, not so pencil/comic art it does by default
+- ~~Add icon (favicon)~~ DONE 2026-07-20: `public/favicon.ico` + `public/icons/` (64/192/512 +
+  maskable + apple-touch), cut from the smirking `ready.png` portrait; wired in `index.html`
+- Suggest to make webpage installable (pwa) so that it can then work online (and add bigger icon for it, so that it then looks nice on the phone screen)
+  — PARTLY DONE 2026-07-20: `public/manifest.webmanifest` (fullscreen, landscape, 192/512 + maskable icons) makes Add-to-Home-Screen use the big icon;
+  still open: service worker for offline play / full install prompt
 - Possibility to exit the game when posed
 
 

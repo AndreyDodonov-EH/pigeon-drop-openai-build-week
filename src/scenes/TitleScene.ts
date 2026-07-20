@@ -42,7 +42,7 @@ const PIGEON_FRAMES = ['pigeon-perch-f0', 'pigeon-perch-f1', 'pigeon-perch-f2'];
 export class TitleScene extends Phaser.Scene {
   private pigeonImg!: Phaser.GameObjects.Image;
   private prompt!: Phaser.GameObjects.Text;
-  private revealing = false;
+  private activated = false;
 
   constructor() {
     super('title');
@@ -107,23 +107,29 @@ export class TitleScene extends Phaser.Scene {
 
     // the title tap is the very first user gesture on mobile, so fullscreen
     // is requested here rather than waiting for the first tap in GameScene
-    this.input.once('pointerdown', (p: Phaser.Input.Pointer) => {
-      const enteringFullscreen =
-        p.wasTouch && this.scale.fullscreen.available && !this.scale.isFullscreen;
-      if (p.wasTouch) requestFullscreen(this);
-      if (enteringFullscreen) this.time.delayedCall(FULLSCREEN_SETTLE_MS, () => this.reveal());
-      else this.reveal();
-    });
-    this.input.keyboard?.once('keydown', this.reveal, this);
+    this.input.once('pointerdown', (p: Phaser.Input.Pointer) => this.onActivate(p.wasTouch));
+    this.input.keyboard?.once('keydown', () => this.onActivate(false));
+  }
+
+  /** Shared entry point for both the tap and keyboard triggers. Gives instant
+   * feedback (prompt snaps solid) no matter what happens with fullscreen
+   * below, then either waits out the fullscreen transition or reveals right
+   * away. `requestFullscreen`'s return value — not a separately re-derived
+   * guess — decides whether that transition is actually coming, so this
+   * can't disagree with what it actually did. */
+  private onActivate(wasTouch: boolean): void {
+    if (this.activated) return;
+    this.activated = true;
+    this.tweens.killTweensOf(this.prompt);
+    this.tweens.add({ targets: this.prompt, alpha: 1, duration: 120 });
+
+    const enteringFullscreen = wasTouch && requestFullscreen(this);
+    if (enteringFullscreen) this.time.delayedCall(FULLSCREEN_SETTLE_MS, () => this.reveal());
+    else this.reveal();
   }
 
   /** the pigeon turns to face the camera, holds the smirk, then the title fades into gameplay */
   private reveal(): void {
-    if (this.revealing) return;
-    this.revealing = true;
-    this.tweens.killTweensOf(this.prompt);
-    this.tweens.add({ targets: this.prompt, alpha: 1, duration: 120 });
-
     PIGEON_FRAMES.slice(1).forEach((key, i) => {
       this.time.delayedCall(TURN_STEP_MS * (i + 1), () => this.pigeonImg.setTexture(key));
     });
