@@ -93,8 +93,12 @@ export class GasSim {
    * Detonation: every airborne parcel catches fire and is shoved radially
    * away from the blast point, hardest near the centre. Rainbow parcels burn
    * too — an explosion outranks whimsy.
+   *
+   * chilli→gas completes with no cloud yet (pea just armed the timer), so seed
+   * a fireball when the air is empty — same read as lighting a dumped cloud.
    */
   ignite(x: number, y: number): void {
+    if (this.particles.length === 0) this.emit(x, y, true, 16, false, true);
     for (const p of this.particles) {
       p.fire = true;
       p.rainbow = false;

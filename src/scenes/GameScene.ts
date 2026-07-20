@@ -534,7 +534,14 @@ export class GameScene extends Phaser.Scene {
       setPaused: (v: boolean) => this.setPaused(v),
       isPaused: () => this.gamePaused,
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
-      setGas: (v: boolean) => (this.gasTimer = v ? GAS_DURATION : 0),
+      setGas: (v: boolean) => {
+        if (!v) {
+          this.gasTimer = 0;
+          return;
+        }
+        this.activateGas();
+        this.announceCombo('pea', this.pigeon.x, this.pigeonY);
+      },
       particleCount: () => this.guanoFx.particleCount,
       gasParticleCount: () => this.guanoFx.gasParticleCount,
       spawnHydrant: () => this.spawnHydrant(),
@@ -826,7 +833,11 @@ export class GameScene extends Phaser.Scene {
     addButton('CHILI', 1, 2, () => spawnHere('chilli'));
     addButton('COFF', 2, 2, () => spawnHere('coffee'));
     addButton('POD', 0, 3, () => spawnHere('pea'));
-    addButton('GAS', 1, 3, () => this.activateGas());
+    // Same combo path as a pea pickup so chilli→gas still detonates.
+    addButton('GAS', 1, 3, () => {
+      this.activateGas();
+      this.announceCombo('pea', this.pigeon.x, this.pigeonY);
+    });
     addButton('TIME', 2, 3, () => this.dayNight.jumpNext());
     addButton('CAFE', 0, 4, () => this.bgNear.queueNext('bg-building-2'));
   }
