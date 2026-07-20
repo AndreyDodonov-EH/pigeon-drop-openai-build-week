@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { W, H } from '../world/textures';
+import { requestFullscreen, lockLandscapeOnFullscreen } from './fullscreen';
 
 /** Coarse-pointer check for cosmetic gating (hints, debug menu). Gameplay
  * reacts to actual touch events via `pointer.wasTouch`, never this. */
@@ -89,20 +90,19 @@ export class TouchControls {
     // backgrounded tab / incoming call: drop everything, don't leave the
     // pigeon climbing or the tap unspent
     scene.game.events.on(Phaser.Core.Events.BLUR, this.releaseAll, this);
-    // lock only once fullscreen has actually engaged — locking in the same
-    // tick as the request silently rejects (fullscreen isn't active yet)
-    scene.scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, this.lockLandscape, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.game.events.off(Phaser.Core.Events.BLUR, this.releaseAll, this);
-      scene.scale.off(Phaser.Scale.Events.ENTER_FULLSCREEN, this.lockLandscape, this);
     });
+    // usually already fullscreen from the title screen's first tap — this
+    // covers re-entry after a rotation/exit drops it mid-game
+    lockLandscapeOnFullscreen(scene);
 
     if (isTouchDevice()) this.createFingers();
   }
 
   private onDown(p: Phaser.Input.Pointer): void {
     if (!p.wasTouch) return;
-    this.tryFullscreen();
+    requestFullscreen(this.scene);
     if (p.x < W / 2) {
       if (this.flyId < 0) {
         this.flyId = p.id;
@@ -148,26 +148,6 @@ export class TouchControls {
     this.fly = false;
     this.dive = false;
     this.poop = false;
-  }
-
-  private tryFullscreen(): void {
-    const scale = this.scene.scale;
-    if (!scale.fullscreen.available) return; // iOS Safari: unavailable, no-op
-    // rotation can drop browser fullscreen behind Phaser's back — trust the
-    // DOM, and resync Phaser's flag if it went stale, so this tap re-enters
-    const fsEl =
-      document.fullscreenElement ?? (document as any).webkitFullscreenElement;
-    if (fsEl) return;
-    try {
-      if (scale.isFullscreen) scale.stopFullscreen();
-      scale.startFullscreen();
-    } catch {
-      /* user gesture expired or browser refused — try again next tap */
-    }
-  }
-
-  private lockLandscape(): void {
-    (screen.orientation as any)?.lock?.('landscape')?.catch(() => {});
   }
 
   private createFingers(): void {

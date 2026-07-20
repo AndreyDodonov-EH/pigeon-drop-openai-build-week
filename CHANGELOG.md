@@ -4,6 +4,28 @@ Design/implementation record of what's in the game and why. Newest last within e
 entry's follow-ups. Future ideas live in `BACKLOG.md`; art provenance in
 `assets/ART_LOG.md`.
 
+## Title screen (shipped 2026-07-20)
+
+First scene now shown on load: `src/scenes/TitleScene.ts`, registered ahead of
+`GameScene` in `main.ts`. Full-bleed hero art (`public/assets/sprites/title-bg.png`,
+2560×1080 rooftop-at-dusk skyline, generated per `assets/ART_LOG.md`) plus a genuinely
+non-animated pigeon overlay (`pigeon-perch-f{0,1,2}.png`, new standing/perched sprite
+family — folded wings, planted feet, no flight silhouette) sit still for however long
+the player looks, so the whole screen reads as one static painting. The same
+tap/click/key that starts the game also triggers the reveal: the pigeon turns its head
+through f0→f1→f2 to face the camera with the same conspiratorial smirk as GameScene's
+post-hit glance, holds it, then the screen fades into `GameScene`. First leg of
+BACKLOG's "Demo wrapping"; DAY 1 lettering, the auto day→dusk→night run, fly-to-roof,
+and the cozy outro screen are still open.
+
+**Logo + tagline localization (2026-07-20):** the "PIGEON DROP" title is now a
+generated wordmark (`public/assets/sprites/title-logo.png`, chunky cartoon lettering
+matching the game's outline/cel-shading style) instead of plain code text — kept as a
+single fixed brand asset across all locales, the same way most games don't translate
+their logotype. The subtitle tagline moved into `src/i18n.ts` (`t.tagline`, all 11
+languages) instead of being hardcoded English, so every remaining piece of
+title-screen text is either generated brand art or properly localized.
+
 ## Meter inversion — pressure economy (agreed 2026-07-14, core shipped 2026-07-14)
 
 Shipped: digestion-pressure economy (passive fill 0.12/frame, poop drains), auto-blowout

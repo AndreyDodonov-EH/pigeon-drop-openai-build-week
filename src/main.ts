@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
+import { TitleScene } from './scenes/TitleScene';
 import { W, H } from './world/textures';
 
 const game = new Phaser.Game({
@@ -25,7 +26,7 @@ const game = new Phaser.Game({
     antialias: true,
     roundPixels: false,
   },
-  scene: [GameScene],
+  scene: [TitleScene, GameScene],
 });
 
 // mobile browsers fire the rotation resize while the old viewport numbers
@@ -37,3 +38,25 @@ const remeasure = (): void => {
 };
 screen.orientation?.addEventListener('change', remeasure);
 window.addEventListener('orientationchange', remeasure);
+
+// the CSS #rotate-overlay covers the canvas in portrait (see index.html),
+// but nothing stopped the game (or its music) running underneath it. Freeze
+// the whole Phaser loop while the overlay is up; game.pause()/resume() are
+// idempotent so no extra bookkeeping is needed. Leave audio alone if the
+// player already paused manually — GameScene's own pause menu owns sound
+// state in that case, in both directions.
+const portraitQuery = window.matchMedia('(orientation: portrait) and (pointer: coarse)');
+const syncOrientationPause = (portrait: boolean): void => {
+  const scenePaused = (
+    window as unknown as { SP?: { isPaused?: () => boolean } }
+  ).SP?.isPaused?.();
+  if (portrait) {
+    game.pause();
+    if (!scenePaused) game.sound.pauseAll();
+  } else {
+    game.resume();
+    if (!scenePaused) game.sound.resumeAll();
+  }
+};
+syncOrientationPause(portraitQuery.matches);
+portraitQuery.addEventListener('change', (e) => syncOrientationPause(e.matches));
