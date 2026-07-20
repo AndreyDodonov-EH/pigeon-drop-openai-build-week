@@ -6,6 +6,7 @@
 
 const STRINGS = {
   en: {
+    tagline: 'a day in the life of an unrepentant menace',
     howToPlay: 'HOW TO PLAY',
     holdClimb: 'HOLD — CLIMB',
     dragDive: 'DRAG DOWN — DIVE',
@@ -21,6 +22,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — RESUME',
   },
   es: {
+    tagline: 'un día en la vida de una amenaza sin remordimientos',
     howToPlay: 'CÓMO JUGAR',
     holdClimb: 'MANTÉN — SUBIR',
     dragDive: 'DESLIZA ABAJO — PICADO',
@@ -36,6 +38,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — CONTINUAR',
   },
   fr: {
+    tagline: "une journée dans la vie d'une nuisance sans remords",
     howToPlay: 'COMMENT JOUER',
     holdClimb: 'MAINTIENS — MONTER',
     dragDive: 'GLISSE VERS LE BAS — PIQUÉ',
@@ -51,6 +54,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — REPRENDRE',
   },
   de: {
+    tagline: 'ein tag im leben einer unverbesserlichen plage',
     howToPlay: 'SO WIRD GESPIELT',
     holdClimb: 'HALTEN — STEIGEN',
     dragDive: 'RUNTERZIEHEN — STURZFLUG',
@@ -66,6 +70,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — WEITERSPIELEN',
   },
   it: {
+    tagline: 'un giorno nella vita di una piaga senza rimorsi',
     howToPlay: 'COME SI GIOCA',
     holdClimb: 'TIENI PREMUTO — SALI',
     dragDive: 'TRASCINA GIÙ — PICCHIATA',
@@ -81,6 +86,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — RIPRENDI',
   },
   pt: {
+    tagline: 'um dia na vida de uma ameaça sem remorsos',
     howToPlay: 'COMO JOGAR',
     holdClimb: 'SEGURE — SUBIR',
     dragDive: 'ARRASTE PARA BAIXO — MERGULHO',
@@ -96,6 +102,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — CONTINUAR',
   },
   ru: {
+    tagline: 'один день из жизни неисправимого хулигана',
     howToPlay: 'КАК ИГРАТЬ',
     holdClimb: 'ДЕРЖИ — ВЗЛЁТ',
     dragDive: 'ТЯНИ ВНИЗ — ПИКЕ',
@@ -111,6 +118,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — ПРОДОЛЖИТЬ',
   },
   uk: {
+    tagline: 'один день із життя невиправного хулігана',
     howToPlay: 'ЯК ГРАТИ',
     holdClimb: 'ТРИМАЙ — ЗЛІТ',
     dragDive: 'ТЯГНИ ВНИЗ — ПІКЕ',
@@ -126,6 +134,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — ПРОДОВЖИТИ',
   },
   ja: {
+    tagline: '反省知らずな迷惑者の、とある一日',
     howToPlay: 'あそびかた',
     holdClimb: '長押し — 上昇',
     dragDive: '下にドラッグ — 急降下',
@@ -141,6 +150,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — つづける',
   },
   zh: {
+    tagline: '一个死不悔改的捣蛋鬼的一天',
     howToPlay: '玩法说明',
     holdClimb: '按住 — 爬升',
     dragDive: '下拉 — 俯冲',
@@ -156,6 +166,7 @@ const STRINGS = {
     pauseHint: 'P / ESC — 继续游戏',
   },
   ko: {
+    tagline: '반성이라곤 모르는 말썽꾼의 하루',
     howToPlay: '게임 방법',
     holdClimb: '길게 누르기 — 상승',
     dragDive: '아래로 드래그 — 급강하',

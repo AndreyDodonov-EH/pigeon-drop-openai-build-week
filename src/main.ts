@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
+import { TitleScene } from './scenes/TitleScene';
 import { W, H } from './world/textures';
 
 const game = new Phaser.Game({
@@ -25,7 +26,7 @@ const game = new Phaser.Game({
     antialias: true,
     roundPixels: false,
   },
-  scene: [GameScene],
+  scene: [TitleScene, GameScene],
 });
 
 // mobile browsers fire the rotation resize while the old viewport numbers

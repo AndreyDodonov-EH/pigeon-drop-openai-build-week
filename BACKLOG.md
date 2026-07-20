@@ -35,12 +35,14 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 - Add sound to pick-ups (some are already present in the repository, just not wired)
 - Kebab/bread can effect how liquid goo is - kebab should make it more liquid, bread - a little denser. May be with timer, but no explicit one. It just should feel naturally as part of the game, more    diegetic.
 
-**Demo wrapping**
-- This demo is day one, once night is done -pigeon goes happily to sleep - flies away and goes to sleep on the roof. 
+**Game sequence**
+- Current implementation is demo of a potential game - is day one, once night is done -pigeon goes happily to sleep - flies away and goes to sleep on the roof. 
   Then full-screen cozy art of pigeon going to sleep and text "see you in the morning!" or "see you next day!"
-- Title screen: generate title screen, inspiration from gemini (agy skill), consistent picture from code.
-  Twist: title screen seems static, but pigeon there is a separate overlay, and it turns at the end of title screen its head smirkingly at us
-- Demo sequence: Title Screen -> DAY 1 letters over already player screen -> day->dusk->night (no dawn or fix its colors) -> pigeon flies off to the roof -> Outro cozy screen with pigeon falling asleep
+- ~~Title screen: generate title screen, inspiration from gemini (agy skill), consistent picture from code.
+  Twist: title screen seems static, but pigeon there is a separate overlay, and it turns at the end of title screen its head smirkingly at us~~
+  DONE: `src/scenes/TitleScene.ts`, key art `public/assets/sprites/title-bg.png` (see ART_LOG); now the first scene in `main.ts`
+- Sequence: Title Screen -> DAY 1 letters over already player screen -> day->dusk->night (no dawn or fix its colors) -> pigeon flies off to the roof -> Outro cozy screen with pigeon falling asleep
+  (title screen leg above is done; DAY 1 lettering / auto day-dusk-night / fly-to-roof / outro still open)
 
 **World & level design**
 - **Combo-rank world reactions** (user, 2026-07-19): convey the "heating up" phases
