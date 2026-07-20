@@ -3,7 +3,7 @@
 # Usage: deploy.sh "Redeploy demo: <what changed since last deploy>"
 set -euo pipefail
 
-REPO=/home/aadod/_PROJECTS/pigeon_drop
+REPO=~/_PROJECTS/pigeon_drop
 BASE=/pigeon_drop/          # Pages serves under this subpath; a build without it 404s every asset
 URL=https://andreydodonov-eh.github.io/pigeon_drop/
 

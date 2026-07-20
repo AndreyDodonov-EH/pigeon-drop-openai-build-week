@@ -65,6 +65,7 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 - Add icon (favicon)
 - Suggest to make webpage installable (pwa) so that it can then work online (and add bigger icon for it, so that it then looks nice on the phone)
 - Loading screen? Progress bar + splash Art - probably use gemini for inspiration too, but it should match our style more, not so pencil/comic art it does by default
+- Possibility to exit the game when posed
 
 
 ## Other candidates
