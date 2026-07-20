@@ -9,6 +9,13 @@ const GUANO_TINT = 0xf2ecd4;
 const CHILLI_JET_BOOST = 2.6;
 const FLAME_TEXTURE = 'flame-dot';
 
+const FLAME_COLORS = [0xfff7cf, 0xffce42, 0xff7a24, 0xb91f24];
+const SPARK_TINTS = [0xfff2b0, 0xffce42, 0xff7a24];
+// fireworks variants: flames open white-hot then walk the hue wheel instead of
+// cooling to red; sparks scatter in the pickup-burst rainbow palette
+const RAINBOW_FLAME_COLORS = [0xffffff, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8, 0xff5b57];
+const RAINBOW_SPARK_TINTS = [0xff5b57, 0xff9d3e, 0xffe05c, 0x65cf76, 0x5bc8e8, 0x8f73e8];
+
 /** Phaser's manager returns a WebAudio/HTML5 sound with mutable runtime controls. */
 type AdjustableSound = Phaser.Sound.BaseSound & { volume: number; rate: number };
 
@@ -56,6 +63,8 @@ export class GuanoEffects {
   private readonly gasLayer: GasLayer;
   private readonly fireEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly sparkEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly rainbowFlameEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly rainbowSparkEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
 
   private readonly fireDepth: number;
   private emitCarry = 0;
@@ -83,36 +92,10 @@ export class GuanoEffects {
     this.fireDepth = options.fireDepth;
 
     this.ensureFlameTexture();
-    this.fireEmitter = scene.add
-      .particles(0, 0, FLAME_TEXTURE, {
-        speedX: { min: -20, max: 20 },
-        speedY: { min: -110, max: -30 },
-        scale: { start: 1.8, end: 0.2 },
-        alpha: { start: 0.95, end: 0 },
-        lifespan: { min: 250, max: 600 },
-        color: [0xfff7cf, 0xffce42, 0xff7a24, 0xb91f24],
-        colorEase: 'quad.out',
-        quantity: 0,
-        emitting: false,
-        maxAliveParticles: 300,
-        blendMode: Phaser.BlendModes.ADD,
-      })
-      .setDepth(options.fireDepth);
-    this.sparkEmitter = scene.add
-      .particles(0, 0, FLAME_TEXTURE, {
-        speedX: { min: -70, max: 70 },
-        speedY: { min: -140, max: 10 },
-        gravityY: 280,
-        scale: { start: 0.4, end: 0 },
-        alpha: { start: 1, end: 0.2 },
-        lifespan: { min: 300, max: 750 },
-        tint: [0xfff2b0, 0xffce42, 0xff7a24],
-        quantity: 0,
-        emitting: false,
-        maxAliveParticles: 140,
-        blendMode: Phaser.BlendModes.ADD,
-      })
-      .setDepth(options.fireDepth);
+    this.fireEmitter = this.makeFlameEmitter(FLAME_COLORS, options.fireDepth);
+    this.rainbowFlameEmitter = this.makeFlameEmitter(RAINBOW_FLAME_COLORS, options.fireDepth);
+    this.sparkEmitter = this.makeSparkEmitter(SPARK_TINTS, options.fireDepth);
+    this.rainbowSparkEmitter = this.makeSparkEmitter(RAINBOW_SPARK_TINTS, options.fireDepth);
 
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
   }
@@ -165,8 +148,10 @@ export class GuanoEffects {
     }
 
     if (stream.fire) {
-      this.fireEmitter.emitParticleAt(stream.x, stream.y - 16, 3);
-      this.sparkEmitter.emitParticleAt(stream.x, stream.y - 10, 1);
+      const flames = stream.rainbow ? this.rainbowFlameEmitter : this.fireEmitter;
+      const sparks = stream.rainbow ? this.rainbowSparkEmitter : this.sparkEmitter;
+      flames.emitParticleAt(stream.x, stream.y - 16, 3);
+      sparks.emitParticleAt(stream.x, stream.y - 10, stream.rainbow ? 3 : 1);
     }
 
     for (let i = 0; i < count; i++) {
@@ -227,6 +212,48 @@ export class GuanoEffects {
     });
   }
 
+  private makeFlameEmitter(
+    color: number[],
+    depth: number,
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    return this.scene.add
+      .particles(0, 0, FLAME_TEXTURE, {
+        speedX: { min: -20, max: 20 },
+        speedY: { min: -110, max: -30 },
+        scale: { start: 1.8, end: 0.2 },
+        alpha: { start: 0.95, end: 0 },
+        lifespan: { min: 250, max: 600 },
+        color,
+        colorEase: 'quad.out',
+        quantity: 0,
+        emitting: false,
+        maxAliveParticles: 300,
+        blendMode: Phaser.BlendModes.ADD,
+      })
+      .setDepth(depth);
+  }
+
+  private makeSparkEmitter(
+    tint: number[],
+    depth: number,
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    return this.scene.add
+      .particles(0, 0, FLAME_TEXTURE, {
+        speedX: { min: -70, max: 70 },
+        speedY: { min: -140, max: 10 },
+        gravityY: 280,
+        scale: { start: 0.4, end: 0 },
+        alpha: { start: 1, end: 0.2 },
+        lifespan: { min: 300, max: 750 },
+        tint,
+        quantity: 0,
+        emitting: false,
+        maxAliveParticles: 140,
+        blendMode: Phaser.BlendModes.ADD,
+      })
+      .setDepth(depth);
+  }
+
   private ensureFlameTexture(): void {
     if (this.scene.textures.exists(FLAME_TEXTURE)) return;
     const flame = this.scene.make.graphics({ x: 0, y: 0 }, false);
@@ -245,12 +272,17 @@ export class GuanoEffects {
       const particle = particles[(Math.random() * particles.length) | 0];
       if (!particle.fire || particle.dead) continue;
       if (Math.random() < 0.7) {
-        this.fireEmitter.emitParticleAt(
+        (particle.rainbow ? this.rainbowFlameEmitter : this.fireEmitter).emitParticleAt(
           particle.x + (Math.random() - 0.5) * 6,
           particle.y - 3,
         );
       }
-      if (Math.random() < 0.12) this.sparkEmitter.emitParticleAt(particle.x, particle.y - 2);
+      // fireworks goo sputters sparks much more eagerly than a plain fire jet
+      if (Math.random() < (particle.rainbow ? 0.35 : 0.12))
+        (particle.rainbow ? this.rainbowSparkEmitter : this.sparkEmitter).emitParticleAt(
+          particle.x,
+          particle.y - 2,
+        );
     }
   }
 
@@ -300,12 +332,16 @@ export class GuanoEffects {
       if (!particle.fire) continue;
       const spread = particle.radius * 0.6;
       if (Math.random() < 0.55) {
-        this.fireEmitter.emitParticleAt(
+        (particle.rainbow ? this.rainbowFlameEmitter : this.fireEmitter).emitParticleAt(
           particle.x + (Math.random() - 0.5) * spread,
           particle.y + (Math.random() - 0.5) * spread * 0.7,
         );
       }
-      if (Math.random() < 0.08) this.sparkEmitter.emitParticleAt(particle.x, particle.y);
+      if (Math.random() < (particle.rainbow ? 0.2 : 0.08))
+        (particle.rainbow ? this.rainbowSparkEmitter : this.sparkEmitter).emitParticleAt(
+          particle.x,
+          particle.y,
+        );
     }
   }
 

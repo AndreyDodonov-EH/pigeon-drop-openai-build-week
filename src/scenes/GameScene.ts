@@ -1627,6 +1627,10 @@ export class GameScene extends Phaser.Scene {
     // Runoff dripping off a victim or the hydrant lands silently — the hit that put
     // it there already made its noise, and dozens of trickling drops read as clicks.
     if (p.wasStuck) return;
+    // fireworks goo (rainbow + fire) pops a starburst where it lands; sampled
+    // so a dense volley reads as scattered fireworks, not a wall of circles
+    if (p.rainbow && p.fire && impact >= 2.2 && Math.random() < 0.35)
+      this.pickupBurst(p.x, p.y - 8, RAINBOW_COLORS);
     if (impact < 2.2 || this.time.now < this.nextAsphaltSplatAt) return;
     this.nextAsphaltSplatAt = this.time.now + ASPHALT_SPLAT_COOLDOWN_MS;
     this.sound.play('sfx-splat-asphalt', {
@@ -1766,7 +1770,8 @@ export class GameScene extends Phaser.Scene {
       y: this.pigeonY + 24,
       sourceVy: this.pigeonVy,
       rainbow,
-      fire: !rainbow && this.chilliTimer > 0,
+      // rainbow + fire coexist: fireworks goo / disco-inferno gas
+      fire: this.chilliTimer > 0,
       gas: this.gasTimer > 0,
     });
   }
