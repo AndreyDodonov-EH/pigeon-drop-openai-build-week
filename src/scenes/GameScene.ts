@@ -534,7 +534,14 @@ export class GameScene extends Phaser.Scene {
       setPaused: (v: boolean) => this.setPaused(v),
       isPaused: () => this.gamePaused,
       setRainbow: (v: boolean) => (this.rainbowDebug = v),
-      setGas: (v: boolean) => (this.gasTimer = v ? GAS_DURATION : 0),
+      setGas: (v: boolean) => {
+        if (!v) {
+          this.gasTimer = 0;
+          return;
+        }
+        this.activateGas();
+        this.announceCombo('pea', this.pigeon.x, this.pigeonY);
+      },
       particleCount: () => this.guanoFx.particleCount,
       gasParticleCount: () => this.guanoFx.gasParticleCount,
       spawnHydrant: () => this.spawnHydrant(),
@@ -826,7 +833,11 @@ export class GameScene extends Phaser.Scene {
     addButton('CHILI', 1, 2, () => spawnHere('chilli'));
     addButton('COFF', 2, 2, () => spawnHere('coffee'));
     addButton('POD', 0, 3, () => spawnHere('pea'));
-    addButton('GAS', 1, 3, () => this.activateGas());
+    // Same combo path as a pea pickup so chilli→gas still detonates.
+    addButton('GAS', 1, 3, () => {
+      this.activateGas();
+      this.announceCombo('pea', this.pigeon.x, this.pigeonY);
+    });
     addButton('TIME', 2, 3, () => this.dayNight.jumpNext());
     addButton('CAFE', 0, 4, () => this.bgNear.queueNext('bg-building-2'));
   }
@@ -1627,6 +1638,10 @@ export class GameScene extends Phaser.Scene {
     // Runoff dripping off a victim or the hydrant lands silently — the hit that put
     // it there already made its noise, and dozens of trickling drops read as clicks.
     if (p.wasStuck) return;
+    // fireworks goo (rainbow + fire) pops a starburst where it lands; sampled
+    // so a dense volley reads as scattered fireworks, not a wall of circles
+    if (p.rainbow && p.fire && impact >= 2.2 && Math.random() < 0.35)
+      this.pickupBurst(p.x, p.y - 8, RAINBOW_COLORS);
     if (impact < 2.2 || this.time.now < this.nextAsphaltSplatAt) return;
     this.nextAsphaltSplatAt = this.time.now + ASPHALT_SPLAT_COOLDOWN_MS;
     this.sound.play('sfx-splat-asphalt', {
@@ -1766,7 +1781,8 @@ export class GameScene extends Phaser.Scene {
       y: this.pigeonY + 24,
       sourceVy: this.pigeonVy,
       rainbow,
-      fire: !rainbow && this.chilliTimer > 0,
+      // rainbow + fire coexist: fireworks goo / disco-inferno gas
+      fire: this.chilliTimer > 0,
       gas: this.gasTimer > 0,
     });
   }
