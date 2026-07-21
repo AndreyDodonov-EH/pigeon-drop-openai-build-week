@@ -22,6 +22,7 @@ import {
 } from '../world/BuildingPalettePipeline';
 import { DayNight, type DayLook } from '../world/DayNight';
 import { LampFx } from '../world/LampFx';
+import { CarHeadlightFx } from '../world/CarHeadlightFx';
 import { PooFanLayer } from '../world/PooFanLayer';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
@@ -54,7 +55,8 @@ const HYDRANT_SCALE = 0.5 * MOBILE_MODEL_BUMP;
 /** texture px from the hydrant's base to its open neck (the jet's origin) */
 const HYDRANT_CAP_H = 92;
 const PICKUP_SCALE = 0.34;
-const PED_VARIANT_COUNT = 7;
+const PED_VARIANT_COUNT = 10;
+const CAR_VARIANT_COUNT = 6;
 // The inline skater outruns the world scroll: high-value, high-lead target.
 const SKATER_VARIANT = 6;
 const SKATER_BASE_SCORE = 40;
@@ -164,6 +166,7 @@ const ITEM_PICKUP_EFFECTS: Record<ItemPickupKind, ItemPickupEffect> = {
 
 interface Victim {
   sprite: Phaser.GameObjects.Sprite;
+  headlights?: CarHeadlightFx;
   collider: Collider;
   kind: 'ped' | 'car';
   variant: number;
@@ -182,6 +185,9 @@ const PED_LINES = [
   'MY MAP!',
   'BRO! SERIOUSLY?!',
   'DUDE, MY HOODIE!',
+  'MY AESTHETIC!',
+  'MY PORTFOLIO!',
+  'PHILISTINE!',
 ];
 // rainbow goo delights instead of disgusts — same characters, opposite mood
 const PED_LINES_RAINBOW = [
@@ -192,9 +198,19 @@ const PED_LINES_RAINBOW = [
   'BEST TRIP EVER!',
   'SICK COLORS!',
   'RADICAL!!',
+  'THIS... SLAPS?!',
+  'BULLISH!!',
+  'A MASTERPIECE!',
 ];
-const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
-const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
+const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!', 'MY LUGGAGE!', 'THE UPHOLSTERY!', 'MY TRUCK!'];
+const CAR_LINES_RAINBOW = [
+  'FREE PAINT JOB!',
+  'BEEP BEEP JOY!',
+  'LOVELY!!',
+  'ROAD TRIP GLOW!',
+  'CLASSY!',
+  'SHINY RIG!',
+];
 const REACT_FRAMES = 90;
 
 // Post-hit conspiratorial glance: the pigeon turns to face the camera for a beat
@@ -409,9 +425,11 @@ export class GameScene extends Phaser.Scene {
     this.load.image('pigeon-look-f0', 'assets/sprites/pigeon-look-f0.png');
     this.load.image('pigeon-look-f1', 'assets/sprites/pigeon-look-f1.png');
     this.load.image('pigeon-look-f2', 'assets/sprites/pigeon-look-f2.png');
-    this.load.image('car-0', 'assets/sprites/car-0.png');
-    this.load.image('car-1', 'assets/sprites/car-1.png');
-    this.load.image('car-2', 'assets/sprites/car-2.png');
+    for (let i = 0; i < CAR_VARIANT_COUNT; i++) {
+      this.load.image(`car-${i}`, `assets/sprites/car-${i}.png`);
+      this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
+      this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
+    }
     for (let i = 0; i < PED_VARIANT_COUNT; i++) {
       this.load.image(`ped-${i}`, `assets/sprites/ped-${i}.png`);
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
@@ -423,10 +441,6 @@ export class GameScene extends Phaser.Scene {
         `ped-${SKATER_VARIANT}${suffix}`,
         `assets/sprites/ped-${SKATER_VARIANT}${suffix}.png`,
       );
-    }
-    for (let i = 0; i < 3; i++) {
-      this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
-      this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
     for (const key of [...BUILDING_SPRITES, ...CONNECTOR_SPRITES]) {
       this.load.image(key, `assets/sprites/${key}.png`);
@@ -887,6 +901,7 @@ export class GameScene extends Phaser.Scene {
       h.crown.setTint(worldTint);
     }
     for (const pk of this.pickups) pk.sprite.setTint(actorTint);
+    for (const v of this.victims) v.headlights?.update(f, dn.glow);
     this.pooFans.setAmbient(worldTint);
     this.pigeonImg.setTint(actorTint);
     this.bgNear.setGlow(dn.glow);
@@ -1208,7 +1223,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnCar(): void {
-    const v = (Math.random() * 3) | 0;
+    const v = (Math.random() * CAR_VARIANT_COUNT) | 0;
     const hue = VICTIM_PALETTE_HUES[(Math.random() * VICTIM_PALETTE_HUES.length) | 0];
     const sprite = this.add
       .sprite(W + 80, 0, `car-${v}`)
@@ -1216,9 +1231,12 @@ export class GameScene extends Phaser.Scene {
       .setDepth(CAR_DEPTH)
       .setTint(victimPaletteTint(hue, v, 'car'))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
+    // Wide bodies (the limo especially) must start fully past the screen edge.
+    sprite.setX(W + sprite.displayWidth / 2 + 16);
     sprite.setY(GROUND_Y + 32 - sprite.displayHeight / 2);
     this.victims.push({
       sprite,
+      headlights: new CarHeadlightFx(this, sprite, v),
       kind: 'car',
       variant: v,
       vx: -(1.6 + Math.random() * 1.2),
@@ -1518,6 +1536,7 @@ export class GameScene extends Phaser.Scene {
     this.victims = this.victims.filter((v) => {
       // rightward skaters outrun the scroll and exit stage right
       if (v.sprite.x < -160 || v.sprite.x > W + 160) {
+        v.headlights?.destroy();
         v.sprite.destroy();
         return false;
       }
