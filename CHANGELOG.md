@@ -430,3 +430,20 @@ cold while glow spilled onto stone. Fixed in a fresh Codex session with hand-tra
 per-pane polygons (arch tops included), self-validated against a magenta outline trace
 over the base art (`bg-building-2-lit-upper-trace-qa.png`) before shipping; storefront
 output pixel-identical to the previous rev.
+
+## Poo hits the fan (shipped 2026-07-21)
+
+Cafés now bring a spinning pedestal fan onto the sidewalk. Animated wind ribbons show its
+up-left airflow, and the matching widening force cone physically catches and bends airborne
+goo while preserving the fluid simulation. A close pass awards a one-time `POO HITS THE
+FAN!` trick-shot bonus per fan, counts as a successful volley, and can carry the same goo
+onward into pedestrians or cars for a continued combo. `window.SP.spawnFan(x?)` and the
+debug palette's `FAN` button provide deterministic testing.
+
+**Real sprite + street scale (2026-07-21):** the code-drawn placeholder (which stood
+nearly twice pedestrian height and clashed with the painterly style) was replaced by a
+generated two-frame pedestal-fan sprite (`prop-fan-f{0,1}.png`, vintage steel/navy with
+baked spin-blur disc; provenance in ART_LOG). The frames alternate to flicker the blur
+streaks, the fan now renders at shoulder height (~58 px desktop, ×1.4 mobile), and the
+wind cone/gust streaks emanate from the measured cage-hub point. Gusts were retuned to
+start at the cage and fade downwind instead of popping in mid-flight.

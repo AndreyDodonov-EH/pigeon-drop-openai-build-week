@@ -22,6 +22,7 @@ import {
 } from '../world/BuildingPalettePipeline';
 import { DayNight, type DayLook } from '../world/DayNight';
 import { LampFx } from '../world/LampFx';
+import { PooFanLayer } from '../world/PooFanLayer';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, DiveRatchet } from '../input/TouchControls';
@@ -265,6 +266,7 @@ export class GameScene extends Phaser.Scene {
   /** lit-windows overlay over bgFar, faded in after dark */
   private bgFarLit!: Phaser.GameObjects.TileSprite;
   private bgNear!: NearBuildingsLayer;
+  private pooFans!: PooFanLayer;
   private sidewalkTs!: Phaser.GameObjects.TileSprite;
   private streetTs!: Phaser.GameObjects.TileSprite;
   private clouds: Phaser.GameObjects.Image[] = [];
@@ -439,6 +441,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg-mailbox', 'assets/sprites/bg-mailbox.png');
     this.load.image('hydrant-0', 'assets/sprites/hydrant-0.png');
     this.load.image('hydrant-1', 'assets/sprites/hydrant-1.png');
+    this.load.image('prop-fan-f0', 'assets/sprites/prop-fan-f0.png');
+    this.load.image('prop-fan-f1', 'assets/sprites/prop-fan-f1.png');
     this.load.image('water-col', 'assets/sprites/water-col.png');
     this.load.image('water-crown', 'assets/sprites/water-crown.png');
     this.load.image('pickup-rainbow', 'assets/sprites/pickup-rainbow.png');
@@ -491,6 +495,7 @@ export class GameScene extends Phaser.Scene {
       .tileSprite(0, GROUND_Y - 6 - SIDEWALK_H, W, SIDEWALK_H, 'sidewalk')
       .setOrigin(0, 0)
       .setDepth(1.5);
+    this.pooFans = new PooFanLayer(this, (x, y) => this.onFanHit(x, y));
     this.bgNear = new NearBuildingsLayer(this, 2);
     this.streetTs = this.add
       .tileSprite(0, GROUND_Y - 6, W, H - GROUND_Y + 6, 'street')
@@ -571,6 +576,8 @@ export class GameScene extends Phaser.Scene {
       spawnProp: (key: 'bg-lamp' | 'bg-tree' | 'bg-mailbox' = 'bg-lamp', x?: number) =>
         this.spawnProp(key, x),
       spawnBuilding: (key = 'bg-building-2') => this.bgNear.queueNext(key),
+      spawnFan: (x = this.pigeon.x + 20) => this.pooFans.spawn(x),
+      fanCount: () => this.pooFans.count,
       touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
   }
@@ -836,6 +843,7 @@ export class GameScene extends Phaser.Scene {
     });
     addButton('TIME', 2, 3, () => this.dayNight.jumpNext());
     addButton('CAFE', 0, 4, () => this.bgNear.queueNext('bg-building-2'));
+    addButton('FAN', 1, 4, () => this.pooFans.spawn(this.pigeon.x + 20));
   }
 
   update(_time: number, deltaMs: number): void {
@@ -879,6 +887,7 @@ export class GameScene extends Phaser.Scene {
       h.crown.setTint(worldTint);
     }
     for (const pk of this.pickups) pk.sprite.setTint(actorTint);
+    this.pooFans.setAmbient(worldTint);
     this.pigeonImg.setTint(actorTint);
     this.bgNear.setGlow(dn.glow);
 
@@ -891,8 +900,10 @@ export class GameScene extends Phaser.Scene {
   private scrollWorld(f: number): void {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
     this.bgFarLit.tilePositionX = this.bgFar.tilePositionX;
-    this.bgNear.update(SCROLL * 0.55 * f);
-    this.sidewalkTs.tilePositionX += SCROLL * 0.55 * f;
+    const nearDx = SCROLL * 0.55 * f;
+    this.pooFans.update(nearDx, f);
+    this.bgNear.update(nearDx);
+    this.sidewalkTs.tilePositionX += nearDx;
     this.streetTs.tilePositionX += SCROLL * f;
     for (const cloud of this.clouds) {
       cloud.x -= (SCROLL * 0.06 + cloud.getData('drift')) * f;
@@ -1646,6 +1657,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** One trick-shot bonus per fan; blown goo can continue the chain on victims. */
+  private onFanHit(x: number, y: number): void {
+    this.salvoHit = true;
+    this.comboTimer = 120;
+    this.combo += 1;
+    const pts = 50 * Math.min(this.combo, 8);
+    this.score += pts;
+    this.popup(x - 36, y - 48, `POO HITS THE FAN! +${pts}`, COLOR_AMBER, 18);
+    if (this.time.now >= this.nextGlanceAt) {
+      this.glanceFrames = GLANCE_FRAMES;
+      this.nextGlanceAt = this.time.now + GLANCE_COOLDOWN_MS;
+    }
+  }
+
   private popup(x: number, y: number, msg: string, color = COLOR_CREAM, size = 19): void {
     const t = this.add
       .text(x, y, msg, {
@@ -1760,6 +1785,7 @@ export class GameScene extends Phaser.Scene {
         hh: v.collider.hh,
         onHit: (rainbow: boolean, fire: boolean) => this.onVictimHit(v, rainbow, 'gas', fire),
       })),
+      this.pooFans.windFields(),
     );
   }
 

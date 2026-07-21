@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { GasLayer } from '../gas/GasLayer';
 import { GasSim, type GasTarget } from '../gas/GasSim';
 import { GooLayer } from '../goo/GooLayer';
-import { GooSim, type Collider, type Particle } from '../goo/GooSim';
+import { GooSim, type Collider, type GooWind, type Particle } from '../goo/GooSim';
 import { SFX_VOLUME } from '../audio/mix';
 
 const GUANO_TINT = 0xf2ecd4;
@@ -185,8 +185,13 @@ export class GuanoEffects {
   }
 
   /** Advances and renders both output simulations. */
-  update(f: number, colliders: Collider[], gasTargets: GasTarget[]): void {
-    this.gooSim.step(colliders);
+  update(
+    f: number,
+    colliders: Collider[],
+    gasTargets: GasTarget[],
+    winds: readonly GooWind[] = [],
+  ): void {
+    this.gooSim.step(colliders, winds);
     this.gooLayer.render(this.gooSim.particles);
     this.updateFireFx();
     this.gasSim.step(f, gasTargets);
