@@ -29,6 +29,10 @@ const FULLSCREEN_SETTLE_MS = 350;
 
 const PIGEON_FRAMES = ['pigeon-perch-f0', 'pigeon-perch-f1', 'pigeon-perch-f2'];
 
+/** ?notitle jumps straight into GameScene — for headless drivers and quick
+ * dev reloads, where the title tap + reveal is pure wait time */
+const skipTitle = (): boolean => new URLSearchParams(location.search).has('notitle');
+
 /**
  * First thing the player sees. A single non-animated pigeon overlay sits on
  * the background's rooftop ledge — nothing moves, so the whole screen reads
@@ -49,12 +53,17 @@ export class TitleScene extends Phaser.Scene {
   }
 
   preload(): void {
+    if (skipTitle()) return;
     this.load.image('title-bg', 'assets/sprites/title-bg.png');
     this.load.image('title-logo', 'assets/sprites/title-logo.png');
     for (const key of PIGEON_FRAMES) this.load.image(key, `assets/sprites/${key}.png`);
   }
 
   create(): void {
+    if (skipTitle()) {
+      this.scene.start('game');
+      return;
+    }
     // canvas is RES× the design space — zoom so world coords stay 540-tall
     this.cameras.main.setZoom(RES).centerOn(W / 2, H / 2);
 

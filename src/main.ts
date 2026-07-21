@@ -29,6 +29,12 @@ const game = new Phaser.Game({
   scene: [TitleScene, GameScene],
 });
 
+// ?mute silences music and sfx globally — mainly for headless test runs and
+// muted local dev; independent of the pause/resume sound handling below
+if (new URLSearchParams(location.search).has('mute')) {
+  game.events.once(Phaser.Core.Events.READY, () => (game.sound.mute = true));
+}
+
 // mobile browsers fire the rotation resize while the old viewport numbers
 // are still live, so FIT keeps the previous orientation's size; re-measure
 // once the viewport settles (twice — some devices report late)

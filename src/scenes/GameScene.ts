@@ -302,6 +302,10 @@ export class GameScene extends Phaser.Scene {
   private hydrantTimer = 4000;
   private rainbowPickupTimer = RAINBOW_PICKUP_FIRST_MS;
   private itemPickupTimer = ITEM_PICKUP_FIRST_MS;
+  /** ?nospawn freezes all timer-driven spawns (peds, cars, hydrants, props,
+   * pickups) so a headless screenshot only contains what the driver staged;
+   * SP.setAutoSpawn re-enables at runtime */
+  private autoSpawn = !new URLSearchParams(location.search).has('nospawn');
 
   /** digestion pressure, 0–100: fills passively, spent by pooping, 100 = blowout */
   private meter = 40;
@@ -511,7 +515,9 @@ export class GameScene extends Phaser.Scene {
       .setDepth(1.5);
     this.pooFans = new PooFanLayer(this, (x, y) => this.onFanHit(x, y));
     this.bgNear = new NearBuildingsLayer(this, 2, (placement) => {
-      if (placement.use === 'cafe') {
+      // buildings keep flowing under ?nospawn (they're the scrolling
+      // backdrop), but the interactive fan they'd bring along does not
+      if (placement.use === 'cafe' && this.autoSpawn) {
         this.pooFans.spawn(placement.x + placement.width + 12);
       }
     });
@@ -570,6 +576,7 @@ export class GameScene extends Phaser.Scene {
       particleCount: () => this.guanoFx.particleCount,
       gasParticleCount: () => this.guanoFx.gasParticleCount,
       spawnHydrant: () => this.spawnHydrant(),
+      setAutoSpawn: (v: boolean) => (this.autoSpawn = v),
       spawnRainbowPickup: (x = W + 60, y = this.pigeonY) => this.spawnPickup('rainbow', x, y),
       spawnItemPickup: (
         kind: ItemPickupKind = ITEM_PICKUP_KINDS[0],
@@ -958,7 +965,7 @@ export class GameScene extends Phaser.Scene {
 
   /** sidewalk furniture scrolls with the ground, in front of the pedestrians */
   private updateProps(f: number, deltaMs: number): void {
-    this.propTimer -= deltaMs;
+    if (this.autoSpawn) this.propTimer -= deltaMs;
     if (this.propTimer <= 0) {
       if (this.streetClearAt(W + 90)) {
         const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
@@ -1044,7 +1051,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updatePickups(f: number, deltaMs: number): void {
-    this.rainbowPickupTimer -= deltaMs;
+    if (this.autoSpawn) this.rainbowPickupTimer -= deltaMs;
     if (this.rainbowPickupTimer <= 0) {
       if (this.dayNight.isNight) {
         // no rainbows after dark (backlog rule) — keep rechecking until sunrise
@@ -1057,7 +1064,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.itemPickupTimer -= deltaMs;
+    if (this.autoSpawn) this.itemPickupTimer -= deltaMs;
     if (this.itemPickupTimer <= 0) {
       this.spawnPickup(this.pickItemKind());
       this.itemPickupTimer =
@@ -1311,7 +1318,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHydrants(f: number, deltaMs: number): void {
-    this.hydrantTimer -= deltaMs;
+    if (this.autoSpawn) this.hydrantTimer -= deltaMs;
     if (this.hydrantTimer <= 0) {
       if (this.streetClearAt(W + 40)) {
         this.spawnHydrant();
@@ -1486,15 +1493,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateVictims(f: number, deltaMs: number): void {
-    this.pedTimer -= deltaMs;
-    this.carTimer -= deltaMs;
-    if (this.pedTimer <= 0) {
-      this.spawnPed();
-      this.pedTimer = 900 + Math.random() * 1600;
-    }
-    if (this.carTimer <= 0) {
-      this.spawnCar();
-      this.carTimer = 2600 + Math.random() * 3500;
+    if (this.autoSpawn) {
+      this.pedTimer -= deltaMs;
+      this.carTimer -= deltaMs;
+      if (this.pedTimer <= 0) {
+        this.spawnPed();
+        this.pedTimer = 900 + Math.random() * 1600;
+      }
+      if (this.carTimer <= 0) {
+        this.spawnCar();
+        this.carTimer = 2600 + Math.random() * 3500;
+      }
     }
 
     for (const v of this.victims) {

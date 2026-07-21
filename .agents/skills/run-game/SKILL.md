@@ -64,10 +64,23 @@ waits for `window.SP`, applies a state-setup callback, waits a few frames, and
 screenshots. Edit the `setup` block in the copy (or inline the eval) for the
 state you need — the shipped example parks a hydrant on-screen in full burst.
 
-The driver loads `/?nowizard`, which suppresses the "how to play" overlay
-shown on every launch (see `shouldShowWizard` in `src/ui/FirstRunWizard.ts`).
-Keep the param in any custom URL; drop it only when the overlay itself is what
-you're screenshotting.
+The driver loads `/?nowizard&notitle&nospawn&mute` — the game's debug URL
+flags. Keep them in any custom URL; drop one only when the thing it suppresses
+is what you're testing:
+
+- `nowizard` — skip the "how to play" overlay shown on every launch
+  (`shouldShowWizard` in `src/ui/FirstRunWizard.ts`)
+- `notitle` — boot straight into GameScene, no title tap/reveal
+  (`src/scenes/TitleScene.ts`)
+- `nospawn` — freeze all timer-driven spawns (peds, cars, hydrants, props,
+  pickups, café fans) so the frame only contains what `setup` staged;
+  re-enable at runtime with `SP.setAutoSpawn(true)` if you need organic
+  traffic. Background buildings still scroll/generate — they're scenery,
+  not spawns.
+- `mute` — silence music and sfx (`src/main.ts`)
+
+Also available: `?debug` (on-screen spawn-button palette, for interactive
+use), `?lang=<code>`, `?res=<n>`.
 
 **Then Read the screenshot and actually look at it.** A blank frame is a launch
 failure, not a pass.
