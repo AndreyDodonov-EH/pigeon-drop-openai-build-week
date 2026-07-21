@@ -131,6 +131,18 @@ export const DEFAULT_PARAMS: GooParams = {
   surfaceSeek: 8,
 };
 
+// --- wind loft tuning ("shit hits the fan") ---
+/** fraction of gravity a fully lofted drop loses; 1 = weightless, >1 drifts upward */
+const LOFT_GRAVITY_CUT = 0.99;
+/** per-frame loft decay once out of the wind; higher = floats longer */
+const LOFT_DECAY = 0.995;
+/** extra scroll-air entrainment at full loft (multiplier on airEntrainX) */
+const LOFT_ENTRAIN_BOOST = 2;
+/** loft gained per frame at the cone axis; 0.4 ≈ fully lofted in ~3 frames */
+const LOFT_RAMP = 0.4;
+/** per-frame bleed of cross-stream velocity inside the cone (kills incoming fall speed) */
+const WIND_CARRY = 0.5;
+
 const CELL_SHIFT = 5; // 32px cells (~h)
 const HASH_W = 1024;
 
@@ -271,9 +283,9 @@ export class GooSim {
       // wind-lofted drops are atomized spray: near-weightless and far more
       // entrained by the air, so a fan visibly flings them instead of merely
       // bending their fall; loft decays back to heavy goo over a few seconds
-      p.vy += P.gravity * (1 - 0.95 * p.loft);
-      p.vx += (-this.worldVx - p.vx) * P.airEntrainX * (1 + 2 * p.loft);
-      p.loft *= 0.995;
+      p.vy += P.gravity * (1 - LOFT_GRAVITY_CUT * p.loft);
+      p.vx += (-this.worldVx - p.vx) * P.airEntrainX * (1 + LOFT_ENTRAIN_BOOST * p.loft);
+      p.loft *= LOFT_DECAY;
     }
     this.applyWind(winds);
 
@@ -360,10 +372,10 @@ export class GooSim {
         // velocity (the fall speed a drop brings in), otherwise it plunges
         // straight through the blast band before the push can matter.
         const crossV = p.vx * px + p.vy * py;
-        const carry = 0.25 * edge;
+        const carry = WIND_CARRY * edge;
         p.vx -= px * crossV * carry;
         p.vy -= py * crossV * carry;
-        p.loft = Math.min(1, p.loft + 0.12 * edge);
+        p.loft = Math.min(1, p.loft + LOFT_RAMP * edge);
 
         if (along <= wind.engageDistance) wind.onEngage?.(p);
       }
