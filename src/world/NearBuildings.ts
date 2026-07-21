@@ -33,6 +33,10 @@ const FACADES: FacadeDef[] = [
   { key: 'bg-building-4', kind: 'canal', flippable: true, minScale: 0.78, maxScale: 1.0 },
   { key: 'bg-building-5', kind: 'canal', flippable: true, minScale: 0.78, maxScale: 1.02 },
   { key: 'bg-building-6', kind: 'canal', flippable: true, minScale: 0.78, maxScale: 1.02 },
+  { key: 'bg-building-11', kind: 'canal', flippable: true, minScale: 0.78, maxScale: 1.02 },
+  { key: 'bg-building-12', kind: 'canal', flippable: true, minScale: 0.78, maxScale: 1.02 },
+  // Restrained side plane and directional lantern light make mirroring read wrong.
+  { key: 'bg-building-13', kind: 'canal', flippable: false, minScale: 0.78, maxScale: 1.02 },
   { key: 'bg-building-7', kind: 'office', flippable: true, minScale: 0.9, maxScale: 1.15 },
   // These storefronts share a right-facing 3/4 perspective, so keep their
   // generated lighting and side wall orientation instead of mirroring them.
