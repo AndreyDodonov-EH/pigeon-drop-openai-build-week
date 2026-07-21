@@ -6,7 +6,7 @@
 <p align="center">
   Ever received a "gift" from a pigeon?<br>
   On your hat? May be on your car?<br>
-  Now you can become that pigeon.<br>
+  Ever wanted to become that pigeon?<br>
   Now you can - at <a href="https://pigeondrop.me"><b>https://pigeondrop.me</b></a>
 </p>
 
