@@ -120,13 +120,14 @@ export class TitleScene extends Phaser.Scene {
       .setDepth(3);
     this.tweens.add({ targets: this.prompt, alpha: 0.35, duration: 700, yoyo: true, repeat: -1 });
 
-    // the game's full sprite/audio manifest downloads in the background while
-    // the player looks at the key art — by the time they tap, GameScene's
-    // preload usually finds everything cached and the transition is instant.
-    // Tapping early is fine: this loader dies with the scene and GameScene's
-    // own bar picks up whatever is left.
+    // the game's full sprite/audio manifest downloads while the player looks
+    // at the key art, so the tap-to-start transition is always instant. The
+    // start prompt stays hidden until the download finishes — first the bar,
+    // then the invitation — so the prompt never promises a start the game
+    // can't deliver yet.
     queueGameAssets(this);
     if (this.load.list.size > 0) {
+      this.prompt.setVisible(false);
       attachLoadBar(this, {
         cx: W / 2,
         y: H * 0.945,
@@ -136,12 +137,20 @@ export class TitleScene extends Phaser.Scene {
         depth: 3,
         fadeOutMs: 400,
       });
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.enableStart());
       this.load.start();
+    } else {
+      this.enableStart();
     }
 
     this.cameras.main.fadeIn(500, 0, 0, 0);
     lockLandscapeOnFullscreen(this);
+  }
 
+  /** shows the start prompt and arms the tap/key triggers — deferred until
+   * the background download is done, replacing the loading bar */
+  private enableStart(): void {
+    this.prompt.setVisible(true);
     // the title tap is the very first user gesture on mobile, so fullscreen
     // is requested here rather than waiting for the first tap in GameScene
     this.input.once('pointerdown', (p: Phaser.Input.Pointer) => this.onActivate(p.wasTouch));

@@ -386,9 +386,10 @@ export class GameScene extends Phaser.Scene {
   preload(): void {
     hideBootSplash();
     queueGameAssets(this);
-    // after the title screen's background load these are usually all cached
-    // (the loader skips cached keys) — only draw a bar when files remain,
-    // i.e. the player tapped before the download finished or skipped the title
+    // the title screen only offers the start prompt after its background
+    // load finishes, so normally everything is already cached (the loader
+    // skips cached keys) — files remain only on ?notitle boots or when a
+    // title-screen download failed and gets retried here
     if (this.load.list.size > 0) {
       // sized in raw canvas pixels: the RES zoom is only applied in create()
       const cw = this.scale.width;
