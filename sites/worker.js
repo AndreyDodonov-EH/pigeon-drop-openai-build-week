@@ -1,4 +1,4 @@
-const INDEX_PATH = '/';
+const INDEX_PATH = '/index.html';
 
 export default {
   async fetch(request, env) {
