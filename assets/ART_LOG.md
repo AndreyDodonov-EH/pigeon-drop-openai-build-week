@@ -3,6 +3,210 @@
 Reuse these exact prompts (with the listed reference attachments) when regenerating or
 extending a set — consistency depends on it.
 
+## assets/masters/bg-buildings-office-variety-sheet-2.png → public/assets/sprites/bg-building-{16,17}.png — 2026-07-21
+
+- **References attached and inspected:** `assets/masters/bg-buildings-office-variety-sheet.png`
+  and `assets/masters/bg-buildings-sheet.png` for the established facade family's
+  silhouettes, rendering, outline weight, warm upper-left lighting, material texture,
+  shared baseline, and gameplay scale. Their specific building designs were explicitly
+  excluded. `src/world/BuildingPalettePipeline.ts` defined the saturated-material
+  repaint contract.
+- **Tool:** Codex built-in `image_gen` / `imagegen`; model identifier was not exposed.
+  One generation, accepted without revision.
+- **Master:** untouched generated 1536×1024 RGB PNG at
+  `assets/masters/bg-buildings-office-variety-sheet-2.png`; SHA-256
+  `f254c8bf4cd522a4f080b8b99a3b0f0bc3bc651394bc936d90838381bf123dfe`
+  matches the original generator output byte for byte.
+- **Panel semantics:** left/building 16 is a very low, wide terracotta-spandrel
+  three-story mid-century office with ribbon windows and an asymmetric recessed lobby;
+  right/building 17 is a tall narrow indigo glazed-terra-cotta neo-Gothic office with
+  cream vertical trim and a stepped finial parapet. Both are frontal office infill and
+  share the generated baseline.
+- **Post-processing:** keyed the whole sheet before slicing using ImageMagick 6:
+  `-fuzz 20% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`;
+  separated the subjects at the full-height gap, trimmed to alpha bounds (`774×508`
+  and `462×878`), uniformly resized each by `55%`, added a 4 px transparent safety
+  border, and compressed only the runtime copies with
+  `pngquant --force --quality 70-90`. Shipping sizes are `434×287` and `262×491`.
+- **QA:** slate composites are `assets/masters/bg-building-{16,17}-qa.png`; all four
+  corners of both shipping sprites are transparent and neither contains exact opaque
+  `#ff00ff`. Live street QA is
+  `assets/masters/bg-buildings-office-variety-2-live-qa.png`. Both use
+  `BuildingPalettePipeline` with packed per-instance hue/brightness controls. The
+  controlled opposite-hue comparison at
+  `assets/masters/bg-buildings-16-18-shader-qa.png` visibly repaints terracotta and
+  indigo facade fields while preserving glass, outlines, and cream trim.
+- **Exact final prompt:**
+
+  > REFERENCES AND ROLE — Inspect both supplied reference sheets before generating. They are STYLE, SCALE, LIGHTING, OUTLINE, MATERIAL, and SHARED-BASELINE references only for the established Pigeon Drop building family: polished 2D cartoon architecture, thick clean dark-brown/near-black outlines, painterly cel shading, warm upper-left afternoon light, cool lower-right shadow planes, restrained hand-painted wear, crisp details readable after downscaling, isolated frontal side-scroller facades, and flat bottoms on a common invisible baseline. Do not copy, remix, or include any existing reference building, cafe, canal house, loft office, Art Deco office, glass tower, rooftop accessory arrangement, or other specific design.
+  >
+  > SUBJECT — Create one coherent sprite sheet containing exactly TWO completely new OFFICE BUILDINGS, left to right:
+  > 1) LEFT: a LOW, WIDE MID-CENTURY MODERN OFFICE, exactly three occupied office stories, strong horizontal silhouette, flat overhanging roof slab, broad continuous ribbon windows with dark neutral glass, and large saturated burnt-orange/terracotta enamel spandrel panels as the main recolorable material. Add slim cream concrete bands, a slightly asymmetric recessed glazed lobby entrance, and one compact geometric rooftop vent box. It must read as a 1950s–60s commercial office, not a school, motel, apartment, shop, hospital, parking garage, or factory. No sign or text.
+  > 2) RIGHT: a TALL, NARROW CHICAGO-SCHOOL / NEO-GOTHIC OFFICE, five office stories, strong vertical silhouette, deep saturated indigo-blue glazed-terra-cotta piers as the main recolorable material, cream limestone window surrounds, dark neutral grouped windows, a small centered brass-accented office entrance, and a distinctive restrained pointed/stepped parapet with two tiny finials. It must read as an old commercial office tower, not a church, hotel, apartment, bank, castle, or civic monument. No gargoyles, clock, sign, or text.
+  >
+  > COMPOSITION — Wide landscape 3:2 sheet suitable for a reusable 1536x1024 master. Exactly two complete independent buildings, one in each conceptual half, with a generous full-height pure-magenta gap. Nothing overlaps, touches the other building, or touches any outer image edge. Both lowest flat bottom edges align precisely on one shared invisible baseline near the bottom; no visible ground line. Pure frontal/elevation view with no visible side walls and no isometric rotation. Give them deliberately contrasting silhouettes: the mid-century office much wider and shorter, about 62–70% of canvas height; the neo-Gothic office narrower and taller, about 82–88%. Keep all roof/parapet details inside each half with ample clearance.
+  >
+  > PALETTE AND RENDERING — Match the references closely: thick clean dark-brown/near-black contours that become about 2–3 pixels at runtime; painterly cel shading; subtle handmade texture; warm upper-left highlights and controlled cool shadows; charming slightly absurdist city personality. SHADER CONTRACT: preserve one broad contiguous saturated facade field per building with HSV saturation above roughly 0.34, with coherent light/dark cel-shaded variants of the same hue. Building 1 uses burnt-orange/terracotta enamel spandrels; building 2 uses indigo-blue glazed-terra-cotta piers/panels. Keep window glass, cream concrete/limestone, outlines, metal, doors, and brass chromatically distinct and mostly neutral/dark so the hue-distance shader repaints the facade without recoloring glass or stone. Never use legitimate magenta in either building.
+  >
+  > INVARIANTS — Exactly two newly designed office facades in the specified order; strongly distinct from all reference offices and from each other; frontal perspective; common baseline; flat bottoms; comparable game-world scale. No people, animals, vehicles, bicycles, hydrants, street furniture, trees, plants, signs, readable text, logos, awnings, storefronts, pavement, road, ground plane, cast/contact shadows, scenery, glow, watermark, labels, dividers, borders, or extra buildings.
+  >
+  > BACKGROUND/CUTOUT — Every pixel outside the two building silhouettes must be a perfectly uniform flat pure solid #ff00ff chroma-key field. No gradient, texture, vignette, floor, horizon, skyline, lighting variation, shadow, reflection, halo, panel divider, or stray marks. Keep all contours safely clear of every edge.
+  >
+  > OUTPUTS — One high-resolution untouched two-office master intended for assets/masters/bg-buildings-office-variety-sheet-2.png. It will later be keyed, sliced, uniformly downscaled, and shipped as public/assets/sprites/bg-building-16.png and bg-building-17.png.
+
+## assets/masters/bg-building-18-cafe-master.png → public/assets/sprites/bg-building-18.png — 2026-07-21
+
+- **References attached and inspected:** `assets/masters/bg-buildings-sheet.png` for
+  the established family style and `public/assets/sprites/bg-building-2.png` for the
+  right-facing corner gameplay role only. The existing café's exact design was
+  explicitly excluded. `src/world/BuildingPalettePipeline.ts` defined the repaint
+  contract.
+- **Tool:** Codex built-in `image_gen` / `imagegen`; model identifier was not exposed.
+  One generation, accepted without revision.
+- **Master:** untouched generated 1536×1024 RGB PNG at
+  `assets/masters/bg-building-18-cafe-master.png`; SHA-256
+  `c1f424c58ce2ead7024883cc990f9aa8f7a93bd37342f87184c0f307359ad879`
+  matches the original generator output byte for byte.
+- **Semantics:** a cute cobalt glazed-tile patisserie/tea café with cream arched
+  windows, golden scalloped awning, curved copper-green cornice, pastry display, and
+  teapot hanging sign. Its narrow visible right wall makes it a non-flippable
+  right-corner endcap like café 2 without duplicating that facade.
+- **Post-processing:** keyed with ImageMagick 6 using
+  `-fuzz 20% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`,
+  trimmed to an `877×877` alpha bound, uniformly resized by `41%`, added a 4 px
+  transparent safety border, and compressed only the runtime copy with
+  `pngquant --force --quality 70-90`. Shipping size is `368×368`.
+- **QA:** slate composite is `assets/masters/bg-building-18-qa.png`; every shipping
+  corner is transparent and no exact opaque `#ff00ff` remains. Live semantic endcap
+  QA is `assets/masters/bg-building-18-cafe-live-qa.png`. Runtime inspection confirmed
+  `BuildingPalettePipeline`; the opposite-hue sweep at
+  `assets/masters/bg-buildings-16-18-shader-qa.png` recolors the blue tile and awning
+  while keeping dark glass, outlines, cream trim, and copper cornice legible.
+- **Exact final prompt:**
+
+  > REFERENCES AND ROLE — Inspect both supplied references before generating. The full sheet defines the exact established Pigeon Drop building-family STYLE, SCALE, LIGHTING, OUTLINE, MATERIAL texture, and shared-baseline convention. The isolated current cafe is a PERSPECTIVE-AND-GAMEPLAY-ROLE reference only: a right-facing corner endcap whose restrained visible right wall makes sense at the right edge of a neighborhood block. Do not copy, remix, recolor, or reproduce that cafe's green stone facade, striped red awning, round coffee-cup sign, window layout, roofline, flowers, or exact silhouette. Do not include any other reference building or accessory.
+  >
+  > SUBJECT — Create exactly ONE completely new cute RIGHT-CORNER CAFE facade: a cozy neighborhood patisserie/tea cafe with a dusty saturated cobalt-blue glazed-tile upper facade as the broad recolorable material, cream ceramic window trim, a warm muted golden-yellow scalloped awning (not striped), a large dark storefront window showing only soft abstract pastry silhouettes and two tiny warm pendant lamps, a narrow wooden corner entrance, and a small hanging sign shaped like a simple teapot silhouette with no letters or logo. Give the upper floor two charming arched windows with restrained curtains. Include a clearly visible but narrow RIGHT SIDE WALL with one small side window so it reads as a right-facing corner building. Add a gently curved copper-green cornice as its distinct roofline hook. It must read immediately as a cafe/patisserie, not a house, pub, restaurant, boutique, bakery factory, or office.
+  >
+  > COMPOSITION — One complete independent building centered on a landscape or square canvas suitable for a reusable 1024–1536 px master. Keep the whole building, hanging sign, awning, cornice, and narrow right side wall safely clear of all image edges. Flat bottom aligned to one invisible baseline; no visible ground. Restrained three-quarter facade with front dominant and only the right side plane visible, matching the gameplay logic of a right block endcap. Target a runtime-ready proportion comparable to the existing cafe: somewhat wider than a narrow house and shorter than tall offices, with all details readable around 360–420 px shipping height.
+  >
+  > PALETTE AND RENDERING — Match the reference family's polished 2D cartoon finish: thick clean dark-brown/near-black contours that become about 2–3 pixels at runtime; painterly cel shading; warm upper-left afternoon light; cooler lower-right side-plane shadow; subtle handmade ceramic and wood texture; cozy charming personality. SHADER CONTRACT: keep the dusty cobalt-blue tile/plaster facade as one broad contiguous saturated field with HSV saturation above roughly 0.34, including coherent lighter/darker blue shading. Keep cream trim, dark glass, warm wood, copper-green cornice, outlines, lamps, and awning sufficiently chromatically distinct/neutral so the building palette shader repaints the main facade without muddying windows or outlines. Do not use legitimate magenta inside the architecture.
+  >
+  > INVARIANTS — Exactly one newly designed cafe; right-facing corner perspective; front-dominant restrained side plane; flat bottom; no resemblance to the existing cafe beyond shared art style and role. No people, animals, vehicles, bicycles, hydrants, street furniture, outdoor tables/chairs, trees, plants outside the window, readable text, logos, brands, pavement, road, ground plane, cast/contact shadow, scenery, glow, watermark, labels, borders, or extra buildings.
+  >
+  > BACKGROUND/CUTOUT — Every pixel outside the cafe silhouette must be perfectly uniform flat pure solid #ff00ff. No gradient, texture, vignette, floor, horizon, skyline, shadow, reflection, halo, or stray marks. Nothing may touch the frame.
+  >
+  > OUTPUTS — One high-resolution untouched master intended for assets/masters/bg-building-18-cafe-master.png. It will later be chroma-keyed, tightly cropped, uniformly downscaled, given transparent safety padding, and shipped as public/assets/sprites/bg-building-18.png.
+
+## assets/masters/bg-buildings-office-variety-sheet.png → public/assets/sprites/bg-building-{14,15}.png — 2026-07-21
+
+- **References attached and inspected:** `assets/masters/bg-buildings-sheet.png` and
+  `assets/masters/bg-buildings-sheet-2.png` for the established facade family's
+  rendering, outline weight, warm upper-left lighting, material texture, shared
+  baseline, and gameplay scale. Their specific buildings, accessories, and office
+  designs were explicitly excluded. `assets/BUILDING_STYLE.md` and
+  `src/world/BuildingPalettePipeline.ts` defined the saturated-material repaint
+  contract.
+- **Tool:** Codex built-in `image_gen` / `imagegen`; model identifier was not exposed.
+  One generation, accepted without revision.
+- **Master:** untouched generated 1536×1024 RGB PNG at
+  `assets/masters/bg-buildings-office-variety-sheet.png`; SHA-256
+  `ca085da589029bcbfbe0e7e57ff30bbc28e70b50fb73440de2ee7e5cb8e4b21a`
+  matches the original generator output byte for byte.
+- **Panel semantics:** left/building 14 is a tall converted rust-brick industrial
+  loft office with black multi-pane windows and a compact rooftop penthouse;
+  right/building 15 is a wider, shorter cream-and-teal Art Deco office with a
+  stepped central parapet, vertical piers, and brass entrance accents. Both are
+  fully frontal office infill and share the generated baseline.
+- **Post-processing:** keyed the entire sheet before slicing using ImageMagick 6:
+  `-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`;
+  cropped the exact `768×1024` left and right halves; trimmed to alpha bounds
+  (`495×902` and `680×784`); uniformly resized both by `51%`; added a 4 px
+  transparent safety border; and compressed only the runtime copies with
+  `pngquant --force --skip-if-larger --output ... 256`. Shipping sizes are
+  `260×468` and `355×408`.
+- **QA:** slate composites are `assets/masters/bg-building-{14,15}-qa.png`.
+  Both shipping sprites have transparent corner alpha `0,0,0,0`, alpha content
+  bounds safely inside the canvas, and zero nontransparent pixels in the
+  near-magenta cube `R>=230, G<=26, B>=230`. Live four-office district QA is
+  `assets/masters/bg-buildings-office-variety-live-qa.png`; both new sprites use
+  `BuildingPalettePipeline` with non-white tint controls. The controlled -1 / 0 /
+  +1 hue sweep at `assets/masters/bg-buildings-office-variety-shader-qa.png`
+  repaints the rust masonry and teal spandrels distinctly while neutral stone,
+  glass, outlines, and metal stay stable. Directly adjoining canal-row runtime QA
+  is `assets/masters/bg-buildings-canal-tight-row-live-qa.png`.
+- **Exact final prompt:**
+
+  > REFERENCES AND ROLE — Inspect both supplied reference sheets before generating. They are STYLE, SCALE, LIGHTING, OUTLINE, MATERIAL, and SHARED-BASELINE references for the established Pigeon Drop building family only: polished 2D cartoon architecture, thick clean near-black/dark-brown contours, painterly cel shading, warm upper-left afternoon light, cooler lower-right shadow planes, subtle hand-painted wear, crisp details readable after downscaling, and isolated frontal side-scroller facades. Do not copy, remix, or include any reference building, canal gable, cafe, water tower, birds, bicycle, fire escape, rooftop antenna arrangement, or exact glass-office design.
+  >
+  > SUBJECT — Create one coherent sprite sheet containing exactly TWO completely new office buildings, left to right:
+  > 1) LEFT: a converted early-20th-century INDUSTRIAL LOFT OFFICE, five stories, medium width, warm saturated rust-red brick facade, large dark steel multi-pane factory windows, restrained cream stone lintels and sill bands, a sturdy double office entrance, a shallow black metal cornice, and one compact rooftop elevator/mechanical penthouse. It must read as an occupied office conversion, not apartments or a factory; no fire escape, sign, text, logo, loading dock, or smokestack.
+  > 2) RIGHT: a distinct wider and slightly shorter ART DECO OFFICE, four stories, pale warm sandstone frame with a strong stepped central parapet and vertical fluted piers, broad saturated dusty teal-green spandrel panels as the main recolorable material, dark neutral window glass, small restrained brass accents, and a centered formal double-door lobby entrance. It must read as an office/commercial headquarters, not a hotel, cinema, shop, apartment, church, or government monument; no lettering, clock, logo, awning, flag, or sculpture.
+  >
+  > COMPOSITION — Wide landscape 3:2 sheet suitable for a reusable 1536x1024 master. Exactly two independent full buildings, one in each conceptual half, with a generous full-height magenta gap. Nothing overlaps, touches another building, or touches the image edges. Both lowest flat bottom edges align precisely to one invisible shared baseline near the lower portion of the canvas; no visible ground line. Pure frontal/elevation view with no visible side wall and no isometric rotation. Keep both at comparable game-world scale and about 78–88% of canvas height; loft office slightly taller and narrower, Art Deco office slightly shorter and wider. Keep every rooftop and parapet detail safely inside its own half.
+  >
+  > PALETTE AND RENDERING — Match the references closely: thick clean dark-brown/near-black outer contours that become about 2–3 pixels at runtime; intricate but readable windows and entrances; painterly cel shading; warm upper-left highlights; cool lower-right shadows; restrained weathering and charming hand-made city personality. SHADER CONTRACT: each building must preserve one broad contiguous saturated facade field with HSV saturation above roughly 0.34, including coherent lighter and darker painted/cel-shaded versions of the same source hue. For the loft this is the rust-red brick field; for the Art Deco building this is the broad dusty teal-green spandrel/panel field. Keep glass, cream stone, sandstone trim, outlines, metal, doors, and brass chromatically distinct and mostly neutral/dark so a hue-distance shader can repaint the facade without recoloring glass or trim. Never use legitimate magenta within either building.
+  >
+  > INVARIANTS — Exactly two new office facades in the specified order; strongly different silhouettes/materials from each other and from the reference glass offices; frontal perspective; shared baseline; comparable scale; flat bottoms. No people, animals, vehicles, bicycles, hydrants, street furniture, trees, plants, signs, readable text, logos, awnings, storefront displays, pavement, road, ground plane, cast shadow, contact shadow, scenery, glow, watermark, labels, dividers, borders, or extra buildings.
+  >
+  > BACKGROUND/CUTOUT — Every pixel outside the two building silhouettes must be a perfectly uniform, flat, pure solid #ff00ff chroma-key field. No gradient, texture, vignette, floor, horizon, skyline, lighting variation, shadow, reflection, halo, panel divider, or stray marks. Keep all contours clear of every outer edge.
+  >
+  > OUTPUTS — One high-resolution untouched two-building master intended for assets/masters/bg-buildings-office-variety-sheet.png. It will later be keyed, sliced, tightly cropped, uniformly downscaled, and shipped as public/assets/sprites/bg-building-14.png and bg-building-15.png.
+
+## assets/masters/bg-buildings-canal-residential-sheet.png → public/assets/sprites/bg-building-{11,12,13}.png — 2026-07-21
+
+- **References attached and inspected:** `assets/masters/bg-buildings-sheet.png` and
+  `assets/masters/bg-buildings-sheet-2.png` for the established facade family's
+  rendering, lighting, outline, material texture, shared baseline, and gameplay scale;
+  their specific buildings and accessories were explicitly excluded from the render.
+  `assets/BUILDING_STYLE.md` and `src/world/BuildingPalettePipeline.ts` defined the
+  saturated-material repaint contract.
+- **Tool:** Codex built-in `image_gen` / `imagegen`; model identifier was not exposed.
+  One generation, accepted without revision.
+- **Master:** untouched generated 1536×1024 RGB PNG at
+  `assets/masters/bg-buildings-canal-residential-sheet.png`; SHA-256
+  `191aa8d97c4b3a28a809e3874770a24c820342f773001628046a0cae134ef1da`
+  matches the original generator output byte for byte.
+- **Panel semantics:** left to right: tall dusty-blue residential neck-gable canal
+  house with hoisting beam; wider ochre converted-warehouse apartments with loft
+  windows and iron balcony; narrow sage-teal rococo/bell-gable corner residence with
+  a restrained right side plane. All three share the generated baseline. Building 13
+  is non-flippable in runtime because its side plane and lantern are directional.
+- **Post-processing:** keyed the whole sheet before slicing with ImageMagick 6 using
+  `-fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`;
+  cropped the three exact 512×1024 thirds; trimmed each to nontransparent bounds;
+  uniformly resized all three by `51%`; added a 4 px transparent border; and compressed
+  only the runtime copies with `pngquant --force --skip-if-larger --output ... 256`.
+  Shipping sizes are 171×453, 251×387, and 165×452.
+- **QA:** slate composites are `assets/masters/bg-building-{11,12,13}-qa.png`.
+  Every shipping corner alpha is `0,0,0,0`; every sprite has zero nontransparent
+  pixels within a ±10% per-channel cube around `#ff00ff`. Live Phaser QA is
+  `assets/masters/bg-buildings-canal-residential-live-qa.png`; all three textures
+  loaded at the planner's sidewalk baseline and rendered through
+  `BuildingPalettePipeline` without console/page errors. A controlled hue sweep of
+  building 12 at controls -1 / 0 / +1 is
+  `assets/masters/bg-building-12-shader-qa.png`: the broad ochre masonry repaints to
+  coral / ochre / lime while dark window frames, glass, ironwork, and neutral trim
+  remain stable.
+- **Exact final prompt:**
+
+  > REFERENCES AND ROLE — Inspect both attached references before generating. They define the exact established Pigeon Drop building-family style: polished 2D cartoon architecture; thick clean near-black/dark-brown contours; painterly cel shading; warm upper-left afternoon light; cooler lower-right shadow planes; subtle hand-painted masonry texture; crisp details readable after downscaling; frontal/elevation side-scroller facades; isolated silhouettes with flat bottoms on one shared invisible baseline. They are STYLE, SCALE, LIGHTING, OUTLINE, and MATERIAL references only. Do not copy, remix, or include any existing reference building, office, cafe, water tower, fire escape, bicycle, birds, wire, rooftop HVAC, or other specific accessory.
+  >
+  > SUBJECT AND STATE — Create ONE coherent production sprite sheet containing exactly THREE NEW residential Amsterdam canal-house facades, in this fixed left-to-right order:
+  > 1) A tall narrow dusty-cornflower-blue neck-gable house (halsgevel), subtly leaning, four residential floors, cream sandstone neck-gable scrolls and trim, tall dark teal window glass, small mismatched curtains, and a traditional projecting hoisting beam with a short hook. Keep the doorway simple and residential.
+  > 2) A slightly wider converted canal warehouse apartment in rich weathered ochre-orange painted brick, shallow triangular warehouse gable, three broad rows of black-framed loft windows, a centered upper loading-door shape converted into a glazed balcony door, one narrow dark iron balcony, and a tiny roof pulley. It must clearly read as homes converted from an old warehouse, never as a shop or office.
+  > 3) A narrow softly crooked sage-teal corner canal residence with a restrained right side plane, ornate cream bell/rococo gable, five residential floors, tall windows with warm muted curtains, two tiny flower boxes, dark green front door, and one small brass wall lantern. No shopfront.
+  >
+  > COMPOSITION — Wide landscape 3:2 sheet suitable for a 1536x1024 reusable master. Exactly three complete independent buildings, one per conceptual third, with generous full-height magenta gaps between them and no visible dividers. Nothing may overlap, touch another building, or touch the outer image edges. All lowest flat bottom edges must align to precisely the same horizontal baseline; no visible ground line. Frontal elevation, except the third building may have only a very restrained narrow right side plane. Keep all three at comparable game-world scale, about 80–90% of canvas height; building 1 tallest, building 2 a little shorter and wider, building 3 between them. Keep hooks, beam, pulley, gable ornaments, balcony, flower boxes, and lantern entirely inside each building's own panel with ample clearance.
+  >
+  > PALETTE AND RENDERING — Match the references closely: thick clean dark-brown/near-black outlines that become about 2–3 pixels after runtime downscale; crisp silhouettes; painterly cel shading; warm upper-left highlights and cool lower-right shadows; restrained wear; charming handmade slightly absurdist Amsterdam character. Use dusty cornflower-blue, rich ochre-orange, and sage-teal as the three main facade materials. SHADER CONTRACT: on every building, preserve one broad contiguous facade/masonry field with clearly saturated source color (HSV saturation above roughly 0.34), including coherent lighter and darker cel-shaded versions of that same hue. Keep window glass, curtains, cream stone trim, outlines, metal, doors, and accessories chromatically distinct and mostly neutral/dark so a hue-distance shader can repaint the facade without recoloring glass, stone, or outlines. Avoid tiny multicolored patterns as the dominant facade material. Never use legitimate magenta anywhere in the architecture.
+  >
+  > INVARIANTS — Exactly three newly designed residential canal houses in the specified order. They must read as residences rather than shops, cafes, or offices. Shared baseline, coherent perspective, comparable scale, identical established rendering language. No people, animals, vehicles, bicycles, hydrants, street furniture, trees, signs, readable text, logos, awnings, storefronts, pavement, street, canal water, bridges, scenery, cast shadows, contact shadows, glow, watermark, labels, borders, or extra buildings.
+  >
+  > BACKGROUND/CUTOUT — The entire area outside the three building silhouettes must be a perfectly uniform, flat, pure solid #ff00ff chroma-key field. No gradient, texture, vignette, floor plane, horizon, skyline, lighting variation, shadows, reflections, halos, panel dividers, or stray marks. Keep every subject and outline safely clear of all image edges.
+  >
+  > OUTPUTS — One high-resolution untouched master intended for assets/masters/bg-buildings-canal-residential-sheet.png, then three separately keyed, tightly cropped, uniformly downscaled runtime sprites intended for public/assets/sprites/bg-building-11.png, bg-building-12.png, and bg-building-13.png.
+
 ## assets/masters/bg-building-{8,9,10}-master.png → public/assets/sprites/bg-building-{8,9,10}.png — 2026-07-21
 
 - **Sources inspected:** the three supplied masters at original resolution;
@@ -35,11 +239,13 @@ extending a set — consistency depends on it.
   pale-pink wall, and awning regions remain available to the shared building palette
   shader for per-instance hue/brightness variation.
 - **Runtime QA:** inspected all three sprites in the live Phaser scene at the planner's
-  sidewalk baseline and gameplay scale, then rendered building 9 three times through
-  `BuildingPalettePipeline` at hue controls -1 / 0 / +1. The facade produced clearly
-  distinct teal/pink, blue/coral, and purple/lime paint schemes while outlines, dark
-  window frames, and neutral stone remained stable. The browser reported no console or
-  page errors.
+  sidewalk baseline and gameplay scale. Each of buildings 8, 9, and 10 was rendered
+  three times through `BuildingPalettePipeline` at hue controls -1 / 0 / +1; captures
+  are `assets/masters/bg-building-{8,9,10}-shader-qa.png`. Both gyms produced clearly
+  distinct facade/awning/sign palettes and the boutique varied its plaster, awning,
+  display, and sign while outlines, dark glazing, neutral stone, and structural trim
+  remained readable. Runtime inspection confirmed the named pipeline and three unique
+  packed tint controls on every sprite. The browser reported no console or page errors.
 
 ## assets/masters/bg-building-2-lit.png → public/assets/sprites/bg-building-2-lit.png — 2026-07-19
 
@@ -952,3 +1158,78 @@ extending a set — consistency depends on it.
   all-over-drip direction). Note this entry's own "Revision note" above claims it replaced an
   "earlier 2026-07-20 clean golden-amber bubble-letter candidate" — that candidate's files were
   overwritten in place before being committed and could not be recovered.
+
+## assets/masters/prop-fan-sheet.png → public/assets/sprites/prop-fan-f{0,1}.png — 2026-07-21
+
+- **Purpose/panel semantics:** Two-frame running metal pedestal-fan prop for the café sidewalk. The fan faces and blows left in a subtle 3/4 view. Both shipping frames use the exact same canonical body/cage/motor/pole/base pixels; f0 has the curved motion-blur highlights at phase 0°, and f1 moves only those highlights +60°.
+- **Tool:** Codex built-in `imagegen`; model identifier was not exposed. One render was accepted. The generator output was copied byte-for-byte, untouched, to `assets/masters/prop-fan-sheet.png` (SHA-256 `773358634452c40e347bb8606ffdedbc3e1934f21031420087d73a373980e2ec`).
+- **References inspected before generation:** `public/assets/sprites/hydrant-0.png`, `public/assets/sprites/bg-mailbox.png`, `public/assets/sprites/ped-0.png`, and `public/assets/sprites/bg-building-18.png`, all viewed at original resolution. They were style-only references; their subjects were explicitly excluded from the render.
+- **Dimensions/paths:** Untouched master: 1717×916 sRGB PNG at `assets/masters/prop-fan-sheet.png`. The tool-native odd width was divided into two equal 858×916 working panels at x=0 and x=859; the single center background-only column x=858 was omitted. Shipped indexed PNGs with alpha: `public/assets/sprites/prop-fan-f0.png` and `public/assets/sprites/prop-fan-f1.png`, both 112×152. Slate QA composites: `assets/masters/prop-fan-f0-qa.png` and `assets/masters/prop-fan-f1-qa.png`, both 112×152.
+- **Post-processing actually performed:** (1) preserved the untouched generator PNG at the master path; (2) cropped equal 858×916 working panels with ImageMagick at `+0+0` and `+859+0`; (3) keyed each crop exactly with `convert in.png -fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel out.png`; (4) measured alpha bboxes/anchors with Pillow; (5) translated keyed panel 1 +66 px on x because raw drift exceeded 2 px, then normalized both aligned panels through the same padded source box `(261,39,703,870)` onto a common transparent 112×152 canvas; (6) used normalized f0 as the canonical body in both deliverables so all non-streak pixels are identical, and added three semi-transparent pale curved cage-interior highlights at phase 0°/60° with a supersampled Pillow overlay; (7) joined both frames into one 224×152 strip, ran `pngquant --force --skip-if-larger --output ... 256` once on the shared strip so both frames share one quantization palette, then split it back into two indexed shipping PNGs without re-quantizing; (8) composited each shipping cutout over solid `#3a405a` with ImageMagick and visually inspected both QA composites at original resolution.
+- **Anchor measurements:** Raw keyed alpha bboxes `(left,top,right,bottom; right/bottom exclusive)` were f0 `(279,57,685,852)` and f1 `(213,57,619,852)`. Raw bottom-center anchors were f0 `(481.5,851)` and f1 `(415.5,851)`, for frame1−frame0 drift `(-66,0)` px (66 px magnitude). A `(+66,0)` px shift aligned f1, after which both intermediate bboxes were `(279,57,685,852)` and residual anchor drift was `(0,0)` px. Both shipped content bboxes are exactly `(18,4,94,148)`, with common bottom-center anchor `(55.5,147)` and final drift `(0,0)` px.
+- **Transparency/invariance QA:** Corner alpha in TL/TR/BL/BR order is `[0,0,0,0]` for both shipped frames. Near-magenta nonzero-alpha count is 0 in both frames, using `R>=230, G<=26, B>=230`. The frame-difference bbox is `(27,10,65,73)` with 264 differing pixels; every differing pixel is inside the expanded cage-interior ellipse and differing pixels outside the cage are 0. The fan has transparent clearance on all sides and neither outline nor base is clipped.
+- **2026-07-21 cage de-magenta correction:** The untouched master was deliberately left unchanged (SHA-256 remains `773358634452c40e347bb8606ffdedbc3e1934f21031420087d73a373980e2ec`). A Pillow pass was applied only inside the shipping-space cage-disc ellipse `(18,2,75,82)`. Contamination detection required nonzero alpha, `R>G`, `B>G`, and `min(R,B)-G>12`; it found f0=650 and f1=652 affected pixels. Each detected pixel was blended toward neutral gray at its Rec.709 luminance (`0.2126R + 0.7152G + 0.0722B`), proportionally for mild contamination and fully desaturated at strength ≥36, then RGB was rounded to the nearest multiple of 6 to keep the shared two-frame union at 255 colors. The frames were joined and re-run through `pngquant --force --skip-if-larger ... 256`; because the union remained below 256 colors, pngquant was RGBA-lossless and every pixel outside the cage ellipse remained byte-identical. The shared indexed strip was split back to the two 112×152 shipping paths, and both slate QA composites were regenerated over `#3a405a`. Post-fix cage-region magenta-ish count is f0=0/f1=0; the same raw predicate still finds 80 pixels per frame outside the edit mask (the intentional red/body palette and low-alpha outline antialiasing), all deliberately unchanged. Corner alphas remain `[0,0,0,0]`; both content bboxes remain exactly `(18,4,94,148)`; all alpha values, the navy motor housing, and the warm-red knob are unchanged. Frame differences remain confined to `(27,10,65,73)` inside the cage, with 0 differing pixels outside it.
+- **Exact user prompt (verbatim):**
+  > First view these reference images with your image viewing tool: public/assets/sprites/hydrant-0.png, public/assets/sprites/bg-mailbox.png, public/assets/sprites/ped-0.png, public/assets/sprites/bg-building-18.png. Study the art style before generating: cartoon game art, thick clean dark outlines of consistent weight, painterly cel shading, warm slightly desaturated palette. These are street props/characters from the same sidewalk scene the new asset will stand in.
+  >
+  > TASK: Generate ONE new sprite sheet — a metal PEDESTAL FAN (standing floor fan on a round weighted base, the kind a café drags onto the sidewalk in summer). It will be placed on the sidewalk next to a café and blows wind to the LEFT, so draw it in a subtle 3/4 view FACING LEFT: round safety cage tilted slightly up-and-left, motor housing behind it to the right, single slim pole, round flat base. Colors: brushed steel / pale blue-gray metal with a darker navy motor housing and base, small warm-red or brass accent (switch knob or badge) so it isn't monochrome. It must look like it belongs next to the referenced hydrant and mailbox — same outline weight, same cel shading.
+  >
+  > The fan is RUNNING: inside the cage, do NOT draw individual crisp blades — draw a semi-transparent circular motion-blur disc with 2–3 curved pale streak highlights suggesting fast spin, plus the small round hub center clearly visible.
+  >
+  > COMPOSITION: wide landscape sheet, exactly TWO equal side-by-side panels, no divider lines. The SAME fan, IDENTICAL in body, cage, pole, base, size, position, palette and outline in both panels — the game swaps the two textures in place to animate the spin, so the body must not shift by even a pixel of scale or position. The ONLY difference between panels: the curved blur streaks inside the cage are at clearly DIFFERENT rotation positions (roughly 60 degrees apart), so alternating the frames flickers like a spinning fan. Everything outside the cage interior is a pixel-for-pixel duplicate.
+  >
+  > BACKGROUND/CUTOUT: entire background solid flat pure magenta #ff00ff, no gradients, no ground or shadow drawn, nothing touching the image edges; the fan centered in each panel with generous magenta clearance from panel boundaries and outer edges.
+  >
+  > POST-PROCESSING (do this yourself with the available tools — ImageMagick `convert`, pngquant, Python/Pillow):
+  > 1. Save the untouched master to assets/masters/prop-fan-sheet.png.
+  > 2. Crop the two panels; key each with `convert in.png -fuzz 10% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel out.png`.
+  > 3. Normalize both panels onto a common padded canvas so the base/pole/cage anchor does NOT shift between frames (same approach as the pigeon-look-f* family); measure the content bounding box of each frame with a Pillow script and report any anchor drift in pixels. If drift exceeds 2px, shift-align frame 1 to frame 0 before shipping.
+  > 4. Resize both to a common shipping size around 100–120 px wide by 140–160 px tall (match the fan's actual proportions; keep both frames the exact same canvas size), compress with pngquant.
+  > 5. Ship to public/assets/sprites/prop-fan-f0.png and public/assets/sprites/prop-fan-f1.png.
+  > 6. QA: composite each shipped cutout over dark slate #3a405a (save as assets/masters/prop-fan-f0-qa.png / prop-fan-f1-qa.png), report corner-pixel alphas, count of near-#ff00ff pixels with nonzero alpha, and both frames' content bounding boxes so anchor stability is verifiable.
+  > 7. Append a provenance entry to assets/ART_LOG.md: date, master and shipped paths, references viewed, exact prompt (this message), dimensions, panel semantics, anchor-drift measurement, and every post-processing step performed.
+  >
+  > DELIVERABLE: reply with absolute paths of the master and both shipped files, their final pixel dimensions, the anchor-drift measurement, and confirmation the ART_LOG entry was appended.
+- **Exact image-generation prompt (verbatim):**
+  > Create ONE new raster game-art sprite sheet for a sidewalk-scene prop.
+  >
+  > STYLE REFERENCES ALREADY INSPECTED: hydrant-0.png, bg-mailbox.png, ped-0.png, and bg-building-18.png from the same game. Match their cartoon game-art language: thick clean near-black/dark outlines of consistent weight, painterly cel shading, warm slightly desaturated palette, strong readable silhouette, compact prop detail and subtle painted wear. These files are STYLE ONLY. Do not include a hydrant, mailbox, person, building, café façade, street, sidewalk, text, or any other object.
+  >
+  > SUBJECT: a metal PEDESTAL FAN, the standing floor fan on a round weighted base that a café drags onto the sidewalk in summer. The fan is running and blows wind to the LEFT. Draw it in a subtle 3/4 view FACING LEFT: a round safety cage tilted slightly up-and-left, motor housing behind the cage to the right, a single slim pole, and a round flat weighted base. Use brushed steel / pale blue-gray metal, with a darker navy motor housing and base, and one small warm-red or brass accent such as a switch knob or badge. Make it feel like it belongs beside the referenced hydrant and mailbox, with the same outline weight and painterly cel shading.
+  >
+  > RUNNING FAN INTERIOR: do NOT draw individual crisp blades. Inside the safety cage draw a semi-transparent circular motion-blur disc with 2–3 curved pale streak highlights suggesting fast spin, plus a clearly visible small round hub center.
+  >
+  > COMPOSITION: wide landscape sprite sheet with exactly TWO equal side-by-side panels and absolutely no divider line. Both panels show the SAME fan. The fan body, outer cage, cage wires, motor housing, pole, base, size, position, palette, lighting, silhouette, outline, hub center, and every detail outside the cage interior must be visually identical in both panels, aligned precisely for texture-swap animation. The ONLY difference is that the 2–3 curved pale motion-blur streaks inside the cage are at clearly different rotation positions, approximately 60 degrees apart. Do not change any other detail between frames. Center one fan in each half at matching coordinates and scale, with generous clearance from the center boundary and all outer edges. Nothing may touch any image edge.
+  >
+  > BACKGROUND: entire background must be a uniform, solid, flat pure magenta #ff00ff. No gradients, no texture, no ground, no contact shadow, no cast shadow, no panel border, and no divider. The fan must be fully surrounded by pure magenta clearance.
+  >
+  > OUTPUT: one wide high-resolution landscape PNG master suitable for later two-panel cropping, chroma keying, anchor normalization, and resize to approximately 100–120 px wide by 140–160 px tall per frame.
+
+## assets/masters/portrait_wink_closed.png → presentation/assets/pigeon_wink_{closed,open}.png — 2026-07-21
+
+- **Purpose/frame semantics:** Two aligned portrait frames for a slide-corner cross-fade. `pigeon_wink_open.png` is the original smug portrait; `pigeon_wink_closed.png` changes only the viewer-right squinted eye to a fully closed cheeky wink beneath the pressed scruffy brow. The viewer-left orange eye, pose, beak, grin/teeth, feather construction, palette, medallion, and framing remain matched to the open reference.
+- **Tool:** Codex built-in `imagegen`; model identifier was not exposed. One edit render was accepted. The generator output was copied byte-for-byte, untouched, to `assets/masters/portrait_wink_closed.png` (1254×1254 sRGB PNG). The original open source remains `images/normal.png` (1254×1254 indexed sRGB PNG).
+- **References viewed before generation:** `images/normal.png` at original resolution as the primary edit target and exact identity/geometry/rendering reference; `images/damage_taken.png` at original resolution as identity/style corroboration only. The damage reference's scuffs, distressed mouth, and pose changes were explicitly excluded.
+- **Outputs:** untouched master `assets/masters/portrait_wink_closed.png`; 512×512 sRGBA shipping frames `presentation/assets/pigeon_wink_closed.png` and `presentation/assets/pigeon_wink_open.png`; 512×512 RGB QA composites `presentation/assets/qa_wink_closed.png` and `presentation/assets/qa_wink_open.png` over solid slide color `#f6f4ee`.
+- **Circle measurement/alignment:** A threshold-15 scan through the rim center found identical extents in both 1254px sources: horizontal `x=25..1226`, center x `625.5`, horizontal radius `601.0`; vertical `y=14..1231`, center y `622.5`, vertical radius `609.0`. (The painted “circle” is subtly taller than wide, so the mask retains its measured ellipse rather than clipping the top/bottom rim.) Closed-minus-open offset is exactly `(0.0, 0.0)` px; horizontal- and vertical-radius deltas are both `0.0` px. Both outputs use the same analytical mask and their final 512px alpha channels are byte-identical.
+- **Post-processing actually performed:** (1) preserved the 1254×1254 generated source untouched at the master path; (2) used Pillow to apply one shared centered elliptical mask `(625.5,622.5)`, radii `(601.0,609.0)`, with a 2px antialiased transition at master size, making all black outside the charcoal rim transparent; (3) resized each separate RGBA working copy to exactly 512×512 with Pillow Lanczos; (4) normalized only the outermost 4px of the charcoal rim/soft-alpha edge to the same near-black RGB so the stacked frames cannot sparkle at the boundary; (5) joined the frames into a temporary 1024×512 strip, ran `pngquant --force --skip-if-larger --output <out> 256 <in>` once to give them a shared palette, and split without re-quantizing; (6) composited each final ship copy over `#f6f4ee` for QA. The untouched master and `images/normal.png` were never resized or overwritten.
+- **QA:** Final ship sizes are 512×512. Corner alphas in TL/TR/BL/BR order are `[0,0,0,0]` for both frames. Final alpha masks are byte-identical (difference bbox `None`, extrema `(0,0)`). Shipped palette usage is 255 colors for closed and 240 for open. Visually inspected the untouched master, close-ups of both viewer-right eye states, both transparent ship copies, and both `#f6f4ee` QA composites; the closed frame has no visible iris/pupil/sclera in the winking eye, the open viewer-left eye is retained, and the rim is unclipped.
+- **Exact image-generation prompt (verbatim):**
+  > Use case: precise-object-edit
+  > Asset type: single portrait animation frame for a game presentation, cross-faded with the source at slide-corner size.
+  >
+  > Input images:
+  > - Image 1 (images/normal.png): PRIMARY EDIT TARGET and exact geometry/rendering reference. Edit this portrait, preserving it pixel-close everywhere outside the specified eye.
+  > - Image 2 (images/damage_taken.png): identity and painterly cel-shaded style corroboration only. Do not copy its damage, scuffs, distress, pose changes, or mouth.
+  >
+  > Primary request: Create ONE new portrait frame that is exactly the portrait in Image 1, except fully close the character's squinted eye on the viewer's right in a cheeky wink.
+  >
+  > Required eye edit: On the viewer's right, under the raised scruffy black brow, remove the visible orange iris, pupil, and pale sclera opening and replace the eye opening with one thick, clean, curved near-black lash/lid line following the existing squint arc. The brow presses slightly downward toward the closed lid. It must unmistakably read as FULLY CLOSED, with no eyeball, iris, pupil, or sclera visible. Keep the purple lower eye patch and surrounding face construction in their original positions.
+  >
+  > Absolute invariants: The viewer-left wide-open orange eye remains exactly unchanged. Everything else remains as close to Image 1 as possible in position, scale, silhouette, and rendering: same slate-blue pigeon head and neck; same head angle; same facial proportions; same scruffy black brows except the tiny viewer-right brow press; same purple eye patches; same broad gray-tan beak and pale cere; same smug crooked grin and visible teeth; same feather tufts; same iridescent green-to-purple layered neck feathers; same thick clean dark outlines; same painterly cel shading; same warm slightly desaturated palette; same raunchy/absurdist cartoon tone.
+  >
+  > Composition/background: Preserve the exact square head-and-neck framing from Image 1. Preserve the same circular warm-tan medallion, its thick charcoal rim, its center, radius, size, and position, and the pure black outside. No crop, zoom, rotation, recentering, extra objects, text, effects, scars, sweat, motion marks, or new details.
+  >
+  > Identity invariants: cartoon; thick clean dark outlines; painterly cel shading; slate-blue pigeon; orange eye; purple eye patches; scruffy black brows; iridescent green-to-purple neck feathers; raunchy/absurdist tone.
+  >
+  > Output: exactly one square PNG portrait, 1024×1024-class. This is the untouched master source for assets/masters/portrait_wink_closed.png.

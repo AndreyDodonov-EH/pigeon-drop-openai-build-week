@@ -15,7 +15,7 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 
 
 **Targets & scoring**
-- "Shit heats the fan": literally place near e.g. caffee a fan, which blows (particles/air distortion), and then blows our poo! 
+- ~~"Shit hits the fan": place a fan near a café, with visible airflow that blows the poo.~~ DONE: spinning café-side pedestal fans bend airborne goo through animated wind cones; the first close pass scores a trick-shot bonus and preserves the combo.
 - Stationary Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
 - Higher-altitude targets: rooftop party.

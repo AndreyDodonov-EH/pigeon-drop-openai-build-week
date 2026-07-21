@@ -430,3 +430,75 @@ cold while glow spilled onto stone. Fixed in a fresh Codex session with hand-tra
 per-pane polygons (arch tops included), self-validated against a magenta outline trace
 over the base art (`bg-building-2-lit-upper-trace-qa.png`) before shipping; storefront
 output pixel-identical to the previous rev.
+
+## Semantic street districts + true corner buildings (shipped 2026-07-21)
+
+The near-building generator no longer treats every storefront as an interchangeable
+`shop`. A Phaser-free street grammar (`NearBuildingsPlanner.ts`) assigns explicit uses
+and placement roles, then holds one meaningful district for 2–3 blocks: café-centered
+neighborhoods, gym/boutique active neighborhoods, business clusters, and continuous
+canal-residential rows. Buildings inside a block sit shoulder-to-shoulder; larger gaps
+and the three recolored connector types only mark real district boundaries.
+
+The deep three-quarter café (`bg-building-2`) and tall gym (`bg-building-8`) are hard
+right-corner endcaps. Each appears only after compatible infill, is never mirrored, and
+is followed by a clear 78–118 px side street with no fence closing the view of its right
+wall. Manual `SP.spawnBuilding()` requests now enqueue a valid semantic mini-block rather
+than splicing a corner into arbitrary infill. All facades and connectors still use
+`BuildingPalettePipeline`; each 2–3-block area shares a base palette with per-building
+paint variation, while the café's warm ADD-lit overlay remains un-repainted.
+
+Verified with 50,000 deterministic pure-planner blocks plus 2,000 live browser-planned
+blocks: both corner invariants, district run lengths, gap/connector exits, scales, palette
+controls, shader attachment, and the café night overlay passed. Live captures also checked
+the full café, gym, office, and canal-residential compositions.
+
+**Office variety + tighter canal rows (2026-07-21):** business districts gained two
+new shader-ready frontal facades: `bg-building-14`, a tall rust-brick converted loft
+office, and `bg-building-15`, a shorter wide cream-and-teal Art Deco office. Together
+with glass offices 3/7, the sector now has four distinct silhouettes and material
+families instead of alternating two similar towers. Semantic areas now last 2–3 blocks
+instead of 2–4, and canal blocks are 3–4 houses instead of 3–5. Every normal canal
+block guarantees a 2–3-building directly adjoining run; a calibrated -8 px overlap
+cancels the sprites' transparent safety borders while keeping directional corner house
+13 out of the forced joins. Verified over 50,000 planner blocks plus live office, canal,
+alpha, pipeline, and controlled hue-sweep QA; full art provenance is in ART_LOG.
+
+**Shorter offices + more cafés (2026-07-21):** business blocks now contain only
+1–2 offices instead of 2–3, making the sector quicker to read and preventing a run
+of tall facades from dominating the street. Two more shader-ready offices expand the
+roster to six: `bg-building-16`, a low wide terracotta mid-century slab, and
+`bg-building-17`, a narrow indigo neo-Gothic tower. Neighborhood café placement is
+now guaranteed on the first area block and has a 52% chance on later blocks (about
+70% of neighborhood blocks overall). A second cute right-corner endcap,
+`bg-building-18`, adds a cobalt-tile patisserie with a curved copper cornice and
+teapot sign; the planner selects both café designs evenly. A deterministic 50,000-
+block check confirmed 1–2-building office blocks, near-even selection of every new
+variant, and the café last-item/non-flipped/open-side-street invariants. Live Phaser
+captures confirmed shared baselines and `BuildingPalettePipeline` on 16, 17, and 18;
+the controlled hue sweep visibly repaints their saturated facade materials while
+preserving glass, outlines, and neutral trim.
+
+**Gym + boutique shader coverage (2026-07-21):** both gym facades (8/9) and the
+boutique (10) were explicitly regression-tested through `BuildingPalettePipeline` at
+hue controls -1 / 0 / +1. All three receive the shared per-instance tint path used by
+homes, offices, cafés, and connectors. The resulting schemes visibly vary their broad
+painted facade, awning, and sign materials while dark glazing, outlines, stone, and
+structural trim remain legible; dedicated live captures are recorded in ART_LOG.
+
+## Poo hits the fan (shipped 2026-07-21)
+
+Cafés now bring a spinning pedestal fan onto the sidewalk. Animated wind ribbons show its
+up-left airflow, and the matching widening force cone physically catches and bends airborne
+goo while preserving the fluid simulation. A close pass awards a one-time `POO HITS THE
+FAN!` trick-shot bonus per fan, counts as a successful volley, and can carry the same goo
+onward into pedestrians or cars for a continued combo. `window.SP.spawnFan(x?)` and the
+debug palette's `FAN` button provide deterministic testing.
+
+**Real sprite + street scale (2026-07-21):** the code-drawn placeholder (which stood
+nearly twice pedestrian height and clashed with the painterly style) was replaced by a
+generated two-frame pedestal-fan sprite (`prop-fan-f{0,1}.png`, vintage steel/navy with
+baked spin-blur disc; provenance in ART_LOG). The frames alternate to flicker the blur
+streaks, the fan now renders at shoulder height (~58 px desktop, ×1.4 mobile), and the
+wind cone/gust streaks emanate from the measured cage-hub point. Gusts were retuned to
+start at the cage and fade downwind instead of popping in mid-flight.

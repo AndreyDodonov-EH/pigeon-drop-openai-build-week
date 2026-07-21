@@ -42,6 +42,8 @@ export interface Particle {
   sy: number;
   /** frames of impact adhesion before gravity starts pulling the splat down */
   stickHold: number;
+  /** 0→1 wind-whipped lightness: blown drops fall slower and ride the air */
+  loft: number;
   /** short-lived sideways smear from the impact, in collider-local px/frame */
   surfaceVx: number;
   /** prevents a settled or bouncing drop from reporting the same street landing again */
@@ -71,6 +73,26 @@ export interface Collider {
   scaleY?: number;
   flipX?: boolean;
   onHit?: (p: Particle, impactSpeed: number) => void;
+}
+
+/**
+ * A directional cone that accelerates airborne goo. `x/y` is the narrow end,
+ * `dirX/dirY` points downwind, and the radius widens by `spread` per pixel.
+ */
+export interface GooWind {
+  id: number;
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  reach: number;
+  startRadius: number;
+  spread: number;
+  strength: number;
+  maxSpeed: number;
+  /** axial distance from the source that counts as touching the fan */
+  engageDistance: number;
+  onEngage?: (particle: Particle) => void;
 }
 
 export interface GooParams {
@@ -108,6 +130,18 @@ export const DEFAULT_PARAMS: GooParams = {
   dripSlide: 0.28,
   surfaceSeek: 8,
 };
+
+// --- wind loft tuning ("shit hits the fan") ---
+/** fraction of gravity a fully lofted drop loses; 1 = weightless, >1 drifts upward */
+const LOFT_GRAVITY_CUT = 0.99;
+/** per-frame loft decay once out of the wind; higher = floats longer */
+const LOFT_DECAY = 0.995;
+/** extra scroll-air entrainment at full loft (multiplier on airEntrainX) */
+const LOFT_ENTRAIN_BOOST = 2;
+/** loft gained per frame at the cone axis; 0.4 ≈ fully lofted in ~3 frames */
+const LOFT_RAMP = 0.4;
+/** per-frame bleed of cross-stream velocity inside the cone (kills incoming fall speed) */
+const WIND_CARRY = 0.5;
 
 const CELL_SHIFT = 5; // 32px cells (~h)
 const HASH_W = 1024;
@@ -176,6 +210,7 @@ export class GooSim {
       p.sx = 0;
       p.sy = 0;
       p.stickHold = 0;
+      p.loft = 0;
       p.surfaceVx = 0;
       p.groundHit = false;
       p.wasStuck = false;
@@ -184,8 +219,8 @@ export class GooSim {
     }
   }
 
-  /** One 60 Hz step. Colliders are screen-space AABBs supplied by the scene. */
-  step(colliders: Collider[]): void {
+  /** One 60 Hz step. Colliders and wind fields are supplied in screen space. */
+  step(colliders: Collider[], winds: readonly GooWind[] = []): void {
     const P = this.params;
     const ps = this.particles;
     const byId = new Map<number, Collider>();
@@ -245,10 +280,14 @@ export class GooSim {
     // --- free particles: forces ---
     for (const p of ps) {
       if (p.state !== PState.Free) continue;
-      p.vy += P.gravity;
-      // falling drops are entrained by the air rushing past (world scroll)
-      p.vx += (-this.worldVx - p.vx) * P.airEntrainX;
+      // wind-lofted drops are atomized spray: near-weightless and far more
+      // entrained by the air, so a fan visibly flings them instead of merely
+      // bending their fall; loft decays back to heavy goo over a few seconds
+      p.vy += P.gravity * (1 - LOFT_GRAVITY_CUT * p.loft);
+      p.vx += (-this.worldVx - p.vx) * P.airEntrainX * (1 + LOFT_ENTRAIN_BOOST * p.loft);
+      p.loft *= LOFT_DECAY;
     }
+    this.applyWind(winds);
 
     this.buildGrid();
     this.applyViscosity();
@@ -296,6 +335,51 @@ export class GooSim {
     p.stickId = -1;
     p.settled = 0;
     p.stickHold = 0;
+  }
+
+  /** Push free droplets through a widening cone, with a little rotor buffeting. */
+  private applyWind(winds: readonly GooWind[]): void {
+    for (const wind of winds) {
+      const mag = Math.hypot(wind.dirX, wind.dirY);
+      if (mag < 1e-5) continue;
+      const dx = wind.dirX / mag;
+      const dy = wind.dirY / mag;
+      const px = -dy;
+      const py = dx;
+
+      for (const p of this.particles) {
+        if (p.state !== PState.Free || p.groundHit) continue;
+        const rx = p.x - wind.x;
+        const ry = p.y - wind.y;
+        const along = rx * dx + ry * dy;
+        if (along < -p.r || along > wind.reach) continue;
+
+        const across = rx * px + ry * py;
+        const radius = wind.startRadius + Math.max(0, along) * wind.spread;
+        const edge = 1 - Math.abs(across) / Math.max(radius, 1);
+        if (edge <= 0) continue;
+
+        // The blast is strongest beside the cage, then softens through the
+        // cone. Cap downwind speed so a held stream bends instead of teleporting.
+        const axialFalloff = 0.34 + 0.66 * (1 - Math.max(0, along) / wind.reach);
+        const downwindSpeed = p.vx * dx + p.vy * dy;
+        const room = Math.max(0, wind.maxSpeed - downwindSpeed);
+        const push = Math.min(wind.strength * edge * axialFalloff, room);
+        const flutter = Math.sin(p.age * 0.47 + p.x * 0.031 + wind.id) * 0.055 * edge;
+        p.vx += dx * push + px * flutter;
+        p.vy += dy * push + py * flutter;
+        // The jet carries drops along its axis: bleed off the cross-stream
+        // velocity (the fall speed a drop brings in), otherwise it plunges
+        // straight through the blast band before the push can matter.
+        const crossV = p.vx * px + p.vy * py;
+        const carry = WIND_CARRY * edge;
+        p.vx -= px * crossV * carry;
+        p.vy -= py * crossV * carry;
+        p.loft = Math.min(1, p.loft + LOFT_RAMP * edge);
+
+        if (along <= wind.engageDistance) wind.onEngage?.(p);
+      }
+    }
   }
 
   private reapOldest(): void {

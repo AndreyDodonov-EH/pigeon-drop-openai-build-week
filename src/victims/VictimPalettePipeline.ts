@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 
 export const VICTIM_PALETTE_PIPELINE = 'VictimPalette';
 
-// Seven evenly spaced values identify the source art variant without adding a
-// uniform or breaking the shared victim draw batch. Cars use the first three.
-const SOURCE_CONTROLS = [0, 42, 85, 128, 170, 212, 255];
+// Ten evenly spaced values identify the source art variant without adding a
+// uniform or breaking the shared victim draw batch. Cars use the first six.
+const SOURCE_CONTROLS = [0, 28, 57, 85, 113, 142, 170, 198, 227, 255];
 const KIND_CAR_BIT = 128;
 const ACCENT_HUE_MAX = 127;
 
@@ -42,12 +42,13 @@ void main() {
 
   // Phaser supplies the sprite tint as an interpolated vertex attribute, which
   // lets every victim remain in one draw batch. R stores the target hue, G the
-  // source variant (six evenly spaced values). B packs two controls: bit 7 selects clothing
+  // source variant (ten evenly spaced values). B packs two controls: bit 7 selects clothing
   // or car paint, bits 0-6 carry the accent hue (tie, hair) in 128 steps.
   vec3 control = outTint.bgr;
   float kindByte = floor(control.b * 255.0 + 0.5);
   float isCar = step(128.0, kindByte);
   float accentHue = (kindByte - isCar * 128.0) / 127.0;
+  float sourceSlot = floor(control.g * 9.0 + 0.5);
   vec3 sourceColor;
   float maxLuminance;
   float matchStart;
@@ -64,7 +65,7 @@ void main() {
   float accentStrength = 0.0;
 
   if (isCar < 0.5) {
-    if (control.g < 0.08) {
+    if (sourceSlot < 0.5) {
       sourceColor = vec3(0.314, 0.318, 0.310);
       maxLuminance = 0.50;
       accentSource = vec3(0.549, 0.157, 0.118);
@@ -72,7 +73,7 @@ void main() {
       accentMatchEnd = 0.22;
       accentMaxLuminance = 0.60;
       accentStrength = 1.0;
-    } else if (control.g < 0.25) {
+    } else if (sourceSlot < 1.5) {
       sourceColor = vec3(0.149, 0.455, 0.404);
       maxLuminance = 0.54;
       // Hair brown sits near skin in chroma; the luminance ceiling does the
@@ -82,44 +83,62 @@ void main() {
       accentMatchEnd = 0.16;
       accentMaxLuminance = 0.47;
       accentStrength = 1.0;
-    } else if (control.g < 0.42) {
+    } else if (sourceSlot < 2.5) {
       sourceColor = vec3(0.435, 0.282, 0.122);
       maxLuminance = 0.38;
-    } else if (control.g < 0.58) {
+    } else if (sourceSlot < 3.5) {
       // Influencer's pink velour tracksuit (the matching phone may follow it).
       // The ceiling sits above the velour's specular sheen so the sheen
       // follows the recolor instead of staying pink; her skin is redder in
       // chroma than the suit, so the palette mask still excludes it.
       sourceColor = vec3(0.922, 0.274, 0.473);
       maxLuminance = 0.86;
-    } else if (control.g < 0.75) {
+    } else if (sourceSlot < 4.5) {
       // Tourist's blue vacation shirt; pale palm motifs remain as highlights.
       sourceColor = vec3(0.149, 0.418, 0.589);
       maxLuminance = 0.70;
-    } else if (control.g < 0.92) {
+    } else if (sourceSlot < 5.5) {
       // Gym bro's cobalt stringer and shorts, plus coordinated blue gym gear.
       sourceColor = vec3(0.078, 0.334, 0.702);
       maxLuminance = 0.66;
-    } else {
+    } else if (sourceSlot < 6.5) {
       // Skater's grape-purple hoodie (median sampled from shipped ped-6.png;
       // hoodie highlights peak near 0.40 luminance, his skin starts ~0.55).
       sourceColor = vec3(0.420, 0.243, 0.514);
       maxLuminance = 0.50;
+    } else if (sourceSlot < 7.5) {
+      // Baby goth's deep-aubergine trench-dress.
+      sourceColor = vec3(0.345, 0.125, 0.282);
+      maxLuminance = 0.58;
+    } else if (sourceSlot < 8.5) {
+      // Crypto prophet's acid-mint vest and trousers.
+      sourceColor = vec3(0.565, 0.847, 0.627);
+      maxLuminance = 0.95;
+    } else {
+      // Art professor's dusty-plum overcoat.
+      sourceColor = vec3(0.565, 0.220, 0.314);
+      maxLuminance = 0.78;
     }
     matchStart = 0.08;
-    matchEnd = control.g < 0.42 ? 0.18 : 0.22;
+    matchEnd = sourceSlot < 2.5 ? 0.18 : 0.22;
     // Keep variants lively without looking like a full neon recolor.
     targetSaturation = 0.50;
     targetValue = 0.72;
   } else {
-    // Faded-red sedan, yellow taxi, and pale-blue van body palettes. Neutral
-    // doors/panels, glass, chrome, tires, lights, and drivers do not match.
-    if (control.g < 0.08) {
+    // Six vehicle body palettes. Neutral doors/panels, glass, chrome, tires,
+    // lights, luggage, tow equipment, and drivers do not match.
+    if (sourceSlot < 0.5) {
       sourceColor = vec3(0.690, 0.145, 0.145);
-    } else if (control.g < 0.25) {
+    } else if (sourceSlot < 1.5) {
       sourceColor = vec3(0.925, 0.620, 0.075);
-    } else {
+    } else if (sourceSlot < 2.5) {
       sourceColor = vec3(0.315, 0.525, 0.655);
+    } else if (sourceSlot < 3.5) {
+      sourceColor = vec3(0.408, 0.408, 0.157); // olive station wagon
+    } else if (sourceSlot < 4.5) {
+      sourceColor = vec3(0.439, 0.220, 0.471); // dusty-purple limousine
+    } else {
+      sourceColor = vec3(0.690, 0.282, 0.031); // burnt-orange tow truck
     }
     maxLuminance = 1.0;
     matchStart = 0.10;
@@ -155,7 +174,7 @@ void main() {
   float accentSaturation = 0.55;
   float accentValue = 0.62;
   float blondeLift = 0.0;
-  if (isCar < 0.5 && control.g >= 0.08 && control.g < 0.25) {
+  if (isCar < 0.5 && sourceSlot >= 0.5 && sourceSlot < 1.5) {
     if (accentHue < 0.055) {
       accentSaturation = 0.68; // red
       accentValue = 0.70;

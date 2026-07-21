@@ -22,6 +22,8 @@ import {
 } from '../world/BuildingPalettePipeline';
 import { DayNight, type DayLook } from '../world/DayNight';
 import { LampFx } from '../world/LampFx';
+import { CarHeadlightFx } from '../world/CarHeadlightFx';
+import { PooFanLayer } from '../world/PooFanLayer';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, DiveRatchet } from '../input/TouchControls';
@@ -53,7 +55,8 @@ const HYDRANT_SCALE = 0.5 * MOBILE_MODEL_BUMP;
 /** texture px from the hydrant's base to its open neck (the jet's origin) */
 const HYDRANT_CAP_H = 92;
 const PICKUP_SCALE = 0.34;
-const PED_VARIANT_COUNT = 7;
+const PED_VARIANT_COUNT = 10;
+const CAR_VARIANT_COUNT = 6;
 // The inline skater outruns the world scroll: high-value, high-lead target.
 const SKATER_VARIANT = 6;
 const SKATER_BASE_SCORE = 40;
@@ -163,6 +166,7 @@ const ITEM_PICKUP_EFFECTS: Record<ItemPickupKind, ItemPickupEffect> = {
 
 interface Victim {
   sprite: Phaser.GameObjects.Sprite;
+  headlights?: CarHeadlightFx;
   collider: Collider;
   kind: 'ped' | 'car';
   variant: number;
@@ -181,6 +185,9 @@ const PED_LINES = [
   'MY MAP!',
   'BRO! SERIOUSLY?!',
   'DUDE, MY HOODIE!',
+  'MY AESTHETIC!',
+  'MY PORTFOLIO!',
+  'PHILISTINE!',
 ];
 // rainbow goo delights instead of disgusts — same characters, opposite mood
 const PED_LINES_RAINBOW = [
@@ -191,9 +198,19 @@ const PED_LINES_RAINBOW = [
   'BEST TRIP EVER!',
   'SICK COLORS!',
   'RADICAL!!',
+  'THIS... SLAPS?!',
+  'BULLISH!!',
+  'A MASTERPIECE!',
 ];
-const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!'];
-const CAR_LINES_RAINBOW = ['FREE PAINT JOB!', 'BEEP BEEP JOY!', 'LOVELY!!'];
+const CAR_LINES = ['HEY!!', 'HONNNK!', 'MY VAN!', 'MY LUGGAGE!', 'THE UPHOLSTERY!', 'MY TRUCK!'];
+const CAR_LINES_RAINBOW = [
+  'FREE PAINT JOB!',
+  'BEEP BEEP JOY!',
+  'LOVELY!!',
+  'ROAD TRIP GLOW!',
+  'CLASSY!',
+  'SHINY RIG!',
+];
 const REACT_FRAMES = 90;
 
 // Post-hit conspiratorial glance: the pigeon turns to face the camera for a beat
@@ -265,6 +282,7 @@ export class GameScene extends Phaser.Scene {
   /** lit-windows overlay over bgFar, faded in after dark */
   private bgFarLit!: Phaser.GameObjects.TileSprite;
   private bgNear!: NearBuildingsLayer;
+  private pooFans!: PooFanLayer;
   private sidewalkTs!: Phaser.GameObjects.TileSprite;
   private streetTs!: Phaser.GameObjects.TileSprite;
   private clouds: Phaser.GameObjects.Image[] = [];
@@ -284,6 +302,10 @@ export class GameScene extends Phaser.Scene {
   private hydrantTimer = 4000;
   private rainbowPickupTimer = RAINBOW_PICKUP_FIRST_MS;
   private itemPickupTimer = ITEM_PICKUP_FIRST_MS;
+  /** ?nospawn freezes all timer-driven spawns (peds, cars, hydrants, props,
+   * pickups) so a headless screenshot only contains what the driver staged;
+   * SP.setAutoSpawn re-enables at runtime */
+  private autoSpawn = !new URLSearchParams(location.search).has('nospawn');
 
   /** digestion pressure, 0–100: fills passively, spent by pooping, 100 = blowout */
   private meter = 40;
@@ -407,9 +429,11 @@ export class GameScene extends Phaser.Scene {
     this.load.image('pigeon-look-f0', 'assets/sprites/pigeon-look-f0.png');
     this.load.image('pigeon-look-f1', 'assets/sprites/pigeon-look-f1.png');
     this.load.image('pigeon-look-f2', 'assets/sprites/pigeon-look-f2.png');
-    this.load.image('car-0', 'assets/sprites/car-0.png');
-    this.load.image('car-1', 'assets/sprites/car-1.png');
-    this.load.image('car-2', 'assets/sprites/car-2.png');
+    for (let i = 0; i < CAR_VARIANT_COUNT; i++) {
+      this.load.image(`car-${i}`, `assets/sprites/car-${i}.png`);
+      this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
+      this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
+    }
     for (let i = 0; i < PED_VARIANT_COUNT; i++) {
       this.load.image(`ped-${i}`, `assets/sprites/ped-${i}.png`);
       this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
@@ -421,10 +445,6 @@ export class GameScene extends Phaser.Scene {
         `ped-${SKATER_VARIANT}${suffix}`,
         `assets/sprites/ped-${SKATER_VARIANT}${suffix}.png`,
       );
-    }
-    for (let i = 0; i < 3; i++) {
-      this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
-      this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
     }
     for (const key of [...BUILDING_SPRITES, ...CONNECTOR_SPRITES]) {
       this.load.image(key, `assets/sprites/${key}.png`);
@@ -439,6 +459,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg-mailbox', 'assets/sprites/bg-mailbox.png');
     this.load.image('hydrant-0', 'assets/sprites/hydrant-0.png');
     this.load.image('hydrant-1', 'assets/sprites/hydrant-1.png');
+    this.load.image('prop-fan-f0', 'assets/sprites/prop-fan-f0.png');
+    this.load.image('prop-fan-f1', 'assets/sprites/prop-fan-f1.png');
     this.load.image('water-col', 'assets/sprites/water-col.png');
     this.load.image('water-crown', 'assets/sprites/water-crown.png');
     this.load.image('pickup-rainbow', 'assets/sprites/pickup-rainbow.png');
@@ -491,7 +513,14 @@ export class GameScene extends Phaser.Scene {
       .tileSprite(0, GROUND_Y - 6 - SIDEWALK_H, W, SIDEWALK_H, 'sidewalk')
       .setOrigin(0, 0)
       .setDepth(1.5);
-    this.bgNear = new NearBuildingsLayer(this, 2);
+    this.pooFans = new PooFanLayer(this, (x, y) => this.onFanHit(x, y));
+    this.bgNear = new NearBuildingsLayer(this, 2, (placement) => {
+      // buildings keep flowing under ?nospawn (they're the scrolling
+      // backdrop), but the interactive fan they'd bring along does not
+      if (placement.use === 'cafe' && this.autoSpawn) {
+        this.pooFans.spawn(placement.x + placement.width + 12);
+      }
+    });
     this.streetTs = this.add
       .tileSprite(0, GROUND_Y - 6, W, H - GROUND_Y + 6, 'street')
       .setOrigin(0, 0)
@@ -547,6 +576,7 @@ export class GameScene extends Phaser.Scene {
       particleCount: () => this.guanoFx.particleCount,
       gasParticleCount: () => this.guanoFx.gasParticleCount,
       spawnHydrant: () => this.spawnHydrant(),
+      setAutoSpawn: (v: boolean) => (this.autoSpawn = v),
       spawnRainbowPickup: (x = W + 60, y = this.pigeonY) => this.spawnPickup('rainbow', x, y),
       spawnItemPickup: (
         kind: ItemPickupKind = ITEM_PICKUP_KINDS[0],
@@ -571,6 +601,9 @@ export class GameScene extends Phaser.Scene {
       spawnProp: (key: 'bg-lamp' | 'bg-tree' | 'bg-mailbox' = 'bg-lamp', x?: number) =>
         this.spawnProp(key, x),
       spawnBuilding: (key = 'bg-building-2') => this.bgNear.queueNext(key),
+      spawnFan: (x = this.pigeon.x + 20) => this.pooFans.spawn(x),
+      fanCount: () => this.pooFans.count,
+      buildingPlan: (count = 12) => this.bgNear.debugPlan(count),
       touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
   }
@@ -836,6 +869,7 @@ export class GameScene extends Phaser.Scene {
     });
     addButton('TIME', 2, 3, () => this.dayNight.jumpNext());
     addButton('CAFE', 0, 4, () => this.bgNear.queueNext('bg-building-2'));
+    addButton('FAN', 1, 4, () => this.pooFans.spawn(this.pigeon.x + 20));
   }
 
   update(_time: number, deltaMs: number): void {
@@ -879,6 +913,8 @@ export class GameScene extends Phaser.Scene {
       h.crown.setTint(worldTint);
     }
     for (const pk of this.pickups) pk.sprite.setTint(actorTint);
+    for (const v of this.victims) v.headlights?.update(f, dn.glow);
+    this.pooFans.setAmbient(worldTint);
     this.pigeonImg.setTint(actorTint);
     this.bgNear.setGlow(dn.glow);
 
@@ -891,8 +927,12 @@ export class GameScene extends Phaser.Scene {
   private scrollWorld(f: number): void {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
     this.bgFarLit.tilePositionX = this.bgFar.tilePositionX;
-    this.bgNear.update(SCROLL * 0.55 * f);
-    this.sidewalkTs.tilePositionX += SCROLL * 0.55 * f;
+    const nearDx = SCROLL * 0.55 * f;
+    // Move existing fans before the planner creates a new café fan at its
+    // already-updated screen position.
+    this.pooFans.update(nearDx, f);
+    this.bgNear.update(nearDx);
+    this.sidewalkTs.tilePositionX += nearDx;
     this.streetTs.tilePositionX += SCROLL * f;
     for (const cloud of this.clouds) {
       cloud.x -= (SCROLL * 0.06 + cloud.getData('drift')) * f;
@@ -925,7 +965,7 @@ export class GameScene extends Phaser.Scene {
 
   /** sidewalk furniture scrolls with the ground, in front of the pedestrians */
   private updateProps(f: number, deltaMs: number): void {
-    this.propTimer -= deltaMs;
+    if (this.autoSpawn) this.propTimer -= deltaMs;
     if (this.propTimer <= 0) {
       if (this.streetClearAt(W + 90)) {
         const kinds = ['bg-lamp', 'bg-tree', 'bg-mailbox'] as const;
@@ -1011,7 +1051,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updatePickups(f: number, deltaMs: number): void {
-    this.rainbowPickupTimer -= deltaMs;
+    if (this.autoSpawn) this.rainbowPickupTimer -= deltaMs;
     if (this.rainbowPickupTimer <= 0) {
       if (this.dayNight.isNight) {
         // no rainbows after dark (backlog rule) — keep rechecking until sunrise
@@ -1024,7 +1064,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.itemPickupTimer -= deltaMs;
+    if (this.autoSpawn) this.itemPickupTimer -= deltaMs;
     if (this.itemPickupTimer <= 0) {
       this.spawnPickup(this.pickItemKind());
       this.itemPickupTimer =
@@ -1197,7 +1237,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnCar(): void {
-    const v = (Math.random() * 3) | 0;
+    const v = (Math.random() * CAR_VARIANT_COUNT) | 0;
     const hue = VICTIM_PALETTE_HUES[(Math.random() * VICTIM_PALETTE_HUES.length) | 0];
     const sprite = this.add
       .sprite(W + 80, 0, `car-${v}`)
@@ -1205,9 +1245,12 @@ export class GameScene extends Phaser.Scene {
       .setDepth(CAR_DEPTH)
       .setTint(victimPaletteTint(hue, v, 'car'))
       .setPipeline(VICTIM_PALETTE_PIPELINE);
+    // Wide bodies (the limo especially) must start fully past the screen edge.
+    sprite.setX(W + sprite.displayWidth / 2 + 16);
     sprite.setY(GROUND_Y + 32 - sprite.displayHeight / 2);
     this.victims.push({
       sprite,
+      headlights: new CarHeadlightFx(this, sprite, v),
       kind: 'car',
       variant: v,
       vx: -(1.6 + Math.random() * 1.2),
@@ -1275,7 +1318,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHydrants(f: number, deltaMs: number): void {
-    this.hydrantTimer -= deltaMs;
+    if (this.autoSpawn) this.hydrantTimer -= deltaMs;
     if (this.hydrantTimer <= 0) {
       if (this.streetClearAt(W + 40)) {
         this.spawnHydrant();
@@ -1450,15 +1493,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateVictims(f: number, deltaMs: number): void {
-    this.pedTimer -= deltaMs;
-    this.carTimer -= deltaMs;
-    if (this.pedTimer <= 0) {
-      this.spawnPed();
-      this.pedTimer = 900 + Math.random() * 1600;
-    }
-    if (this.carTimer <= 0) {
-      this.spawnCar();
-      this.carTimer = 2600 + Math.random() * 3500;
+    if (this.autoSpawn) {
+      this.pedTimer -= deltaMs;
+      this.carTimer -= deltaMs;
+      if (this.pedTimer <= 0) {
+        this.spawnPed();
+        this.pedTimer = 900 + Math.random() * 1600;
+      }
+      if (this.carTimer <= 0) {
+        this.spawnCar();
+        this.carTimer = 2600 + Math.random() * 3500;
+      }
     }
 
     for (const v of this.victims) {
@@ -1507,6 +1552,7 @@ export class GameScene extends Phaser.Scene {
     this.victims = this.victims.filter((v) => {
       // rightward skaters outrun the scroll and exit stage right
       if (v.sprite.x < -160 || v.sprite.x > W + 160) {
+        v.headlights?.destroy();
         v.sprite.destroy();
         return false;
       }
@@ -1646,6 +1692,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** One trick-shot bonus per fan; blown goo can continue the chain on victims. */
+  private onFanHit(x: number, y: number): void {
+    this.salvoHit = true;
+    this.comboTimer = 120;
+    this.combo += 1;
+    const pts = 50 * Math.min(this.combo, 8);
+    this.score += pts;
+    this.popup(x - 36, y - 48, `POO HITS THE FAN! +${pts}`, COLOR_AMBER, 18);
+    if (this.time.now >= this.nextGlanceAt) {
+      this.glanceFrames = GLANCE_FRAMES;
+      this.nextGlanceAt = this.time.now + GLANCE_COOLDOWN_MS;
+    }
+  }
+
   private popup(x: number, y: number, msg: string, color = COLOR_CREAM, size = 19): void {
     const t = this.add
       .text(x, y, msg, {
@@ -1760,6 +1820,7 @@ export class GameScene extends Phaser.Scene {
         hh: v.collider.hh,
         onHit: (rainbow: boolean, fire: boolean) => this.onVictimHit(v, rainbow, 'gas', fire),
       })),
+      this.pooFans.windFields(),
     );
   }
 

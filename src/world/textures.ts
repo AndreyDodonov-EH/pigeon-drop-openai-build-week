@@ -56,6 +56,7 @@ export function buildTextures(scene: Phaser.Scene): void {
   street(scene);
   shadow(scene);
   lampGlow(scene);
+  headlightBeam(scene);
 }
 
 /** height of the sidewalk band the near buildings stand on */
@@ -494,6 +495,37 @@ function lampGlow(scene: Phaser.Scene): void {
   g.addColorStop(1, 'rgba(255, 170, 70, 0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, S, S);
+  c.refresh();
+}
+
+/** Soft left-facing cone; alpha is strongest at the lamp and feathered at the edges. */
+function headlightBeam(scene: Phaser.Scene): void {
+  const width = 256;
+  const height = 96;
+  const c = scene.textures.createCanvas('headlight-beam', width, height)!;
+  const ctx = c.getContext();
+  const pixels = ctx.createImageData(width, height);
+  const midY = height / 2;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const along = x / (width - 1); // 0 = far edge, 1 = lamp
+      const halfH = 4 + (1 - along) * 39;
+      const across = Math.abs(y + 0.5 - midY) / halfH;
+      if (across >= 1) continue;
+
+      const edge = 1 - across;
+      const distanceFade = Math.pow(along, 0.72);
+      const alpha = Math.round(170 * distanceFade * edge * edge);
+      const i = (y * width + x) * 4;
+      pixels.data[i] = 255;
+      pixels.data[i + 1] = 229;
+      pixels.data[i + 2] = 166;
+      pixels.data[i + 3] = alpha;
+    }
+  }
+
+  ctx.putImageData(pixels, 0, 0);
   c.refresh();
 }
 
