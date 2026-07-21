@@ -20,7 +20,10 @@
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "ffmpeg-static": "^5.3.0",
+    "jsqr": "^1.4.0",
     "playwright": "^1.61.1",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4",
     "reveal.js": "^6.0.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.4"

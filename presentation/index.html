@@ -91,6 +91,26 @@
       @keyframes word-expand {
         to { max-width: 6em; }
       }
+      .play-today {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: var(--codex-muted);
+      }
+      .play-url {
+        font-size: 2.4em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        margin-bottom: 0.5em;
+      }
+      .reveal .qr {
+        width: 260px;
+        height: 260px;
+        margin: 0;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+      }
       .conclusion-question {
         font-size: 1.8em;
         font-weight: 800;
@@ -180,6 +200,13 @@
             <img src="assets/pigeon_wink_open.png" alt="" class="wink-open" />
             <img src="assets/pigeon_wink_closed.png" alt="" class="wink-closed" />
           </div>
+        </section>
+        <section>
+          <div class="fragment fade-in slow-fade">
+            <div class="play-today">Play today at</div>
+            <div class="play-url">pigeondrop.me</div>
+          </div>
+          <img class="qr fragment fade-in slow-fade" src="assets/qr_pigeondrop.svg" alt="QR code for pigeondrop.me" />
         </section>
       </div>
     </div>
