@@ -510,7 +510,11 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setDepth(1.5);
     this.pooFans = new PooFanLayer(this, (x, y) => this.onFanHit(x, y));
-    this.bgNear = new NearBuildingsLayer(this, 2);
+    this.bgNear = new NearBuildingsLayer(this, 2, (placement) => {
+      if (placement.use === 'cafe') {
+        this.pooFans.spawn(placement.x + placement.width + 12);
+      }
+    });
     this.streetTs = this.add
       .tileSprite(0, GROUND_Y - 6, W, H - GROUND_Y + 6, 'street')
       .setOrigin(0, 0)
@@ -592,6 +596,7 @@ export class GameScene extends Phaser.Scene {
       spawnBuilding: (key = 'bg-building-2') => this.bgNear.queueNext(key),
       spawnFan: (x = this.pigeon.x + 20) => this.pooFans.spawn(x),
       fanCount: () => this.pooFans.count,
+      buildingPlan: (count = 12) => this.bgNear.debugPlan(count),
       touchState: () => ({ fly: this.touch.fly, dive: this.touch.dive, poop: this.touch.poop }),
     };
   }
@@ -916,6 +921,8 @@ export class GameScene extends Phaser.Scene {
     this.bgFar.tilePositionX += SCROLL * 0.25 * f;
     this.bgFarLit.tilePositionX = this.bgFar.tilePositionX;
     const nearDx = SCROLL * 0.55 * f;
+    // Move existing fans before the planner creates a new café fan at its
+    // already-updated screen position.
     this.pooFans.update(nearDx, f);
     this.bgNear.update(nearDx);
     this.sidewalkTs.tilePositionX += nearDx;
