@@ -9,8 +9,13 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 
 ## Idea dump (user, 2026-07-17)
 
+**Infra**
+- Add options to start game without title screen for easier AI verification
+- Add other options to start empty and spawn on deman, to make debugging easier both for me and AI
+
 
 **Targets & scoring**
+- "Shit heats the fan": literally place near e.g. caffee a fan, which blows (particles/air distortion), and then blows our poo! 
 - Stationary Objects to dump on, e.g. statues (static targets — presumably score less than moving
   victims, or hold a persistent goo coat).
 - Higher-altitude targets: rooftop party.
@@ -24,7 +29,6 @@ Future ideas and agreed-but-unbuilt work. Shipped features move to `CHANGELOG.md
 **Pooping**
 - ~~combine pooping (e.g. gas (pea pod) + rainbow = rainbow gas!)~~ DONE: rainbow gas (pastel hue-cycling clouds, delighted victims, "RAINBOW GAS!" popup); combo logic lives in GasSim/GuanoEffects + src/effects/combos.ts
 - pea pod + chilli - fiery explosion (extend the GuanoStream flags + combos.ts table the same way)
-
 
 
 **Sounds**
