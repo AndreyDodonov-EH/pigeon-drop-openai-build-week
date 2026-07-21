@@ -1,10 +1,31 @@
 ---
 name: deploy-pages
-description: Build the game and redeploy the public demo to GitHub Pages (https://andreydodonov-eh.github.io/pigeon_drop/) by pushing dist to the gh-pages branch. Use whenever the user asks to deploy, redeploy, publish, or update the demo/Pages site.
+description: Build the game and redeploy the public demo — Cloudflare Pages (https://pigeondrop.pages.dev/, custom domain pigeondrop.me) is the primary target; GitHub Pages (https://andreydodonov-eh.github.io/pigeon_drop/) is the legacy mirror. Use whenever the user asks to deploy, redeploy, publish, or update the demo/Pages site.
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
-# Redeploying the demo to GitHub Pages
+# Redeploying the demo
+
+Two targets, each with its own script. When the user just says "deploy",
+deploy to Cloudflare; only touch GitHub Pages when asked for it explicitly
+or asked to update "both".
+
+## Cloudflare Pages (primary — pigeondrop.me)
+
+```bash
+.agents/skills/deploy-pages/deploy-cf.sh
+```
+
+Typechecks, builds with vite's default base `/` (Cloudflare serves from the
+domain root), uploads `dist/` to the `pigeondrop` Pages project via
+`wrangler pages deploy`, and polls https://pigeondrop.pages.dev/ until the
+new bundle hash is live. Uses plain `vite build`, not `npm run build` —
+the npm script also copies GPT Sites scaffolding (`dist/server`,
+`dist/.openai`) that must not be uploaded here. Wrangler auth is a
+persistent OAuth login (`npx wrangler whoami` to check); no commit or push
+is involved — the deploy ships `dist/` directly.
+
+## GitHub Pages (legacy mirror)
 
 The demo is served from the `gh-pages` branch at
 **https://andreydodonov-eh.github.io/pigeon_drop/**. The whole procedure —

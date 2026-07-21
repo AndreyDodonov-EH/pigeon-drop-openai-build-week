@@ -221,19 +221,36 @@ const GLANCE_COOLDOWN_MS = 6000;
 const GLANCE_MIN_COMBO = 3;
 
 // Voiced hit reactions stay a garnish, not a soundtrack: only the loud personalities
-// vocalize (suit guy, granddad, influencer, gym bro; the van keeps its text line), a coin flip
-// thins them further, and one shared cooldown keeps a combo from becoming a chorus.
-const VOCAL_PED_VARIANTS = new Set([0, 2, 3, 5]);
+// vocalize (including the goth, crypto prophet, and professor; the van keeps its text
+// line), a coin flip thins them further, and one shared cooldown keeps a combo from
+// becoming a chorus.
+const VOCAL_PED_VARIANTS = new Set([0, 2, 3, 5, 7, 8, 9]);
 const VOCAL_CAR_VARIANTS = new Set([0, 1]);
 const VICTIM_VOICE_CHANCE = 0.55;
 const VICTIM_VOICE_COOLDOWN_MS = 2500;
 /** voice trails the splat so it reads as a reaction, not part of the impact */
 const VICTIM_VOICE_DELAY_MS = 150;
-// Each vocal ped has its own voice pair (suit guy 0, granddad 2, influencer 3,
-// gym bro 5). Street-level voices sit under the splat — they come from far below the
-// pigeon — and the per-file scalars also even out loudness differences between masters.
-const PED_GRUMBLE_VOLUME: Record<number, number> = { 0: 0.35, 2: 0.45, 3: 0.42, 5: 0.42 };
-const PED_DELIGHT_VOLUME: Record<number, number> = { 0: 0.22, 2: 0.32, 3: 0.25, 5: 0.23 };
+// Each vocal ped has its own voice pair. Street-level voices sit under the splat —
+// they come from far below the pigeon — and the per-file scalars also even out
+// loudness differences between masters.
+const PED_GRUMBLE_VOLUME: Record<number, number> = {
+  0: 0.35,
+  2: 0.45,
+  3: 0.42,
+  5: 0.42,
+  7: 0.3,
+  8: 0.28,
+  9: 0.34,
+};
+const PED_DELIGHT_VOLUME: Record<number, number> = {
+  0: 0.22,
+  2: 0.32,
+  3: 0.25,
+  5: 0.23,
+  7: 0.28,
+  8: 0.2,
+  9: 0.28,
+};
 
 /** cruise line the pigeon starts on (also the altitude it holds hands-off) */
 const START_Y = 150;

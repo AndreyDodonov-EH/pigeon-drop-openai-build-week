@@ -502,3 +502,26 @@ baked spin-blur disc; provenance in ART_LOG). The frames alternate to flicker th
 streaks, the fan now renders at shoulder height (~58 px desktop, ×1.4 mobile), and the
 wind cone/gust streaks emanate from the measured cage-hub point. Gusts were retuned to
 start at the cage and fade downwind instead of popping in mid-flight.
+
+## Expanded victim variety — satirical pedestrians, cars, and voices (2026-07-21)
+
+The street cast grows from seven to ten pedestrians and from three to six cars. New
+pedestrians are deliberately naive, irritating caricatures: a performatively miserable
+baby-goth doomscroller, a delusional crypto-hustle prophet, and an arrogant art professor.
+The new traffic is a luggage-loaded retro station wagon, shabby stretch limousine, and
+battered tow truck. Every design has normal, angry, and rainbow-delighted art with
+character-specific reaction lines.
+
+`VictimPalettePipeline` now carries ten source-art slots (the six cars reuse slots 0–5
+under the existing kind bit). New sampled garment/paint profiles preserve folds, wear,
+glass, skin, props, luggage, chrome, and tow equipment while generating the same eight
+spawn hues across all three moods. Car preload/spawn counts and night-headlight anchors
+were generalized to six variants. Chroma-key, anchor, color-sweep, typecheck, production
+build, and live Phaser QA all pass; no browser errors were observed.
+
+The goth, crypto prophet, and professor also receive individual angry and excited voice
+pairs (`ped-{grumble,delight}-{7,8,9}`), generated as two-take ElevenLabs masters, cut to
+0.48–1.10 s picks, peak-normalized, and shipped as OGG + MP3. Runtime uses the existing
+55% personality roll and shared 2.5 s cooldown, with per-character mix scalars; headless
+trigger QA recorded every new key. Raw alternates remain in `assets/audio-masters/` for
+user audition and revision.
