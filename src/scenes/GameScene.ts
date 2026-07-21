@@ -1,7 +1,17 @@
 import Phaser from 'phaser';
 import type { Collider, Particle } from '../goo/GooSim';
 import { getAlphaMask } from '../goo/alphaMask';
-import { GuanoEffects, preloadGuanoEffects } from '../effects/GuanoEffects';
+import { GuanoEffects } from '../effects/GuanoEffects';
+import {
+  queueGameAssets,
+  PED_VARIANT_COUNT,
+  CAR_VARIANT_COUNT,
+  SKATER_VARIANT,
+  SKATER_STRIDE_POSES,
+  ITEM_PICKUP_KINDS,
+  VOCAL_PED_VARIANTS,
+  type ItemPickupKind,
+} from './gameAssets';
 import { comboOnPickup } from '../effects/combos';
 import {
   ensureVictimPalettePipeline,
@@ -10,11 +20,7 @@ import {
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
 import { buildTextures, W, H, RES, GROUND_Y, SIDEWALK_H, MOBILE } from '../world/textures';
-import {
-  NearBuildingsLayer,
-  BUILDING_SPRITES,
-  CONNECTOR_SPRITES,
-} from '../world/NearBuildings';
+import { NearBuildingsLayer } from '../world/NearBuildings';
 import {
   ensureBuildingPalettePipeline,
   BuildingPalettePipeline,
@@ -29,6 +35,8 @@ import { SFX_VOLUME } from '../audio/mix';
 import { TouchControls, DiveRatchet } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
 import { PauseMenu } from '../ui/PauseMenu';
+import { hideBootSplash } from '../ui/bootSplash';
+import { attachLoadBar } from '../ui/LoadBar';
 import { rankForCombo, type ComboRank } from '../ui/ranks';
 
 const SCROLL = 2.1; // world scroll, px/frame
@@ -55,15 +63,9 @@ const HYDRANT_SCALE = 0.5 * MOBILE_MODEL_BUMP;
 /** texture px from the hydrant's base to its open neck (the jet's origin) */
 const HYDRANT_CAP_H = 92;
 const PICKUP_SCALE = 0.34;
-const PED_VARIANT_COUNT = 10;
-const CAR_VARIANT_COUNT = 6;
-// The inline skater outruns the world scroll: high-value, high-lead target.
-const SKATER_VARIANT = 6;
 const SKATER_BASE_SCORE = 40;
 /** frames per stride pose (~150 ms each across the 4-pose cycle) */
 const SKATER_STRIDE_FRAMES = 9;
-/** texture-key suffixes in cycle order: push -> lift -> glide -> lean-in */
-const SKATER_STRIDE_POSES = ['', '-c', '-b', '-d'];
 const PEDESTRIAN_DEPTH = 5;
 // street furniture (lamps/trees/mailboxes/hydrants) stands at the curb edge,
 // closer to camera than the pedestrians walking against the buildings
@@ -114,8 +116,6 @@ const ASPHALT_SPLAT_COOLDOWN_MS = 420;
 const PICKUP_GRAB_X = 33;
 const PICKUP_GRAB_Y = 30;
 
-const ITEM_PICKUP_KINDS = ['bread', 'fries', 'kebab', 'chilli', 'coffee', 'pea'] as const;
-type ItemPickupKind = (typeof ITEM_PICKUP_KINDS)[number];
 type PickupKind = 'rainbow' | ItemPickupKind;
 
 // Picking things up is the engaging part, and food only nudges the meter, so it
@@ -222,9 +222,8 @@ const GLANCE_MIN_COMBO = 3;
 
 // Voiced hit reactions stay a garnish, not a soundtrack: only the loud personalities
 // vocalize (including the goth, crypto prophet, and professor; the van keeps its text
-// line), a coin flip thins them further, and one shared cooldown keeps a combo from
-// becoming a chorus.
-const VOCAL_PED_VARIANTS = new Set([0, 2, 3, 5, 7, 8, 9]);
+// line — see VOCAL_PED_VARIANTS in gameAssets.ts), a coin flip thins them further,
+// and one shared cooldown keeps a combo from becoming a chorus.
 const VOCAL_CAR_VARIANTS = new Set([0, 1]);
 const VICTIM_VOICE_CHANCE = 0.55;
 const VICTIM_VOICE_COOLDOWN_MS = 2500;
@@ -385,109 +384,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    preloadGuanoEffects(this);
-    this.load.audio('music-sneaky', ['assets/audio/music-sneaky.ogg', 'assets/audio/music-sneaky.mp3']);
-    this.load.audio('music-klezmer', ['assets/audio/music-klezmer.ogg', 'assets/audio/music-klezmer.mp3']);
-    this.load.audio('sfx-splat-ped', ['assets/audio/splat.ogg', 'assets/audio/splat.mp3']);
-    this.load.audio('sfx-splat-car', ['assets/audio/splat-car.ogg', 'assets/audio/splat-car.mp3']);
-    this.load.audio('sfx-splat-asphalt', [
-      'assets/audio/splat-asphalt.ogg',
-      'assets/audio/splat-asphalt.mp3',
-    ]);
-    this.load.audio('sfx-hydrant-clank', [
-      'assets/audio/hydrant-clank.ogg',
-      'assets/audio/hydrant-clank.mp3',
-    ]);
-    this.load.audio('sfx-hydrant-jet-loop', [
-      'assets/audio/hydrant-jet-loop.ogg',
-      'assets/audio/hydrant-jet-loop.mp3',
-    ]);
-    this.load.audio('sfx-splash-hydrant', [
-      'assets/audio/splash-hydrant.ogg',
-      'assets/audio/splash-hydrant.mp3',
-    ]);
-    this.load.audio('sfx-koo-irritated', [
-      'assets/audio/koo-irritated.ogg',
-      'assets/audio/koo-irritated.mp3',
-    ]);
-    this.load.audio('sfx-belly-rumble', [
-      'assets/audio/belly-rumble.ogg',
-      'assets/audio/belly-rumble.mp3',
-    ]);
-    for (const i of VOCAL_PED_VARIANTS) {
-      this.load.audio(`sfx-ped-grumble-${i}`, [
-        `assets/audio/ped-grumble-${i}.ogg`,
-        `assets/audio/ped-grumble-${i}.mp3`,
-      ]);
-      this.load.audio(`sfx-ped-delight-${i}`, [
-        `assets/audio/ped-delight-${i}.ogg`,
-        `assets/audio/ped-delight-${i}.mp3`,
-      ]);
-    }
-    this.load.audio('sfx-car-honk-angry', [
-      'assets/audio/car-honk-angry.ogg',
-      'assets/audio/car-honk-angry.mp3',
-    ]);
-    this.load.audio('sfx-car-honk-happy', [
-      'assets/audio/car-honk-happy.ogg',
-      'assets/audio/car-honk-happy.mp3',
-    ]);
-    this.load.image('portrait-ready', 'assets/portraits/ready.png');
-    this.load.image('portrait-damage', 'assets/portraits/damage.png');
-    this.load.image('portrait-strain', 'assets/portraits/strain.png');
-    this.load.image('portrait-pleased', 'assets/portraits/pleased.png');
-    this.load.image('portrait-panic', 'assets/portraits/panic.png');
-    this.load.image('portrait-hungry', 'assets/portraits/hungry.png');
-    this.load.image('tap-hand', 'assets/ui/tap-hand.png');
-    this.load.image('drag-hand', 'assets/ui/drag-hand.png');
-    this.load.image('pigeon-f0', 'assets/sprites/pigeon-f0.png');
-    this.load.image('pigeon-f1', 'assets/sprites/pigeon-f1.png');
-    this.load.image('pigeon-f2', 'assets/sprites/pigeon-f2.png');
-    this.load.image('pigeon-look-f0', 'assets/sprites/pigeon-look-f0.png');
-    this.load.image('pigeon-look-f1', 'assets/sprites/pigeon-look-f1.png');
-    this.load.image('pigeon-look-f2', 'assets/sprites/pigeon-look-f2.png');
-    for (let i = 0; i < CAR_VARIANT_COUNT; i++) {
-      this.load.image(`car-${i}`, `assets/sprites/car-${i}.png`);
-      this.load.image(`car-${i}-r`, `assets/sprites/car-${i}-r.png`);
-      this.load.image(`car-${i}-rainbow`, `assets/sprites/car-${i}-rainbow.png`);
-    }
-    for (let i = 0; i < PED_VARIANT_COUNT; i++) {
-      this.load.image(`ped-${i}`, `assets/sprites/ped-${i}.png`);
-      this.load.image(`ped-${i}-r`, `assets/sprites/ped-${i}-r.png`);
-      this.load.image(`ped-${i}-rainbow`, `assets/sprites/ped-${i}-rainbow.png`);
-    }
-    // extra stride poses; the skater runs a 4-frame leg cycle instead of bobbing
-    for (const suffix of SKATER_STRIDE_POSES.slice(1)) {
-      this.load.image(
-        `ped-${SKATER_VARIANT}${suffix}`,
-        `assets/sprites/ped-${SKATER_VARIANT}${suffix}.png`,
-      );
-    }
-    for (const key of [...BUILDING_SPRITES, ...CONNECTOR_SPRITES]) {
-      this.load.image(key, `assets/sprites/${key}.png`);
-    }
-    // emissive café windows, ADD-blended over the facade after dark
-    this.load.image('bg-building-2-lit', 'assets/sprites/bg-building-2-lit.png');
-    for (let i = 0; i < 3; i++) {
-      this.load.image(`bg-cloud-${i}`, `assets/sprites/bg-cloud-${i}.png`);
-    }
-    this.load.image('bg-lamp', 'assets/sprites/bg-lamp.png');
-    this.load.image('bg-tree', 'assets/sprites/bg-tree.png');
-    this.load.image('bg-mailbox', 'assets/sprites/bg-mailbox.png');
-    this.load.image('hydrant-0', 'assets/sprites/hydrant-0.png');
-    this.load.image('hydrant-1', 'assets/sprites/hydrant-1.png');
-    this.load.image('prop-fan-f0', 'assets/sprites/prop-fan-f0.png');
-    this.load.image('prop-fan-f1', 'assets/sprites/prop-fan-f1.png');
-    this.load.image('water-col', 'assets/sprites/water-col.png');
-    this.load.image('water-crown', 'assets/sprites/water-crown.png');
-    this.load.image('pickup-rainbow', 'assets/sprites/pickup-rainbow.png');
-    for (const kind of ITEM_PICKUP_KINDS) {
-      if (kind === 'pea') {
-        this.load.image('pickup-pea-0', 'assets/sprites/pickup-pea-0.png');
-        this.load.image('pickup-pea-1', 'assets/sprites/pickup-pea-1.png');
-      } else {
-        this.load.image(`pickup-${kind}`, `assets/sprites/pickup-${kind}.png`);
-      }
+    hideBootSplash();
+    queueGameAssets(this);
+    // after the title screen's background load these are usually all cached
+    // (the loader skips cached keys) — only draw a bar when files remain,
+    // i.e. the player tapped before the download finished or skipped the title
+    if (this.load.list.size > 0) {
+      // sized in raw canvas pixels: the RES zoom is only applied in create()
+      const cw = this.scale.width;
+      const ch = this.scale.height;
+      attachLoadBar(this, {
+        cx: cw / 2,
+        y: Math.round(ch * 0.52),
+        width: Math.round(cw * 0.34),
+        height: Math.max(8, Math.round(ch * 0.016)),
+        fontSize: Math.round(ch * 0.035),
+      });
     }
   }
 

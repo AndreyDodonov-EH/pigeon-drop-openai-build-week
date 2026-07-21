@@ -61,10 +61,50 @@
           display: flex;
         }
       }
+      /* pure-CSS splash so something moves while the JS bundle and title art
+         download; removed by hideBootSplash() once a scene starts drawing */
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: #14161f;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+      #boot-splash span {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #f3ead8;
+        animation: boot-bob 1s infinite ease-in-out;
+      }
+      #boot-splash span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      #boot-splash span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes boot-bob {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.45;
+        }
+        30% {
+          transform: translateY(-10px);
+          opacity: 1;
+        }
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="boot-splash"><span></span><span></span><span></span></div>
     <div id="rotate-overlay">
       <div>
         <span class="icon">&#8635;</span><br />

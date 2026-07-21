@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { W, H, RES } from '../world/textures';
 import { isTouchDevice } from '../input/TouchControls';
 import { requestFullscreen, lockLandscapeOnFullscreen } from '../input/fullscreen';
+import { hideBootSplash } from '../ui/bootSplash';
+import { attachLoadBar } from '../ui/LoadBar';
+import { queueGameAssets } from './gameAssets';
 import { t } from '../i18n';
 
 const COLOR_CREAM = '#f3ead8';
@@ -64,6 +67,7 @@ export class TitleScene extends Phaser.Scene {
       this.scene.start('game');
       return;
     }
+    hideBootSplash();
     // canvas is RES× the design space — zoom so world coords stay 540-tall
     this.cameras.main.setZoom(RES).centerOn(W / 2, H / 2);
 
@@ -115,6 +119,25 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(3);
     this.tweens.add({ targets: this.prompt, alpha: 0.35, duration: 700, yoyo: true, repeat: -1 });
+
+    // the game's full sprite/audio manifest downloads in the background while
+    // the player looks at the key art — by the time they tap, GameScene's
+    // preload usually finds everything cached and the transition is instant.
+    // Tapping early is fine: this loader dies with the scene and GameScene's
+    // own bar picks up whatever is left.
+    queueGameAssets(this);
+    if (this.load.list.size > 0) {
+      attachLoadBar(this, {
+        cx: W / 2,
+        y: H * 0.945,
+        width: W * 0.24,
+        height: 5,
+        fontSize: 0, // bar only — a percent readout would fight the key art
+        depth: 3,
+        fadeOutMs: 400,
+      });
+      this.load.start();
+    }
 
     this.cameras.main.fadeIn(500, 0, 0, 0);
     lockLandscapeOnFullscreen(this);
