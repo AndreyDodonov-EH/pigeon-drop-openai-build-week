@@ -1,3 +1,19 @@
 [mcp_servers.agy]
 command = "node"
 args = ["scripts/agy-mcp.mjs"]
+
+[mcp_servers.codex]
+command = "codex"
+args = [
+    "mcp-server",
+    "-c",
+    'model="gpt-5.6-sol"',
+    "-c",
+    'model_reasoning_effort="high"',
+]
+
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+MCP_TOOL_TIMEOUT = "600000"

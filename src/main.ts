@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
 import { TitleScene } from './scenes/TitleScene';
-import { W, H } from './world/textures';
+import { W, H, RES } from './world/textures';
 
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
   parent: 'game',
-  width: W,
-  height: H,
+  width: Math.round(W * RES),
+  height: Math.round(H * RES),
   backgroundColor: '#14161f',
   scale: {
     mode: Phaser.Scale.FIT,

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { W, H } from '../world/textures';
+import { W, H, RES } from '../world/textures';
 import { isTouchDevice } from '../input/TouchControls';
 import { requestFullscreen, lockLandscapeOnFullscreen } from '../input/fullscreen';
 import { t } from '../i18n';
@@ -55,6 +55,9 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    // canvas is RES× the design space — zoom so world coords stay 540-tall
+    this.cameras.main.setZoom(RES).centerOn(W / 2, H / 2);
+
     // key art fills the frame edge-to-edge; the source is cut wider than
     // the widest supported aspect so it always covers without letterboxing
     const bg = this.add.image(W / 2, H / 2, 'title-bg').setDepth(0);
@@ -84,6 +87,7 @@ export class TitleScene extends Phaser.Scene {
         fontStyle: 'italic',
         fontSize: `${Math.round(H * 0.03)}px`,
         color: '#000000',
+        resolution: RES,
       })
       .setOrigin(0.5)
       .setDepth(3)
@@ -97,6 +101,7 @@ export class TitleScene extends Phaser.Scene {
         color: COLOR_CREAM,
         stroke: COLOR_INK,
         strokeThickness: 5,
+        resolution: RES,
       })
       .setOrigin(0.5)
       .setDepth(3);

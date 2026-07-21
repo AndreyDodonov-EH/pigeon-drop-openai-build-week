@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { W, H } from '../world/textures';
+import { W, H, RES } from '../world/textures';
 import { isTouchDevice } from '../input/TouchControls';
 import { t } from '../i18n';
 
@@ -62,7 +62,12 @@ export class FirstRunWizard {
 
   private text(x: number, y: number, str: string, size: number, alpha = 1): Phaser.GameObjects.Text {
     const t = this.scene.add
-      .text(x, y, str, { fontFamily: 'monospace', fontSize: `${size}px`, color: CREAM })
+      .text(x, y, str, {
+        fontFamily: 'monospace',
+        fontSize: `${size}px`,
+        color: CREAM,
+        resolution: RES,
+      })
       .setOrigin(0.5)
       .setDepth(DEPTH)
       .setAlpha(alpha);

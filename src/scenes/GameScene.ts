@@ -9,7 +9,7 @@ import {
   VictimPalettePipeline,
   VICTIM_PALETTE_PIPELINE,
 } from '../victims/VictimPalettePipeline';
-import { buildTextures, W, H, GROUND_Y, SIDEWALK_H, MOBILE } from '../world/textures';
+import { buildTextures, W, H, RES, GROUND_Y, SIDEWALK_H, MOBILE } from '../world/textures';
 import {
   NearBuildingsLayer,
   BUILDING_SPRITES,
@@ -454,6 +454,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    // canvas is RES× the design space — zoom so world coords stay 540-tall
+    this.cameras.main.setZoom(RES).centerOn(W / 2, H / 2);
+
     buildTextures(this);
     ensureVictimPalettePipeline(this);
     ensureBuildingPalettePipeline(this);
@@ -599,6 +602,7 @@ export class GameScene extends Phaser.Scene {
         color: rank.color,
         stroke: COLOR_INK,
         strokeThickness: 7,
+        resolution: RES,
       })
       .setOrigin(0.5)
       .setDepth(15)
@@ -686,6 +690,7 @@ export class GameScene extends Phaser.Scene {
         color: COLOR_CREAM,
         stroke: COLOR_INK,
         strokeThickness: 6,
+        resolution: RES,
       })
       .setOrigin(1, 0)
       .setDepth(10);
@@ -696,6 +701,7 @@ export class GameScene extends Phaser.Scene {
         color: COLOR_AMBER,
         stroke: COLOR_INK,
         strokeThickness: 4,
+        resolution: RES,
       })
       .setOrigin(1, 0)
       .setDepth(10);
@@ -707,6 +713,7 @@ export class GameScene extends Phaser.Scene {
           fontFamily: 'monospace',
           fontSize: '13px',
           color: COLOR_CREAM,
+          resolution: RES,
         })
         .setDepth(10)
         .setAlpha(0.75);
@@ -732,13 +739,14 @@ export class GameScene extends Phaser.Scene {
       if (p.button === 2) this.pointerPoop = true;
       else if (p.button === 0) {
         this.pointerFly = true;
-        this.mouseRatchet.begin(p.y);
+        // pointer coords are canvas pixels; the ratchet works in 540-space
+        this.mouseRatchet.begin(p.y / RES);
       }
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       // leftButtonDown gate also keeps debug SP.setFly() holds ratchet-free
       if (p.wasTouch || !p.leftButtonDown() || !(this.pointerFly || this.pointerDive)) return;
-      this.mouseRatchet.move(p.y);
+      this.mouseRatchet.move(p.y / RES);
       this.pointerDive = this.mouseRatchet.dive;
       this.pointerFly = !this.pointerDive;
     });
@@ -796,6 +804,7 @@ export class GameScene extends Phaser.Scene {
         color: COLOR_CREAM,
         stroke: COLOR_INK,
         strokeThickness: 3,
+        resolution: RES,
       })
       .setDepth(20);
 
@@ -813,6 +822,7 @@ export class GameScene extends Phaser.Scene {
           fontFamily: 'monospace',
           fontSize: '10px',
           color: COLOR_CREAM,
+          resolution: RES,
         })
         .setOrigin(0.5)
         .setDepth(21);
@@ -1658,6 +1668,7 @@ export class GameScene extends Phaser.Scene {
         color,
         stroke: COLOR_INK,
         strokeThickness: 5,
+        resolution: RES,
       })
       .setOrigin(0.5)
       .setDepth(9);
