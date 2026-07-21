@@ -3,6 +3,44 @@
 Reuse these exact prompts (with the listed reference attachments) when regenerating or
 extending a set — consistency depends on it.
 
+## assets/masters/bg-building-{8,9,10}-master.png → public/assets/sprites/bg-building-{8,9,10}.png — 2026-07-21
+
+- **Sources inspected:** the three supplied masters at original resolution;
+  `assets/masters/bg-buildings-sheet.png` and `assets/masters/bg-buildings-sheet-2.png`
+  for the existing facade family's silhouette, outline, lighting, detail density,
+  runtime height, and transparent-baseline conventions; and
+  `src/world/BuildingPalettePipeline.ts` for the saturated-material repaint contract.
+- **Source provenance:** the three generated RGB masters were supplied in git commit
+  `9b956a3` (`Master images for gym, boutique and sitting peds`, 2026-07-20).
+  Their original generation tool, model, references, and prompt were not recorded, so
+  no generation prompt is available to reproduce here. The masters remain byte-for-byte
+  untouched with SHA-256 values `5edcd81e3f01821ae838f5f2d714cc9cf8126a16fcdf7d21d8ac0d05cd9be860`
+  (8), `ad8842b9d3fd6220c5c548e3def0da382fe7ba0a2917a0ef21341eac972ede32`
+  (9), and `fdcc97683cc4fc3ed2e5f060d790edb47ecdbe9691cb2320f5075db8f14f75c7`
+  (10).
+- **Semantics:** 8 = tall brick-and-blue neighborhood gym; 9 = shorter
+  blue-and-coral gym; 10 = pink-awning fashion boutique. All are standalone
+  `shop` facades and retain their generated right-facing three-quarter perspective.
+- **Post-processing:** each master was keyed with ImageMagick 6 using
+  `-fuzz 15% -transparent '#ff00ff' -channel A -morphology Erode Disk:1 +channel`,
+  trimmed to the alpha bounds, proportionally resized to content heights 452 / 372 /
+  392 px, and given a 4 px transparent border. A targeted alpha expression removed
+  only residual connected-key fringe pixels where `r>0.86`, `g<0.24`, `b>0.78`, and
+  `a<0.08`; the opaque pink boutique art remains intact. Separate runtime copies were
+  compressed with `pngquant --force --output ... 256`.
+- **Outputs and QA:** shipping sizes are 334×460, 334×380, and 352×400. Slate
+  composites are `assets/masters/bg-building-{8,9,10}-qa.png`. Every shipping
+  corner alpha is zero and every sprite has zero nontransparent pixels within a
+  ±10% per-channel cube around `#ff00ff`. The broad brick, blue plaster, coral trim,
+  pale-pink wall, and awning regions remain available to the shared building palette
+  shader for per-instance hue/brightness variation.
+- **Runtime QA:** inspected all three sprites in the live Phaser scene at the planner's
+  sidewalk baseline and gameplay scale, then rendered building 9 three times through
+  `BuildingPalettePipeline` at hue controls -1 / 0 / +1. The facade produced clearly
+  distinct teal/pink, blue/coral, and purple/lime paint schemes while outlines, dark
+  window frames, and neutral stone remained stable. The browser reported no console or
+  page errors.
+
 ## assets/masters/bg-building-2-lit.png → public/assets/sprites/bg-building-2-lit.png — 2026-07-19
 
 - **Source inspected:** `public/assets/sprites/bg-building-2.png` (281×359 palettized PNG; converted to RGBA before processing)
