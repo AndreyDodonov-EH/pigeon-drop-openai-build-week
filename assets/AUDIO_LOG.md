@@ -308,3 +308,68 @@ Dragon-breath detonation (chilli + pea combo completion) one-shot.
   with a whoosh of flame, short and snappy`. v0 chosen for the single clean impact
   with smooth decay; `boom-v1` (secondary rumble bumps in the tail, risks reading as
   multiple events) kept as spare. Played at 0.7 × SFX_VOLUME in `GameScene.detonate`.
+
+## public/assets/audio/ped-{grumble,delight}-{7,8,9}.{ogg,mp3} — satirical cast voices — 2026-07-21
+
+Character-specific angry and rainbow-delighted reactions for the baby-goth
+doomscroller (7), crypto-hustle prophet (8), and arrogant art professor (9). Generated
+with ElevenLabs text-to-sound-effects through `tools/audio.mjs`, two variants per
+reaction at prompt influence 0.7. Every raw MP3 master and spectrogram is retained in
+`assets/audio-masters/`; shipped copies were edge-trimmed, peak-normalized to -1 dB,
+and encoded mono as OGG + MP3. Runtime uses the shared 55% voice chance / 2.5 s global
+cooldown and per-file volume scalars in `GameScene`.
+
+- **ped-grumble-7** (goth angry, 0.62 s shipped) — `ped-grumble-7-v1.mp3`, cut to
+  0.90 s with a 100 ms exit fade before standard shipping. Chosen for the rising,
+  character-breaking shriek contour; v0 is the denser, harsher three-second sustained
+  alternate. Prompt: `cartoon videogame character voice: one very short theatrical
+  offended shriek from a performatively gloomy baby-goth young adult woman whose cool
+  bored persona suddenly cracks after being splatted from above, a natural human female
+  voice actor making one sharp indignant gasp-yelp, organic and expressive, comedic,
+  under one second, one vocal burst only, no words, no repeats, no long tail, no silence,
+  no music, no sound effects`
+- **ped-grumble-8** (crypto angry, 1.00 s shipped) — `ped-grumble-8-v0.mp3` shipped
+  whole after edge trim; its two compact lobes read visually as one incredulous
+  hey-what phrase. v1 is a two-second three-event alternate. Prompt: `cartoon videogame
+  character voice: one very short nasal indignant yelp from an irritating smug
+  crypto-hustle young adult man whose absolute confidence suddenly collapses after
+  being splatted from above, a natural human male voice actor barking one incredulous
+  hey-what style complaint, organic and expressive, comedic, under one second, one
+  vocal burst only, no repeats, no long tail, no silence, no music, no sound effects`
+- **ped-grumble-9** (professor angry, 1.00 s shipped) — `ped-grumble-9-v0.mp3` shipped
+  whole after edge trim; compact two-part protest with a stronger elderly-theatrical
+  body than v1, whose two seconds contain multiple separated phrases. Prompt: `cartoon
+  videogame character voice: one very short pompous outraged bark from an arrogant
+  elderly art professor splatted from above, a natural elderly human male voice actor
+  exclaiming one clipped scandalized outrageous-style protest, cultured and theatrical
+  but not a specific accent, organic and expressive, comedic, under one second, one
+  vocal burst only, no repeats, no long tail, no silence, no music, no sound effects`
+- **ped-delight-7** (goth excited, 0.48 s shipped) — `ped-delight-7-v1.mp3` shipped
+  whole; one compact rising squeal with a clean decay. v0 is a one-second four-event
+  squeal/laugh alternate. Prompt: `cartoon videogame character voice: one very short
+  surprised delighted squeal-laugh from a performatively gloomy baby-goth young woman
+  accidentally breaking character and loving a magical rainbow splat, natural human
+  female voice actor, bright embarrassed joyful gasp and tiny laugh, organic, comedic,
+  under one second, one vocal burst, no words, repeats, long tail, silence, music, or
+  effects`
+- **ped-delight-8** (crypto excited, 1.10 s shipped) — `ped-delight-8-v0.mp3`, first
+  1.10 s with a 100 ms exit fade. Chosen for one strong rising victory whoop; v1 is a
+  busier two-second multi-syllable alternate. Prompt: `cartoon videogame character
+  voice: one very short manic cocky victory cheer from an irritating smug crypto-hustle
+  young adult man who thinks a magical rainbow splat proves he is a genius, a natural
+  human male voice actor giving one exuberant bullish woo-hoo style whoop, organic and
+  expressive, comedic, under one second, one compact vocal burst only, no repeats, no
+  long tail, no silence, no music, no sound effects`
+- **ped-delight-9** (professor excited, 1.08 s shipped) — `ped-delight-9-v1.mp3`, first
+  1.10 s with a 100 ms exit fade, retaining a short four-pulse cultured cackle. v0 is
+  the denser, longer seven-pulse alternate. Prompt: `cartoon videogame character voice:
+  one very short delighted cultured cackle from an arrogant elderly art professor who
+  declares a magical rainbow splat a masterpiece, a natural elderly human male voice
+  actor giving one theatrical self-satisfied ah-ha laugh, organic and expressive,
+  comedic, under one second, one compact vocal burst only, no repeats, no long tail, no
+  silence, no music, no sound effects`
+
+Spectrogram QA found no weak picks (all shipped peaks normalized to 0 dB), no long
+mid-file silence, and durations of 0.48–1.10 s keep the reaction on screen. Headless
+Phaser trigger QA recorded all six expected keys with no browser errors:
+`sfx-ped-{grumble,delight}-{7,8,9}`. User ear acceptance remains final.

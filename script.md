@@ -1,12 +1,12 @@
 [Showing accordingly big "10 YEARS" on the screen, fade in]
 10 years ago I had an idea for a game.
 [Showing underneath big "5 DAYS" on the screen, fade in]
-Now, it turned out to be 5 days of doing.
+This week, it turned out to be 5 days of doing.
 [5 seconds of game play]
 [Next slide - big "HOW?" in the middle]
 But how?
 [Showing "Before" and then the list of people who we would need]
-Before, even for a small prototype we needed several months and several people:
+Before, even for a small game several months and several people were needed:
 -concept artist
 -developer
 -designer

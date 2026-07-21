@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pigeon Drop — Build. With Codex.</title>
+    <link rel="stylesheet" href="../node_modules/reveal.js/dist/reset.css" />
+    <link rel="stylesheet" href="../node_modules/reveal.js/dist/reveal.css" />
+    <link rel="stylesheet" href="../node_modules/reveal.js/dist/theme/white.css" />
+    <link rel="stylesheet" href="../node_modules/@fontsource/inter/400.css" />
+    <link rel="stylesheet" href="../node_modules/@fontsource/inter/600.css" />
+    <link rel="stylesheet" href="../node_modules/@fontsource/inter/800.css" />
+    <link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/400.css" />
+    <style>
+      /* Codex Light: warm paper surface, near-black ink, mono terminal accents */
+      :root {
+        --codex-paper: #f6f4ee;
+        --codex-ink: #101010;
+        --codex-muted: #8a857c;
+        --r-background-color: var(--codex-paper);
+        --r-main-color: var(--codex-ink);
+        --r-heading-color: var(--codex-ink);
+        --r-main-font: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+        --r-heading-font: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+        --r-code-font: 'JetBrains Mono', ui-monospace, monospace;
+      }
+      .big-statement {
+        font-size: 4em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0.3em 0;
+        white-space: nowrap;
+      }
+      .fragment.slow-fade {
+        transition-duration: 1.5s;
+      }
+      /* Blinking terminal cursor — the Codex signature.
+         Absolutely positioned so it doesn't shift the centered text. */
+      .big-statement {
+        position: relative;
+      }
+      .cursor {
+        position: absolute;
+        width: 0.5em;
+        height: 0.72em;
+        margin-left: 0.12em;
+        bottom: 0.28em;
+        background: var(--codex-ink);
+        animation: blink 1.1s steps(1) infinite;
+      }
+      @keyframes blink {
+        50% { opacity: 0; }
+      }
+      .section-label {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: var(--codex-muted);
+        margin-bottom: 1.2em;
+      }
+      .reveal .role-list {
+        list-style: none;
+        display: inline-block;
+        margin: 0;
+        text-align: left;
+        font-family: var(--r-code-font);
+        font-size: 0.95em;
+        line-height: 1.9;
+      }
+      .role-list li::before {
+        content: '- ';
+        color: var(--codex-muted);
+      }
+      .before-codex {
+        font-size: 1.8em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-top: 1em;
+        white-space: nowrap;
+      }
+      /* "BC" expands into "Before Codex": hidden letters grow out of B and C */
+      .bc-expand .ex {
+        display: inline-block;
+        max-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        vertical-align: bottom;
+      }
+      .bc-expand.visible .ex {
+        animation: word-expand 1.4s ease-in-out 1s forwards;
+      }
+      @keyframes word-expand {
+        to { max-width: 6em; }
+      }
+      .conclusion-question {
+        font-size: 1.8em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+      }
+      /* Final slide: left-anchored typing inside a centered box sized to the full line */
+      .typing-line {
+        display: inline-block;
+        text-align: left;
+        font-size: 3em;
+      }
+      .cursor-inline {
+        position: static;
+        display: inline-block;
+        vertical-align: baseline;
+        height: 0.72em;
+        transform: translateY(0.04em);
+      }
+      /* Full-height slide so the pigeon can anchor to the real corner */
+      .reveal .slides section#build-slide.present {
+        display: flex !important;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      .wink-pigeon {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        width: 150px;
+        height: 150px;
+        opacity: 0;
+        transition: opacity 1s ease;
+      }
+      .wink-pigeon.show {
+        opacity: 1;
+      }
+      .wink-pigeon img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .wink-pigeon .wink-closed {
+        opacity: 0;
+      }
+      .wink-pigeon.show .wink-closed {
+        animation: wink-blink 4s linear 0.4s infinite;
+      }
+      @keyframes wink-blink {
+        0%, 3% { opacity: 0; }
+        5%, 11% { opacity: 1; }
+        13%, 100% { opacity: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section>
+          <div class="big-statement fragment fade-in slow-fade">10 YEARS</div>
+          <div class="big-statement fragment fade-in slow-fade">1 WEEK<span class="cursor"></span></div>
+        </section>
+        <section>
+          <div class="big-statement">HOW?</div>
+        </section>
+        <section>
+          <div class="section-label">Before, even for a small prototype:</div>
+          <ul class="role-list">
+            <li class="fragment fade-in">concept artist</li>
+            <li class="fragment fade-in">developer</li>
+            <li class="fragment fade-in">designer</li>
+            <li class="fragment fade-in">animator</li>
+          </ul>
+          <div class="before-codex">
+            <span class="fragment fade-in slow-fade">Before.&nbsp;</span><span class="fragment fade-in bc-expand">B<span class="ex">efore&nbsp;</span>C<span class="ex">odex</span>.</span>
+          </div>
+        </section>
+        <section>
+          <div class="conclusion-question fragment fade-in slow-fade">What&rsquo;s the conclusion?</div>
+        </section>
+        <section id="build-slide">
+          <div class="big-statement typing-line"><span id="typed"></span><span class="cursor cursor-inline"></span></div>
+          <div class="wink-pigeon" id="wink-pigeon">
+            <img src="assets/pigeon_wink_open.png" alt="" class="wink-open" />
+            <img src="assets/pigeon_wink_closed.png" alt="" class="wink-closed" />
+          </div>
+        </section>
+      </div>
+    </div>
+    <script type="module">
+      import Reveal from '../node_modules/reveal.js/dist/reveal.mjs';
+
+      const deck = new Reveal({
+        hash: true,
+        transition: 'fade',
+        controls: false,
+        progress: false,
+      });
+
+      // Final slide: type "Build." … pause … " With Codex.", then the pigeon winks
+      const typedEl = document.getElementById('typed');
+      const winkPigeon = document.getElementById('wink-pigeon');
+      const typingLine = document.querySelector('.typing-line');
+      const FULL_LINE = 'Build. With Codex.';
+      let typingToken = 0;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      function hideWinkInstantly() {
+        winkPigeon.style.transition = 'none';
+        winkPigeon.classList.remove('show');
+        void winkPigeon.offsetWidth;
+        winkPigeon.style.transition = '';
+      }
+
+      async function typeBuildLine() {
+        const token = ++typingToken;
+        hideWinkInstantly();
+        // Pre-measure the finished line so typing stays left-anchored in a centered box
+        typedEl.textContent = FULL_LINE;
+        typingLine.style.minWidth = typedEl.offsetWidth + 'px';
+        typedEl.textContent = '';
+        const type = async (s) => {
+          for (const ch of s) {
+            if (token !== typingToken) return false;
+            typedEl.textContent += ch;
+            await sleep(ch === ' ' ? 150 : 110);
+          }
+          return true;
+        };
+        await sleep(800);
+        if (!(await type('Build.'))) return;
+        await sleep(1200);
+        if (!(await type(' With Codex.'))) return;
+        await sleep(500);
+        if (token === typingToken) winkPigeon.classList.add('show');
+      }
+
+      const onSlide = (slide) => {
+        if (slide && slide.id === 'build-slide') {
+          typeBuildLine();
+        } else {
+          typingToken++;
+          hideWinkInstantly();
+        }
+      };
+      deck.on('ready', (e) => onSlide(e.currentSlide));
+      deck.on('slidechanged', (e) => onSlide(e.currentSlide));
+
+      deck.initialize();
+    </script>
+  </body>
+</html>

@@ -85,6 +85,11 @@ use), `?lang=<code>`, `?res=<n>`.
 **Then Read the screenshot and actually look at it.** A blank frame is a launch
 failure, not a pass.
 
+For motion (not just a still): Playwright can record the page as webm
+(`newPage({ recordVideo: { dir } })` + `page.video().path()` after close), and
+system `ffmpeg`/`ffprobe` are installed for converting to mp4/gif or grabbing
+frames.
+
 Harmless noise to ignore: `GL Driver Message ... ReadPixels` WebGL stall
 warnings on screenshot.
 

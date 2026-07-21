@@ -1233,3 +1233,205 @@ extending a set — consistency depends on it.
   > Identity invariants: cartoon; thick clean dark outlines; painterly cel shading; slate-blue pigeon; orange eye; purple eye patches; scruffy black brows; iridescent green-to-purple neck feathers; raunchy/absurdist tone.
   >
   > Output: exactly one square PNG portrait, 1024×1024-class. This is the untouched master source for assets/masters/portrait_wink_closed.png.
+
+## Victim expansion: ped-{7,8,9} and car-{3,4,5}, three moods each — 2026-07-21
+
+- **Purpose/panel semantics:** three new satirical pedestrians and three new vehicles,
+  each with normal, angry (`-r`), and rainbow-delighted (`-rainbow`) states. Peds are
+  7 = performative baby-goth doomscroller, 8 = delusional crypto-hustle prophet,
+  9 = arrogant art professor. Cars are 3 = olive station wagon with roof luggage,
+  4 = dusty-purple stretch limousine, 5 = burnt-orange tow truck. All face left.
+- **Tool:** Codex built-in `image_gen`; model identifier was not exposed. The first
+  pedestrian concept (courier/nurse/professor) was rejected after user review because
+  the first two were sympathetic realistic workers rather than naive, irritating
+  satire. Only the accepted revised masters are retained in the workspace.
+- **References inspected:** `assets/masters/pedestrians-sheet-2.png` and its angry and
+  rainbow companions for pedestrian family style, scale, left-facing geometry, pose
+  energy, baseline, and recolorable garment contract; `assets/masters/cars-sheet.png`,
+  `assets/masters/cars-react-sheet.png`, and the shipped 3×3 car-state contact sheet for
+  vehicle family style, common wheel baseline, driver-only mood changes, and immutable
+  body geometry. Reference subjects were explicitly excluded.
+- **Untouched masters/SHA-256:** `pedestrians-sheet-3.png` 1774×887,
+  `9166300cfaca8e44162d599d41851336dfc56388bf3c7d2e3febec88c04754bc`;
+  `pedestrians-react-sheet-3.png` 1774×887,
+  `a506a993c8df68e0ad9fc528e7c4fc202e414779709efa4d2b075a952081aeaf`;
+  `pedestrians-rainbow-sheet-3.png` 1774×887,
+  `5eece688310778949d7fc01ccd8f047c37c5759a0ac37eb023897fc92aff574a`;
+  `cars-sheet-2.png` 1983×793,
+  `f4a23d117cef2cda27f6f7e49f4c4be2f39de66b12c841de02b76740d6cdd21a`;
+  `cars-react-sheet-2.png` 1983×793,
+  `b68a7a10ed90c20dc04873d4e8abe6570b6ef939f622df40132f05c7e4dc1b4e`;
+  `cars-rainbow-sheet-2.png` 1983×793,
+  `8a45276a680e81b4d009d83bbea1324ae6e3685b7979f7981eeedee62796a92a`.
+- **Post-processing:** reproducible `scripts/process-victim-sheet.py`. Every complete
+  sheet was keyed before splitting with ImageMagick 6 (`-fuzz N% -transparent
+  '#ff00ff' -channel A -morphology Erode Disk:1 +channel`), sanitized to zero RGB under
+  transparent pixels, split at content-safe gaps, alpha-trimmed, uniformly Lanczos
+  resized, given a 2 px transparent safety border, sanitized again after resizing and
+  after quantization, then compressed with `pngquant 256`. Peds: normal fuzz 12%, splits
+  620/1150; angry fuzz 18%, splits 596/1124; happy fuzz 18%, splits 657/1132; all at
+  15.5%. Cars: fuzz 12%, splits 655/1435 for every mood, all at 39.4%. The stronger ped
+  reaction key was required because those generated backgrounds were near-magenta
+  (`~#e604cf`) rather than exact key color; it removed visible pink flecks while
+  preserving the aubergine/plum garments.
+- **Shipped dimensions:** peds normal 77×112 / 75×119 / 72×112; angry 83×122 /
+  79×122 / 85×124; happy 74×121 / 68×119 / 75×128. Cars normal 248×133 /
+  304×95 / 199×133; angry 248×133 / 304×102 / 199×134; happy 248×133 /
+  304×95 / 199×133.
+- **QA:** every shipped sprite has zero-alpha TL/TR/BL/BR corners and zero nonzero-alpha
+  pixels within ±10% per RGB channel of `#ff00ff`. Per-sprite slate composites are
+  `assets/masters/{ped-7..9,car-3..5}{,-r,-rainbow}-qa.png`. Live Phaser captures
+  `victim-expansion-peds-live-qa.png` and `victim-expansion-cars-live-qa.png` show all
+  18 textures at runtime scale under deliberately different shader hues; broad garments
+  and paint recolor while skin, hair, props, drivers, windows, tires, chrome, luggage,
+  and tow gear stay readable. Both captures completed with zero browser-console errors.
+- **Runtime color contract:** sampled source medians drive ten packed source slots in
+  `VictimPalettePipeline`: goth aubergine `(0.345,0.125,0.282)`, crypto mint
+  `(0.565,0.847,0.627)`, professor plum `(0.565,0.220,0.314)`, wagon olive
+  `(0.408,0.408,0.157)`, limo purple `(0.439,0.220,0.471)`, tow orange
+  `(0.690,0.282,0.031)`. The same packed tint and shader remain attached when mood
+  textures swap.
+
+### Exact accepted pedestrian prompts
+
+Normal design prompt (the rendered image was re-exported pixel-identically after its
+first local save was empty):
+
+> REFERENCES AND ROLE — Inspect both supplied images before editing. pedestrians-sheet-3.png is the current three-panel draft. KEEP PANEL 3's arrogant elderly art professor as the strict identity reference: preserve his exact face, wispy silver hair, round glasses, body proportions, black turtleneck and pinstriped trousers, dusty-plum overcoat, loafers, rolled blank posters, left-facing walk pose, scale, rendering, and foot baseline. REPLACE PANEL 1 and PANEL 2 completely; do not retain the courier or nurse. pedestrians-sheet-2.png is the established Pigeon Drop pedestrian-family STYLE/SCALE/GEOMETRY reference only: thick clean dark outlines, painterly cel shading, warm light, chunky adult caricatures, left-facing walk, shared baseline, and broad recolorable garment fields. Do not include or copy any of its people.
+>
+> PRIMARY REVISION — Create a THIRD PEDESTRIAN WALK CHARACTER SHEET with exactly THREE deliberately SATIRICAL, NAIVE, IRRITATING ADULT CARICATURES whom the audience enjoys seeing comically humbled, fixed left-to-right:
+>
+> 1) LEFT, PERFORMATIVE BABY-GOTH DOOMSCROLLER: a young adult woman who is theatrically gloomy about every tiny inconvenience and clearly trying much too hard to look mysterious. Pale makeup, huge sulky eye makeup, blunt black bob with one absurdly long side fringe, tiny bat hair clip, heavy platform boots, cheap spiked choker, coffin-shaped phone case with no text/logo, and an exaggerated bored eye-roll while doomscrolling as she walks. Her pose says 'existence is beneath me.' Her broad recolorable garment is a SOLID DEEP AUBERGINE oversized belted trench-dress/coat, with coherent lighter/darker purple cel shading. Keep her comic and poser-like, not threatening, tragic, or realistic.
+>
+> 2) MIDDLE, DELUSIONAL CRYPTO-HUSTLE PROPHET: an irritating smug young adult man with aggressively whitened grin, over-gelled hair, fake designer sunglasses pushed onto his head, wireless sales headset, two smartphones, too-short ankle trousers, sockless loafers, chunky fake-gold watch, and a comically inflated confident stride while pitching to nobody. He points upward with one finger as though promising everyone instant riches. His broad recolorable garment is a SOLID ACID-MINT PUFFER VEST over a dark neutral shirt plus matching mint slim trousers, using coherent mint highlights/shadows. He must read as naive, self-important, and exhausting—not as a normal office worker.
+>
+> 3) RIGHT, ARROGANT ART PROFESSOR: preserve the exact existing panel-3 man and pose from pedestrians-sheet-3.png. He is a fussy, self-important elderly art professor with round glasses, rolled blank art posters, black turtleneck, pinstripe trousers, scuffed loafers, and a broad SOLID DUSTY-PLUM overcoat as his recolorable material. His expression judges everyone else.
+>
+> COMPOSITION — One wide 1774x887-like landscape sheet, conceptually three equal side-by-side panels with no visible dividers. One full-body ADULT human per panel, all strict side view FACING LEFT, mid-walk, matching established roughly 3.5-head-tall apparent scale and exactly one shared foot/ground baseline. Keep every silhouette/prop entirely inside its panel with generous clean gaps and edge clearance.
+>
+> STYLE AND TONE — Polished 2D cartoon game art matching the references: thick clean near-black/dark-brown contours; painterly cel shading; warm upper-left highlights; cool lower-right shadows; slightly desaturated hand-painted city palette; crisp readable silhouettes after downscaling; gleefully mean absurdist satire. These are exaggerated fictional vanity archetypes, not sympathetic realistic professions.
+>
+> SHADER CONTRACT — Keep one broad contiguous saturated source-color region per character exactly as named: goth deep-aubergine coat, crypto bro acid-mint vest and trousers, professor dusty-plum coat. Use lighter/darker cel-shaded versions of that source hue, not multicolor patterns. Keep skin, hair, makeup, phone, choker, boots, headset, watch, shirts, glasses, posters, turtleneck, trousers, shoes, and outlines chromatically distinct so a hue-distance shader recolors the main garment only. Do not use legitimate magenta inside subjects.
+>
+> INVARIANTS/EXCLUSIONS — Exactly three adult caricatures in specified order. No courier, delivery backpack, nurse, scrubs, clipboard, coffee cup, existing reference people, children, animals, bicycles, cars, pigeons, droppings, goo, stains, rainbow effects, readable text, brands, logos, scenery, pavement, ground plane, cast/contact shadows, labels, borders, dividers, extra people, watermark, or signature.
+>
+> BACKGROUND/CUTOUT — Entire background perfectly uniform flat solid pure #ff00ff, with no gradient, texture, glow, floor, shadow, vignette, or non-magenta corners. Nothing touches image edges.
+>
+> OUTPUT — One revised high-resolution reusable master intended to REPLACE /home/aadod/_PROJECTS/pigeon_drop/assets/masters/pedestrians-sheet-3.png, later keyed/split as ped-7 (goth), ped-8 (crypto), ped-9 (professor).
+
+Exact re-export prompt: `Re-export the immediately preceding accepted three-panel
+pedestrian sheet EXACTLY AS SHOWN, without any visual changes. Preserve every
+pixel-level design decision: left performative baby-goth doomscroller in deep
+aubergine coat with coffin phone; middle smug crypto-hustle prophet in acid-mint
+puffer vest and trousers with two phones/headset; right arrogant art professor in
+dusty-plum overcoat with rolled blank posters. Preserve exact poses, scale, shared
+foot baseline, left-facing orientation, spacing, palette, outlines, painterly cel
+shading, and perfectly flat pure #ff00ff background. Do not add, remove, redesign,
+crop, shift, recolor, or relight anything. This is only a clean PNG re-export because
+the prior local save was zero bytes. Intended output path:
+/home/aadod/_PROJECTS/pigeon_drop/assets/masters/pedestrians-sheet-3.png.`
+
+Angry prompt:
+
+> REFERENCES AND ROLE — Inspect both images. pedestrians-sheet-3.png is the IMMUTABLE accepted normal identity sheet: preserve exactly the baby-goth doomscroller, crypto-hustle prophet, and arrogant art professor, their order, faces, hair, proportions, wardrobe construction, props, colors, style, scale, and common foot baseline. pedestrians-react-sheet-3.png is REACTION ENERGY and panel-3 professor continuity only: keep the professor's angry identity/gesture concept, but DO NOT include its rejected courier or nurse.
+>
+> SUBJECT — Generate the ANGRY/OUTRAGED POST-SPLAT sheet of these SAME THREE deliberately naive and irritating caricatures. They were hit from above by pigeon droppings, but DO NOT paint droppings, goo, stain, splash, pigeon, text, or effects. The comic pleasure comes from their vanity collapsing.
+>
+> COMPOSITION — Wide three-panel sheet, same order, one full-body adult per panel, generally FACING LEFT, same apparent scale and shared foot baseline as normal. Dynamic gestures stay inside each panel and clear of every edge.
+>
+> LEFT SAME BABY-GOTH DOOMSCROLLER — her studied bored persona shatters into an enormous undignified shriek; heavy fringe flies aside, eyes wide, one platform boot stamping. She raises the coffin phone over her head as a useless shield while clutching the collar of her deep-aubergine trench-dress in outrage. Bat clip, choker, makeup, boots, phone, and coat identity unchanged. Funny poser panic, not genuine harm.
+>
+> MIDDLE SAME CRYPTO-HUSTLE PROPHET — manic confidence collapses into furious disbelief; headset crooked, sunglasses slipping, both smartphones waved accusingly at the sky while he yells as if the universe violated his pitch deck. Acid-mint puffer vest and matching trousers stay clearly visible and unchanged; gold watch, hair, grin geometry, shoes, shirt, phones preserved.
+>
+> RIGHT SAME ARROGANT ART PROFESSOR — offended theatrical rage, round glasses askew, one rolled blank poster raised like a conductor baton while other blank rolls remain under his arm; one loafer stamps and he yells upward. Dusty-plum overcoat and identity exact.
+>
+> STYLE/SHADER CONTRACT — Exact polished cartoon style, thick clean dark outlines, painterly cel shading, warm light, gleefully mean absurdist tone. Preserve exact broad source garment hues across this state: deep-aubergine goth coat, acid-mint crypto vest/trousers, dusty-plum professor coat. Keep skin, hair, makeup, phones, accessories, black clothing, posters, shoes, and outlines chromatically distinct for hue-distance recoloring. No legitimate magenta inside subjects.
+>
+> INVARIANTS — Exact same three adults, not redesigns; exactly three. No courier, nurse, extra people, children, animals, vehicles, pigeons, goo, stains, visible rainbow, effects, readable text, logos, scenery, ground, shadows, dividers, labels, watermark.
+>
+> BACKGROUND — Perfect uniform flat pure #ff00ff, no gradient, texture, floor, glow, cast/contact shadow, or non-magenta corners. Nothing touches edges.
+>
+> OUTPUT — Replaces /home/aadod/_PROJECTS/pigeon_drop/assets/masters/pedestrians-react-sheet-3.png; later ship ped-7-r, ped-8-r, ped-9-r.
+
+Happy prompt:
+
+> REFERENCES AND ROLE — Inspect both images. pedestrians-sheet-3.png is the IMMUTABLE accepted normal identity sheet: preserve exactly the baby-goth doomscroller, crypto-hustle prophet, and arrogant art professor, their order, faces, hair, proportions, wardrobe construction, props, colors, style, scale, and common foot baseline. pedestrians-rainbow-sheet-3.png is JOYFUL REACTION ENERGY and panel-3 professor continuity only; DO NOT include its rejected courier or nurse.
+>
+> SUBJECT — Generate the HAPPY/DELIGHTED MAGICAL RAINBOW-HIT sheet of these SAME THREE deliberately naive and irritating caricatures. Runtime rainbow pigeon goo unexpectedly delights them, but DO NOT paint goo, stain, rainbow, sparkles, hearts, pigeon, text, or effects. Show joy only through pose/expression, with satirical character-specific punchlines.
+>
+> COMPOSITION — Wide three-panel sheet, same order, one full-body adult per panel, generally FACING LEFT, same apparent scale and shared foot baseline as normal. Energetic gestures stay inside each panel and clear of edges.
+>
+> LEFT SAME BABY-GOTH DOOMSCROLLER — her performative misery accidentally breaks: caught in an exuberant one-knee happy dance with a huge embarrassed genuine grin, coffin phone held high for a celebratory selfie, free hand making an enthusiastic little devil-horns gesture. Deep-aubergine trench-dress, bat clip, choker, makeup, boots, hair, phone unchanged. The joke is that she loves it despite the pose.
+>
+> MIDDLE SAME CRYPTO-HUSTLE PROPHET — mistakes the magical moment for proof of his own genius and a viral business opportunity; manic delighted grin, one-knee victory hop, both smartphones held up for a double livestream/selfie while headset stays on and one finger points triumphantly skyward if anatomically possible. Acid-mint puffer vest and trousers, gold watch, hair, sunglasses, shoes, phones unchanged.
+>
+> RIGHT SAME ARROGANT ART PROFESSOR — ecstatic because he declares the invisible spectacle a masterpiece; beaming behind round glasses, conducting an imaginary orchestra with one rolled blank poster while the others stay tucked under his arm, one dainty foot lifted. Dusty-plum overcoat and identity exact.
+>
+> STYLE/SHADER CONTRACT — Exact polished cartoon style, thick clean dark outlines, painterly cel shading, warm light, gleefully mean absurdist tone. Preserve exact broad source garment hues across this state: deep-aubergine goth coat, acid-mint crypto vest/trousers, dusty-plum professor coat. Keep skin, hair, makeup, phones, accessories, black clothing, posters, shoes, outlines distinct for hue-distance recoloring. No legitimate magenta inside subjects.
+>
+> INVARIANTS — Exact same three adults, not redesigns; exactly three. No courier, nurse, extra people, children, animals, vehicles, pigeons, goo, stains, visible rainbows/sparkles/effects, readable text, logos, scenery, ground, shadows, dividers, labels, watermark.
+>
+> BACKGROUND — Perfect uniform flat pure #ff00ff, no gradient, texture, floor, glow, cast/contact shadow, or non-magenta corners. Nothing touches edges.
+>
+> OUTPUT — Replaces /home/aadod/_PROJECTS/pigeon_drop/assets/masters/pedestrians-rainbow-sheet-3.png; later ship ped-7-rainbow, ped-8-rainbow, ped-9-rainbow.
+
+### Exact accepted car prompts
+
+Normal prompt:
+
+> REFERENCES AND ROLE — Inspect cars-sheet.png before generating. It is the exact established Pigeon Drop vehicle-family reference for polished 2D cartoon rendering, thick clean near-black/dark-brown outlines, painterly cel shading, warm upper-left light, chunky slightly squashed worn city vehicles, strict LEFT-facing flat side view, visible adult human drivers, three-panel separation, common wheel/ground baseline, and broad solid recolorable paint regions. Its rusty sedan, yellow taxi, pale-blue van, and drivers are STYLE/SCALE/GEOMETRY ONLY: do not copy, remix, recolor, or include them.
+>
+> SUBJECT AND STATE — Generate a SECOND NORMAL CAR SPRITE SHEET containing exactly THREE completely new LEFT-facing city vehicles, fixed left-to-right:
+> 1) LEFT, RETRO STATION WAGON: a dented 1970s family station wagon with a chunky long roof, slightly sagging suspension, roof rack carrying two securely strapped plain suitcases, modest chrome bumpers, and one broad SOLID FADED OLIVE-GREEN painted body as the recolorable material. A tired adult human road-tripper driver in a knit cap is visible through the front side window, hands on wheel, neutral mildly grumpy expression.
+> 2) MIDDLE, OLD STRETCH LIMOUSINE: a comically long but panel-contained vintage limousine with squared 1980s body, small opera window, restrained chrome trim, slightly shabby tires, and one broad SOLID DUSTY PURPLE painted body as the recolorable material. An adult human chauffeur in a plain dark peaked cap is visible through the front side window, upright and snooty with neutral expression. No logo or flags.
+> 3) RIGHT, MUNICIPAL TOW TRUCK: a compact battered tow truck with short cab, rear tow boom and hook fully contained within its panel, chunky utility tires, modest grey steel equipment, and one broad SOLID BURNT-ORANGE painted cab/fenders/body as the recolorable material. A burly adult human mechanic driver with dark moustache and plain work cap is visible through the front side window, hands on wheel, neutral grumpy expression.
+>
+> COMPOSITION — One wide landscape master, conceptually three equal side-by-side panels with no visible dividers. One complete vehicle per panel, all in strict flat side view FACING LEFT, front/headlamp at left, comparable apparent scale and SAME shared wheel-contact baseline as the reference. Keep roof luggage, limousine ends, tow boom/hook, bumpers, wheels, and all outlines entirely inside each panel with generous pure-background gaps. Nothing touches image edges or another vehicle.
+>
+> PALETTE AND RENDERING — Match the reference closely: thick clean dark contours; painterly cel shading; warm slightly desaturated city palette; warm upper-left highlights; cooler lower-right shadow planes; subtle dents, scuffs, and hand-painted wear; crisp readable silhouettes after downscaling; comic absurdist character. SHADER CONTRACT: preserve one broad contiguous saturated paint field per vehicle exactly as named—faded olive green, dusty purple, burnt orange—with coherent lighter/darker/rust-shadow variants of the same hue. Keep window glass neutral blue-grey and visibly glazed, human skin/clothes, black tires, chrome, bumpers, lights, luggage, tow equipment, outlines, and interiors chromatically distinct so a hue-distance shader recolors paint only. Do not tint window glass magenta. Never use legitimate magenta inside any vehicle.
+>
+> INVARIANTS — Exactly three new complete vehicles and exactly one visible adult human driver in each; specified order; all face left. No pigeons, animals, pedestrians outside cars, children, droppings, goo, stains, rainbow effects, readable text, signs, logos, brands, scenery, road, pavement, ground plane, cast/contact shadows, labels, borders, dividers, watermark, or extra vehicle.
+>
+> BACKGROUND/CUTOUT — Entire background must be perfectly uniform flat solid pure #ff00ff, with no gradient, texture, glow, reflection, floor, shadow, vignette, or non-magenta corners. Window openings must contain neutral dark/blue-grey glass and interior, not background magenta. Strong clean edge clearance.
+>
+> OUTPUT — One high-resolution reusable three-panel PNG master intended for /home/aadod/_PROJECTS/pigeon_drop/assets/masters/cars-sheet-2.png, later chroma-keyed, split, anchor-normalized, and shipped as public/assets/sprites/car-3.png, car-4.png, and car-5.png.
+
+Angry prompt:
+
+> REFERENCES AND ROLE — Inspect both supplied images. cars-sheet-2.png is the IMMUTABLE VEHICLE AND DRIVER IDENTITY reference: preserve its exact three new vehicles, order, dimensions, body geometry, paint colors, dents, luggage, glass, wheels, bumpers, tow equipment, drivers, rendering, common wheel baseline, and panel placement. cars-react-sheet.png is ANGRY DRIVER POSE ENERGY AND FAMILY STYLE ONLY; do not copy or include its old sedan, taxi, van, drivers, colors, or details.
+>
+> SUBJECT AND STATE — Generate a POST-SPLAT ANGRY/OUTRAGED REACTION SHEET for the SAME THREE vehicles and SAME THREE adult human drivers from cars-sheet-2.png. The VEHICLES THEMSELVES MUST REMAIN VISUALLY IDENTICAL to the normal identity sheet, pixel-composition close: same body silhouettes, scale, side-view position, wheel positions, windows, paint regions, luggage, limo length, tow boom and hook, dents, scuffs, baseline, and colors. ONLY the visible driver's pose and facial expression may change.
+>
+> COMPOSITION — One wide landscape master with the exact same three panel positions/order as cars-sheet-2.png, no dividers. All vehicles strict side view FACING LEFT, same scale and shared wheel-contact baseline. Every gesture stays safely inside its panel and away from edges.
+>
+> PANEL 1 LEFT — SAME tired station-wagon road-tripper: now leans partly out of the open front window, furious, shaking one clenched fist upward while the other hand remains inside near the wheel. Same knit cap and face. Roof rack and both strapped suitcases absolutely unchanged.
+> PANEL 2 MIDDLE — SAME limousine chauffeur: now leans from the front window, outraged and indignant, one white-gloved hand extended in a sharp accusing gesture upward/forward while yelling. Same cap and face. Entire old stretch limousine absolutely unchanged.
+> PANEL 3 RIGHT — SAME moustached tow-truck mechanic: now leans from the front window, furious, one broad fist raised and yelling upward. Same work cap, moustache, and face. Tow boom, cable, hook, beacon, steel bed equipment, and truck absolutely unchanged.
+>
+> PALETTE/SHADER CONTRACT — Preserve exact source paint materials across this state: faded olive-green wagon, dusty-purple limousine, burnt-orange tow truck, including all coherent highlights/shadows/wear. Keep neutral blue-grey window glass, skin, uniforms, luggage, tires, chrome, equipment, outlines, and interiors chromatically distinct. Do not tint glass magenta. No legitimate magenta inside vehicles.
+>
+> INVARIANTS — Exactly these three vehicles and one SAME adult human driver each. No redesigned vehicles, shifted wheels, changed scale, altered luggage/tow gear, extra occupants, pedestrians, children, animals, pigeons, goo, stains, rainbow, effects, readable text, logos, scenery, road, ground, shadows, labels, borders, dividers, or watermark.
+>
+> BACKGROUND — Entire background perfectly uniform flat solid pure #ff00ff, no gradients, texture, glow, reflection, floor, cast/contact shadow, or non-magenta corners. Glazed windows remain neutral glass/interior, never background magenta. Nothing touches frame edges.
+>
+> OUTPUT — High-resolution reusable master intended for /home/aadod/_PROJECTS/pigeon_drop/assets/masters/cars-react-sheet-2.png, later keyed and shipped as car-3-r.png, car-4-r.png, car-5-r.png.
+
+Happy prompt:
+
+> REFERENCES AND ROLE — Inspect both supplied images. cars-sheet-2.png is the IMMUTABLE VEHICLE AND DRIVER IDENTITY reference: preserve its exact three new vehicles, order, dimensions, body geometry, paint colors, dents, luggage, glass, wheels, bumpers, tow equipment, drivers, rendering, common wheel baseline, and panel placement. car-state-reference.png demonstrates that the existing game's happy state changes ONLY driver expression/gesture while vehicle geometry remains the same; it is style/pose-energy only. Do not copy or include any old sedan, taxi, van, old driver, or slate background from that reference.
+>
+> SUBJECT AND STATE — Generate a HAPPY/DELIGHTED MAGICAL RAINBOW-HIT REACTION SHEET for the SAME THREE vehicles and SAME THREE adult human drivers from cars-sheet-2.png. Runtime has hit them with magical rainbow pigeon goo, but DO NOT paint goo, stains, rainbows, sparkles, effects, or pigeon. Show delight only through each driver's expression and gesture. The VEHICLES THEMSELVES MUST REMAIN VISUALLY IDENTICAL to the normal identity sheet: same body silhouettes, scale, side-view position, wheel positions, windows, paint regions, luggage, limo length, tow boom/hook, dents, scuffs, baseline, and colors. ONLY visible driver pose/expression may change.
+>
+> COMPOSITION — One wide landscape master with exact same three panel positions/order as cars-sheet-2.png, no dividers. All vehicles strict side view FACING LEFT, same scale and shared wheel-contact baseline. Gestures stay inside panel and clear of edges.
+>
+> PANEL 1 LEFT — SAME station-wagon road-tripper: leans partly out the front window with a huge relieved joyful grin and gives an enthusiastic thumbs-up. Same knit cap and face; other hand remains near wheel. Roof rack and two strapped suitcases unchanged.
+> PANEL 2 MIDDLE — SAME limousine chauffeur: professional reserve breaks into delighted laughter; leans slightly from front window and gives a gracious white-gloved wave/thumbs-up. Same cap and face. Entire limousine unchanged.
+> PANEL 3 RIGHT — SAME moustached tow-truck mechanic: beams and laughs, one broad arm from the front window giving a joyful thumbs-up while the other stays near wheel. Same work cap, moustache, face. Tow equipment unchanged.
+>
+> PALETTE/SHADER CONTRACT — Preserve exact source paint materials across this state: faded olive-green wagon, dusty-purple limousine, burnt-orange tow truck, with all highlights/shadows/wear. Keep glass, skin, uniforms, luggage, tires, chrome, equipment, outlines, and interiors distinct. Do not tint glass magenta. No legitimate magenta inside vehicles.
+>
+> INVARIANTS — Exactly these three vehicles and one SAME adult human driver each. No redesigned vehicles, shifted wheels, changed scale, altered luggage/tow gear, extra occupants, pedestrians, children, animals, pigeons, goo, stains, visible rainbow, effects, readable text, logos, scenery, road, ground, shadows, labels, borders, dividers, or watermark.
+>
+> BACKGROUND — Perfectly uniform flat solid pure #ff00ff, no gradients, texture, glow, reflection, floor, cast/contact shadow, or non-magenta corners. Glazed windows remain neutral glass/interior, never magenta background. Nothing touches frame edges.
+>
+> OUTPUT — High-resolution reusable master intended for /home/aadod/_PROJECTS/pigeon_drop/assets/masters/cars-rainbow-sheet-2.png, later keyed and shipped as car-3-rainbow.png, car-4-rainbow.png, car-5-rainbow.png.
