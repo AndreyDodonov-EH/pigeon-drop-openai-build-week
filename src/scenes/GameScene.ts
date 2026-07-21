@@ -24,11 +24,10 @@ import { DayNight, type DayLook } from '../world/DayNight';
 import { LampFx } from '../world/LampFx';
 import { MusicManager } from '../audio/MusicManager';
 import { SFX_VOLUME } from '../audio/mix';
-import { TouchControls, DiveRatchet, isTouchDevice } from '../input/TouchControls';
+import { TouchControls, DiveRatchet } from '../input/TouchControls';
 import { FirstRunWizard, shouldShowWizard } from '../ui/FirstRunWizard';
 import { PauseMenu } from '../ui/PauseMenu';
 import { rankForCombo, type ComboRank } from '../ui/ranks';
-import { t } from '../i18n';
 
 const SCROLL = 2.1; // world scroll, px/frame
 
@@ -705,19 +704,6 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(1, 0)
       .setDepth(10);
-
-    // touch devices get zone hint labels from TouchControls instead
-    if (!isTouchDevice()) {
-      this.add
-        .text(16, H - 26, `${t.kbClimb}     ${t.kbDive}     ${t.kbRip}`, {
-          fontFamily: 'monospace',
-          fontSize: '13px',
-          color: COLOR_CREAM,
-          resolution: RES,
-        })
-        .setDepth(10)
-        .setAlpha(0.75);
-    }
   }
 
   private createInput(): void {
